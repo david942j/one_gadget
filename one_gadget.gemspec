@@ -23,6 +23,8 @@ Gem::Specification.new do |s|
   s.required_ruby_version = '>= 2.1.0'
 
   s.add_development_dependency 'rspec', '~> 3.5'
+  s.add_development_dependency 'rubocop', '~> 0.46'
   s.add_development_dependency 'rake', '~> 12.0'
+  s.add_development_dependency 'simplecov', '~> 0.13.0'
   s.add_development_dependency 'codeclimate-test-reporter', '~> 1.0', '>= 1.0.5'
 end
