@@ -1,4 +1,4 @@
-require "rspec/core/rake_task"
+require 'rspec/core/rake_task'
 require 'rubocop/rake_task'
 
 task default: %i(rubocop spec)
@@ -9,8 +9,8 @@ RuboCop::RakeTask.new(:rubocop) do |task|
 end
 
 RSpec::Core::RakeTask.new(:spec) do |task|
-  task.pattern = "./spec/**/*_spec.rb"
+  task.pattern = './spec/**/*_spec.rb'
   task.rspec_opts = ['--color']
 end
 
-task :default => [:spec]
+task default: [:spec]

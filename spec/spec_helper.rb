@@ -1,2 +1,8 @@
+require 'codeclimate-test-reporter'
 require 'simplecov'
-SimpleCov.start
+SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new(
+  [SimpleCov::Formatter::HTMLFormatter, CodeClimate::TestReporter::Formatter]
+)
+SimpleCov.start do
+  add_filter '/spec/'
+end

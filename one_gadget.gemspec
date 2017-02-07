@@ -16,9 +16,10 @@ Gem::Specification.new do |s|
   s.license       = 'MIT'
   s.authors       = ['david942j']
   s.email         = ['david942j@gmail.com']
-  s.files         = Dir['lib/**/*.rb'] + %w(README.md)
+  s.files         = Dir['lib/**/*.rb'] + Dir['bin/*'] + %w(README.md)
   s.test_files    = Dir['spec/**/*']
   s.homepage      = 'https://github.com/david942j/one_gadget'
+  s.executables   = ['one_gadget']
 
   s.required_ruby_version = '>= 2.1.0'
 
@@ -26,5 +27,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rubocop', '~> 0.46'
   s.add_development_dependency 'rake', '~> 12.0'
   s.add_development_dependency 'simplecov', '~> 0.13.0'
-  s.add_development_dependency 'codeclimate-test-reporter', '~> 1.0', '>= 1.0.5'
+  s.add_development_dependency 'codeclimate-test-reporter', '~> 0.6'
 end

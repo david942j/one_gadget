@@ -1,0 +1,22 @@
+#!/usr/bun/env ruby
+require 'one_gadget'
+require 'optionparser'
+
+options = {}
+usage = 'Usage: one_gadget [file] [--build-id <BuildID>]'
+parser = OptionParser.new do |opts|
+  opts.banner = usage
+
+  opts.on('-b', '--build-id BuildID', 'BuildID[sha1] of libc') do |b|
+    options[:build_id] = b
+  end
+end
+parser.parse!
+
+if options[:build_id]
+  puts one_gadget(build_id: options[:build_id])
+elsif ARGV[0]
+  puts one_gadget(file: ARGV[0])
+else
+  puts parser.help
+end
