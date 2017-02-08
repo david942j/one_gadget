@@ -10,6 +10,15 @@ module OneGadget
         @constraints = value
       end
 
+      def inspect
+        str = format("offset: 0x%x\n", offset)
+        unless constraints.nil?
+          str += "constraints:\n  "
+          str += constraints.join("\n  ")
+        end
+        str + "\n"
+      end
+
       # Only check if +offset+ being set now.
       def self_check!
         raise ArgumentError, format('invalid offset: %p', offset) unless offset.is_a?(Integer) && offset >= 0

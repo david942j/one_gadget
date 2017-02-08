@@ -12,7 +12,7 @@ module OneGadget
       # @return [Array]
       def from_build_id(build_id, details: false)
         if (build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/).nil?
-          raise ArgumentError, format('invalid BuildID format: %s', build_id)
+          raise ArgumentError, format('invalid BuildID format: %p', build_id)
         end
         gadgets = OneGadget::Gadget.builds(build_id)
         return gadgets if details

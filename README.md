@@ -17,3 +17,22 @@ Also provides the command-line tool `one_gadget` for easy usage.
 
 I'll push to rubygems.org..
 
+## Usage
+
+### Command Line Tool
+
+```bash
+one_gadget
+# Usage: one_gadget [file] [--build-id <BuildID>]
+#    -b, --build-id BuildID           BuildID[sha1] of libc
+
+one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
+
+# offset: 0x4526a
+# constraints:
+#   [rsp+0x30]=NULL
+#
+# offset: 0xef6c4
+# constraints:
+#   [rsp+0x50]=NULL
+```

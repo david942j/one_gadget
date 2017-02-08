@@ -2,7 +2,7 @@ require 'one_gadget/helper'
 
 describe OneGadget::Helper do
   before(:all) do
-    @libcpath = File.join(Dir.pwd, 'spec', 'data', 'libc-2.23.so')
+    @libcpath = File.join(File.dirname(__FILE__), 'data', 'libc-2.23.so')
   end
   it 'abspath' do
     expect(OneGadget::Helper.abspath('./spec/data/libc-2.23.so')).to eq @libcpath

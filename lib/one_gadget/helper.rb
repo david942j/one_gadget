@@ -28,6 +28,10 @@ module OneGadget
         return nil if bid.nil?
         bid.first
       end
+
+      def color_off!
+        @disable_color = true
+      end
     end
     extend ClassMethods
   end

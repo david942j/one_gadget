@@ -6,3 +6,8 @@ OneGadget::Gadget.define(build_id) do |g|
   g.offset = 0x4526a
   g.constraints = ['[rsp+0x30]=NULL']
 end
+
+OneGadget::Gadget.define(build_id) do |g|
+  g.offset = 0xef6c4
+  g.constraints = ['[rsp+0x50]=NULL']
+end
