@@ -10,7 +10,7 @@ end
 
 RSpec::Core::RakeTask.new(:spec) do |task|
   task.pattern = './spec/**/*_spec.rb'
-  task.rspec_opts = ['--color', '--require spec_helper']
+  task.rspec_opts = ['--color', '--require spec_helper', '--order rand']
 end
 
 task default: [:spec]

@@ -1,3 +1,5 @@
+require 'one_gadget/abi'
+
 module OneGadget
   # Module for define gadgets.
   module Gadget
@@ -11,11 +13,13 @@ module OneGadget
       end
 
       def inspect
-        str = format("offset: 0x%x\n", offset)
+        str = format("#{OneGadget::Helper.colorize('offset', sev: :sym)}: 0x%x\n", offset)
         unless constraints.nil?
-          str += "constraints:\n  "
+          str += "#{OneGadget::Helper.colorize('constraints')}:\n  "
           str += constraints.join("\n  ")
         end
+        str.gsub!(/0x[\da-f]+/) { |s| OneGadget::Helper.colorize(s, sev: :integer) }
+        OneGadget::ABI.registers.each { |reg| str.gsub!(reg, OneGadget::Helper.colorize(reg, sev: :reg)) }
         str + "\n"
       end
 

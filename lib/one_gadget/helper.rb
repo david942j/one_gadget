@@ -32,6 +32,31 @@ module OneGadget
       def color_off!
         @disable_color = true
       end
+
+      def color_on!
+        @disable_color = false
+      end
+
+      # Color codes for pretty print
+      COLOR_CODE = {
+        esc_m: "\e[0m",
+        normal_s: "\e[38;5;1m", # red
+        integer: "\e[38;5;12m", # light blue
+        fatal: "\e[38;5;197m", # dark red
+        reg: "\e[38;5;120m", # light green
+        sym: "\e[38;5;229m", # pry like
+      }.freeze
+
+      # Wrapper color codes for for pretty inspect.
+      # @param [String] str Contents to colorize.
+      # @option [Symbol] sev Specific which kind of color want to use, valid symbols are defined in +COLOR_CODE+.
+      # @return [String] Wrapper with color codes.
+      def colorize(str, sev: :normal_s)
+        return str if @disable_color
+        cc = COLOR_CODE
+        color = cc.key?(sev) ? cc[sev] : ''
+        "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"
+      end
     end
     extend ClassMethods
   end

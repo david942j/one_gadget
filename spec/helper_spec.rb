@@ -2,6 +2,7 @@ require 'one_gadget/helper'
 
 describe OneGadget::Helper do
   before(:all) do
+    OneGadget::Helper.color_on!
     @libcpath = File.join(File.dirname(__FILE__), 'data', 'libc-2.23.so')
   end
   it 'abspath' do
@@ -10,5 +11,9 @@ describe OneGadget::Helper do
 
   it 'build_id_of' do
     expect(OneGadget::Helper.build_id_of(@libcpath)).to eq '60131540dadc6796cab33388349e6e4e68692053'
+  end
+
+  it 'colorize' do
+    expect(OneGadget::Helper.colorize('123', sev: :integer)).to eq "\e[38;5;12m123\e[0m"
   end
 end
