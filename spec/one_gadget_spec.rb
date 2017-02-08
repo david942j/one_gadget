@@ -3,7 +3,7 @@ require 'one_gadget'
 describe 'one_gadget' do
   before(:all) do
     @build_id = '60131540dadc6796cab33388349e6e4e68692053'
-    @libcpath = File.join(Dir.pwd, 'spec', 'data', 'libc-2.19.so')
+    @libcpath = File.join(File.dirname(__FILE__), 'data', 'libc-2.19.so')
   end
 
   it 'from file' do

@@ -23,8 +23,8 @@ module OneGadget
       #   build_id_of('/lib/x86_64-linux-gnu/libc-2.23.so')
       #   #=> '60131540dadc6796cab33388349e6e4e68692053'
       def build_id_of(path)
-        cmd = 'file ' + Shellwords.escape(path)
-        bid = `#{cmd}`.scan(/BuildID\[sha1\]=(#{BUILD_ID_FORMAT}),/).first
+        cmd = 'readelf -n ' + Shellwords.escape(path)
+        bid = `#{cmd}`.scan(/Build ID: (#{BUILD_ID_FORMAT})$/).first
         return nil if bid.nil?
         bid.first
       end
