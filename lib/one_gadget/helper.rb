@@ -3,6 +3,7 @@ require 'pathname'
 module OneGadget
   # Define some helpful methods here.
   module Helper
+    BUILD_ID_FORMAT = /[0-9a-f]{40}/
     # Define class methods here.
     module ClassMethods
       # Get absolute path from relative path. Support symlink.
@@ -23,7 +24,7 @@ module OneGadget
       #   #=> '60131540dadc6796cab33388349e6e4e68692053'
       def build_id_of(path)
         cmd = 'file ' + Shellwords.escape(path)
-        bid = `#{cmd}`.scan(/BuildID\[sha1\]=([0-9a-f]+),/).first
+        bid = `#{cmd}`.scan(/BuildID\[sha1\]=(#{BUILD_ID_FORMAT}),/).first
         return nil if bid.nil?
         bid.first
       end

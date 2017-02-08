@@ -25,3 +25,6 @@ module OneGadget
     end
   end
 end
+
+require 'one_gadget/fetcher'
+require 'one_gadget/helper'
