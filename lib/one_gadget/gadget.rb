@@ -24,7 +24,7 @@ module OneGadget
       # Show gadget in a pretty way.
       def inspect
         str = format("#{OneGadget::Helper.colorize('offset', sev: :sym)}: 0x%x\n", offset)
-        unless constraints.nil?
+        unless constraints.empty?
           str += "#{OneGadget::Helper.colorize('constraints')}:\n  "
           str += constraints.join("\n  ")
         end

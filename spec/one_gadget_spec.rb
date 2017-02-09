@@ -9,7 +9,7 @@ describe 'one_gadget' do
   end
 
   it 'from file' do
-    expect(OneGadget.gadgets(filepath: @libcpath)).to eq []
+    expect(OneGadget.gadgets(file: @libcpath)).to eq [0x4647c, 0xe5765, 0xe66bd]
   end
 
   describe 'from build id' do

@@ -13,6 +13,8 @@ This gem provides such gadget finder, no need to use IDA-pro every time like a f
 
 Also provides the command-line tool `one_gadget` for easy usage.
 
+Note: only supports x86-64 now.
+
 ## Install
 
 I'll push to rubygems.org..
@@ -27,12 +29,31 @@ one_gadget
 #    -b, --build-id BuildID           BuildID[sha1] of libc
 
 one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
-
 # offset: 0x4526a
 # constraints:
-#   [rsp+0x30]=NULL
+#   [rsp+0x30] == NULL
 #
 # offset: 0xef6c4
 # constraints:
-#   [rsp+0x50]=NULL
+#   [rsp+0x50] == NULL
+#
+# offset: 0xf0567
+# constraints:
+#   [rsp+0x70] == NULL
 ```
+
+### In exploit script
+```ruby
+require 'one_gadget'
+OneGadget.gadgets(filepath: '/lib/x86_64-linux-gnu/libc.so.6')
+# => [283242, 980676, 984423]
+```
+
+## Screenshots
+
+### Search gadgets from file
+![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file.png?raw=true)
+
+### Fetch gadgets from database
+![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
+
