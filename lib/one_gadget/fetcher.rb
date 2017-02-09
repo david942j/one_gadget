@@ -33,7 +33,7 @@ module OneGadget
       #   Otherwise, array of gadgets is returned.
       def from_file(file, details: false)
         bin_sh_hex = str_offset(file, '/bin/sh').to_s(16)
-        candidates = `objdump -d -M intel #{file}|grep -E '<execve[^+]+>$' -B 10`.split('--').select do |candidate|
+        candidates = `objdump -d -M intel #{file}|egrep '<execve[^+]*>$' -B 10`.split('--').select do |candidate|
           next false unless candidate.include?(bin_sh_hex)
           next false unless candidate.lines.last.include?('call') # last line must be +call execve+
           true
