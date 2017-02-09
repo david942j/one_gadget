@@ -3,12 +3,16 @@
 # @author david942j
 module OneGadget
   class << self
-    # The man entry of gem +one_gadget+
-    # @option [String] file
+    # The man entry of gem +one_gadget+.
+    # If want to find gadgets from file, it will search gadgets by its
+    # build id first.
+    #
+    # @param [String] filepath
     #   The relative path of +libc.so.6+.
-    # @option [String] build_id
+    # @param [String] build_id
     #   The BuildID of target +libc.so.6+.
-    # @return [Array]
+    # @return [Array<OneGadget::Gadget::Gadget>, Array<Integer>]
+    #   The gadgets found.
     # @example
     #   OneGadget.gadgets(filepath: './libc.so.6')
     #   OneGadget.gadgets(build_id: '60131540dadc6796cab33388349e6e4e68692053')

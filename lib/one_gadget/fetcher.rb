@@ -6,10 +6,14 @@ module OneGadget
   module Fetcher
     # Define class methods here.
     module ClassMethods
+      # Fetch one-gadget offsets of this build id.
       # @param [String] build_id The targets' BuildID.
-      # @option [Boolean] details
+      # @param [Boolean] details
       #   If needs to return the gadgets' constraints.
-      # @return [Array]
+      # @return [Array<Integer>, Array<OneGadget::Gadget::Gadget>]
+      #   If +details+ is +false+, +Array<Integer>+ is returned, which
+      #   contains offset only.
+      #   Otherwise, array of gadgets is returned.
       def from_build_id(build_id, details: false)
         if (build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/).nil?
           raise ArgumentError, format('invalid BuildID format: %p', build_id)

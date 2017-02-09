@@ -13,3 +13,6 @@ Rails:
 Metrics/LineLength:
   Enabled: true
   Max: 120
+
+Style/FileName:
+  Enabled: false

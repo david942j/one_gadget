@@ -29,10 +29,12 @@ module OneGadget
         bid.first
       end
 
+      # Disable colorize
       def color_off!
         @disable_color = true
       end
 
+      # Enable colorize
       def color_on!
         @disable_color = false
       end
@@ -47,7 +49,7 @@ module OneGadget
         sym: "\e[38;5;229m", # pry like
       }.freeze
 
-      # Wrapper color codes for for pretty inspect.
+      # Wrapper color codes for pretty inspect.
       # @param [String] str Contents to colorize.
       # @option [Symbol] sev Specific which kind of color want to use, valid symbols are defined in +COLOR_CODE+.
       # @return [String] Wrapper with color codes.
