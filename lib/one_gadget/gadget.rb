@@ -44,6 +44,10 @@ module OneGadget
       def builds(build_id)
         require_all if BUILDS.empty?
         return BUILDS[build_id] if BUILDS.key?(build_id)
+        # fetch remote builds
+        # table = OneGadget::Helper.remote_builds.find { |c| c.include?(build_id) }
+        # return [] if table.nil? # remote doesn't have this one.
+        # builds found in remote! Ask update gem and download remote gadgets.
         # TODO: fetch remote builds information.
         []
       end

@@ -9,14 +9,14 @@ Gem::Specification.new do |s|
   s.date          = Date.today.to_s
   s.summary       = 'one_gadget'
   s.description   = <<-EOS
-  When playing ctf pwn challenges we usually needs the one-gadget of execve('/bin/sh', NULL, NULL).
+  When playing ctf pwn challenges we usually needs the one-gadget of `execve('/bin/sh', NULL, NULL)`.
   This gem provides such gadget finder, no need to use IDA-pro every time like a fool.
   Also provides the command-line tool `one_gadget` for easy usage.
   EOS
   s.license       = 'MIT'
   s.authors       = ['david942j']
   s.email         = ['david942j@gmail.com']
-  s.files         = Dir['lib/**/*.rb'] + Dir['bin/*'] + %w(README.md)
+  s.files         = Dir['lib/**/*.rb'] + Dir['bin/*'] + %w(README.md build-ids)
   s.test_files    = Dir['spec/**/*']
   s.homepage      = 'https://github.com/david942j/one_gadget'
   s.executables   = ['one_gadget']

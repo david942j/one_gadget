@@ -29,6 +29,7 @@ one_gadget
 #     -b, --build-id BuildID           BuildID[sha1] of libc
 #     -r, --[no-]raw                   Output gadgets offset only, split with one space
 #     -s, --script exploit-script      Run exploit script with all possible gadgets
+#                                      The script will be run as 'exploit-script $offset'.
 
 one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 # offset: 0x4526a
@@ -45,7 +46,7 @@ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 ```
 
 #### Combine with exploit script
-Pass your exploit script as +one_gadget+'s arguments, it can
+Pass your exploit script as `one_gadget`'s arguments, it can
 try all gadgets one by one, so you don't need to try every possible gadgets manually.
 
 ```bash
