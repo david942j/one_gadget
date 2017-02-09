@@ -16,7 +16,7 @@ parser.parse!
 if options[:build_id]
   puts OneGadget.gadgets(build_id: options[:build_id], details: true).map(&:inspect).join("\n")
 elsif ARGV[0]
-  puts OneGadget.gadgets(filepath: ARGV[0], details: true).map(&:inspect).join("\n")
+  puts OneGadget.gadgets(file: ARGV[0], details: true).map(&:inspect).join("\n")
 else
   puts parser.help
 end
