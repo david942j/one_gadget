@@ -2,21 +2,53 @@
 require 'one_gadget'
 require 'optionparser'
 
-options = {}
-usage = 'Usage: one_gadget [file] [--build-id <BuildID>]'
+options = { raw: false }
+usage = 'Usage: one_gadget [file] [options]'
 parser = OptionParser.new do |opts|
   opts.banner = usage
 
   opts.on('-b', '--build-id BuildID', 'BuildID[sha1] of libc') do |b|
     options[:build_id] = b
   end
+
+  opts.on('-r', '--[no-]raw', 'Output gadgets offset only, split with one space') do |v|
+    options[:raw] = v
+  end
+
+  opts.on('-s', '--script exploit-script', 'Run exploit script with all possible gadgets.',
+          'The script will be run as \'exploit-script $offset\'.') do |script|
+    options[:script] = script
+  end
 end
 parser.parse!
 
+def execute(script, offset)
+  pid = fork do
+    exec([script, offset.to_s].join(' '))
+  end
+  Process.wait pid
+end
+
 if options[:build_id]
-  puts OneGadget.gadgets(build_id: options[:build_id], details: true).map(&:inspect).join("\n")
+  gadgets = OneGadget.gadgets(build_id: options[:build_id], details: true)
 elsif ARGV[0]
-  puts OneGadget.gadgets(file: ARGV[0], details: true).map(&:inspect).join("\n")
+  gadgets = OneGadget.gadgets(file: ARGV[0], details: true)
 else
   puts parser.help
+  exit(1)
+end
+
+extend OneGadget::Helper::ClassMethods
+if options[:script]
+  gadgets.map(&:offset).each do |offset|
+    puts "[#{colorize('OneGadget', sev: :reg)}] Trying #{colorize(format('0x%x', offset), sev: :integer)}..."
+    execute(options[:script], offset)
+  end
+  exit(0)
+end
+
+if options[:raw]
+  puts gadgets.map(&:offset).join(' ')
+else
+  puts gadgets.map(&:inspect).join("\n")
 end

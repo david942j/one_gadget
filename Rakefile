@@ -4,7 +4,7 @@ require 'rubocop/rake_task'
 task default: %i(rubocop spec)
 
 RuboCop::RakeTask.new(:rubocop) do |task|
-  task.patterns = ['lib/**/*.rb', 'test/**/*.rb']
+  task.patterns = ['lib/**/*.rb', 'spec/**/*.rb', 'bin/*']
   task.formatters = ['files']
 end
 

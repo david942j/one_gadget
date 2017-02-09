@@ -25,8 +25,10 @@ I'll push to rubygems.org..
 
 ```bash
 one_gadget
-# Usage: one_gadget [file] [--build-id <BuildID>]
-#    -b, --build-id BuildID           BuildID[sha1] of libc
+# Usage: one_gadget [file] [options]
+#     -b, --build-id BuildID           BuildID[sha1] of libc
+#     -r, --[no-]raw                   Output gadgets offset only, split with one space
+#     -s, --script exploit-script      Run exploit script with all possible gadgets
 
 one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 # offset: 0x4526a
@@ -42,10 +44,20 @@ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 #   [rsp+0x70] == NULL
 ```
 
-### In exploit script
+#### Combine with exploit script
+Pass your exploit script as +one_gadget+'s arguments, it can
+try all gadgets one by one, so you don't need to try every possible gadgets manually.
+
+```bash
+one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
+```
+
+![--script](https://github.com/david942j/one_gadget/blob/master/examples/script.png?raw=true)
+
+### Directly use in script
 ```ruby
 require 'one_gadget'
-OneGadget.gadgets(filepath: '/lib/x86_64-linux-gnu/libc.so.6')
+OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
 # => [283242, 980676, 984423]
 ```
 
