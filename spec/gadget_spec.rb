@@ -7,6 +7,10 @@ describe OneGadget::Gadget do
     OneGadget::Gadget.add(@build_id, 0x1234, constraints: ['[rsp+0x30] == NULL', 'rax == 0'])
   end
 
+  after(:all) do
+    OneGadget::Gadget::ClassMethods::BUILDS.delete @build_id
+  end
+
   it 'inspect' do
     expect(OneGadget::Gadget.builds(@build_id).map(&:inspect).join).to eq <<-EOS
 offset: 0x1234

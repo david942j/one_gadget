@@ -45,11 +45,14 @@ module OneGadget
         require_all if BUILDS.empty?
         return BUILDS[build_id] if BUILDS.key?(build_id)
         # fetch remote builds
-        # table = OneGadget::Helper.remote_builds.find { |c| c.include?(build_id) }
-        # return [] if table.nil? # remote doesn't have this one.
+        table = OneGadget::Helper.remote_builds.find { |c| c.include?(build_id) }
+        return [] if table.nil? # remote doesn't have this one either.
         # builds found in remote! Ask update gem and download remote gadgets.
-        # TODO: fetch remote builds information.
-        []
+        OneGadget::Helper.ask_update(msg: 'The desired one-gadget can be found in lastest version!')
+        tmp_file = OneGadget::Helper.download_build(table)
+        require tmp_file.path
+        tmp_file.unlink
+        BUILDS[build_id]
       end
 
       # Add a gadget, for scripts in builds/ to use.

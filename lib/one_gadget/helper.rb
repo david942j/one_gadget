@@ -1,5 +1,8 @@
 require 'pathname'
 require 'shellwords'
+require 'net/http'
+require 'openssl'
+require 'tempfile'
 
 module OneGadget
   # Define some helpful methods here.
@@ -59,6 +62,65 @@ module OneGadget
         cc = COLOR_CODE
         color = cc.key?(sev) ? cc[sev] : ''
         "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"
+      end
+
+      # Fetch the latest release version's tag name.
+      # @return [String] The tag name, in form +vx.x.x+.
+      def latest_tag
+        latest = url_request('https://github.com/david942j/one_gadget/releases').scan(%r{/tree/v([\d.]+)"}).map do |tag|
+          Gem::Version.new(tag.first)
+        end.max.to_s
+        'v' + latest
+      end
+
+      # Get the url which can fetch +filename+ from remote repo.
+      # @param [String] filename
+      # @return [String] The url.
+      def url_of_file(filename)
+        raw_file_url = 'https://raw.githubusercontent.com/david942j/one_gadget/@tag/@file'
+        raw_file_url.gsub('@tag', latest_tag).gsub('@file', filename)
+      end
+
+      # Download the latest version of +file+ in +lib/one_gadget/builds/+ from remote repo.
+      #
+      # @param [String] file The filename desired.
+      # @return [Tempfile] The temp file be created.
+      def download_build(file)
+        temp = Tempfile.new(['gadgets', file + '.rb'])
+        url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
+        temp.write url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
+        temp.close
+        temp
+      end
+
+      # Get the latest builds list from repo.
+      # @return [Array<String>] List of build ids.
+      def remote_builds
+        url_request(url_of_file('builds_list')).lines.map(&:strip)
+      end
+
+      # Get request.
+      # @param [String] url The url.
+      # @return [String] The request response body.
+      def url_request(url)
+        # TODO: add timeout to handle github crashed or in no network environment.
+        uri = URI.parse(url)
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = true
+        http.verify_mode = ::OpenSSL::SSL::VERIFY_NONE
+
+        request = Net::HTTP::Get.new(uri.request_uri)
+
+        response = http.request(request)
+        response.body
+      end
+
+      # Show the message of ask user to update gem.
+      # @return [void]
+      def ask_update(msg: '')
+        name = 'one_gadget'
+        cmd = colorize("gem update #{name}")
+        STDERR.puts msg + "\n" + "Update with: $ #{cmd}"
       end
     end
     extend ClassMethods
