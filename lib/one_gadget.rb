@@ -32,3 +32,4 @@ end
 
 require 'one_gadget/fetcher'
 require 'one_gadget/helper'
+require 'one_gadget/version'

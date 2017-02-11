@@ -15,9 +15,14 @@ Also provides the command-line tool `one_gadget` for easy usage.
 
 Note: only supports x86-64 now.
 
+Note2: still work in progress, the gem version might update frequently :p.
+
 ## Install
 
-I'll push to rubygems.org..
+Available on RubyGems.org!
+```bash
+gem install one_gadget
+```
 
 ## Usage
 
@@ -43,6 +48,11 @@ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 # offset: 0xf0567
 # constraints:
 #   [rsp+0x70] == NULL
+#
+# offset: 0xf5b10
+# constraints:
+#   [rbp-0xf8] == NULL
+#   rcx == NULL
 ```
 
 #### Combine with exploit script
@@ -59,7 +69,7 @@ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-# => [283242, 980676, 984423]
+# => [283242, 980676, 984423, 1006352]
 ```
 
 ## Screenshots
