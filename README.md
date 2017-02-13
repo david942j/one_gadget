@@ -13,7 +13,7 @@ This gem provides such gadget finder, no need to use IDA-pro every time like a f
 
 Also provides the command-line tool `one_gadget` for easy usage.
 
-Note: only supports x86-64 now.
+Note: Supports amd64 and i386!
 
 Note2: still work in progress, the gem version might update frequently :p.
 
@@ -54,6 +54,23 @@ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 # constraints:
 #   [rbp-0xf8] == NULL
 #   rcx == NULL
+
+one_gadget /lib/i386-linux-gnu/libc.so.6
+# offset: 0x3ac69
+# constraints:
+#   esi is the address of `rw-p` area of libc
+#   [esp+0x34] == NULL
+#
+# offset: 0x5fbbe
+# constraints:
+#   esi is the address of `rw-p` area of libc
+#   eax == NULL
+#
+# offset: 0x12036c
+# constraints:
+#   esi is the address of `rw-p` area of libc
+#   eax == NULL
+
 ```
 
 #### Combine with exploit script
