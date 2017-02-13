@@ -1,6 +1,7 @@
 require 'one_gadget/helper'
-require 'one_gadget/gadget'
 require 'one_gadget/fetchers/amd64'
+require 'one_gadget/fetchers/i386'
+require 'one_gadget/gadget'
 
 module OneGadget
   # To find gadgets.
@@ -33,7 +34,11 @@ module OneGadget
       #   contains offset only.
       #   Otherwise, array of gadgets is returned.
       def from_file(file, details: false)
-        gadgets = OneGadget::Fetcher::Amd64.new(file).find
+        gadgets = {
+          amd64: OneGadget::Fetcher::Amd64,
+          i386: OneGadget::Fetcher::I386,
+          unknown: OneGadget::Fetcher::Base
+        }[OneGadget::Helper.architecture(file)].new(file).find
         return gadgets if details
         gadgets.map(&:offset)
       end

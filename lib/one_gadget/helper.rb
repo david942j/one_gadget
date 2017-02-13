@@ -123,6 +123,17 @@ module OneGadget
         cmd = colorize("gem update #{name}")
         OneGadget::Logger.info(msg + "\n" + "Update with: $ #{cmd}" + "\n")
       end
+
+      # Fetch the file archiecture of +file+.
+      # @param [String] The target ELF filename.
+      # @return [String]
+      #   Only supports :amd64, :i386 now.
+      def architecture(file)
+        str = `file #{::Shellwords.escape(file)}`
+        return :amd64 if str.include?('x86-64')
+        return :i386 if str.include?('Intel 80386')
+        :unknown
+      end
     end
     extend ClassMethods
   end
