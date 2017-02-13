@@ -7,11 +7,15 @@ usage = 'Usage: one_gadget [file] [options]'
 parser = OptionParser.new do |opts|
   opts.banner = usage
 
-  opts.on('-b', '--build-id BuildID', 'BuildID[sha1] of libc') do |b|
+  opts.on('-b', '--build-id BuildID', 'BuildID[sha1] of libc.') do |b|
     options[:build_id] = b
   end
 
-  opts.on('-r', '--[no-]raw', 'Output gadgets offset only, split with one space') do |v|
+  opts.on('-f', '--[no-]force-file', 'Force search gadgets in file instead of build id first.') do |b|
+    options[:force_file] = b
+  end
+
+  opts.on('-r', '--[no-]raw', 'Output gadgets offset only, split with one space.') do |v|
     options[:raw] = v
   end
 
@@ -32,7 +36,7 @@ end
 if options[:build_id]
   gadgets = OneGadget.gadgets(build_id: options[:build_id], details: true)
 elsif ARGV[0]
-  gadgets = OneGadget.gadgets(file: ARGV[0], details: true)
+  gadgets = OneGadget.gadgets(file: ARGV[0], details: true, force_file: options[:force_file])
 else
   puts parser.help
   exit(1)
