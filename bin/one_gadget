@@ -41,7 +41,7 @@ end
 extend OneGadget::Helper::ClassMethods
 if options[:script]
   gadgets.map(&:offset).each do |offset|
-    puts "[#{colorize('OneGadget', sev: :reg)}] Trying #{colorize(format('0x%x', offset), sev: :integer)}..."
+    OneGadget::Logger.info("Trying #{colorize(format('0x%x', offset), sev: :integer)}...\n")
     execute(options[:script], offset)
   end
   exit(0)

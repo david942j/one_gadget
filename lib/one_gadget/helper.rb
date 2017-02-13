@@ -3,6 +3,7 @@ require 'shellwords'
 require 'net/http'
 require 'openssl'
 require 'tempfile'
+require 'one_gadget/logger'
 
 module OneGadget
   # Define some helpful methods here.
@@ -120,7 +121,7 @@ module OneGadget
       def ask_update(msg: '')
         name = 'one_gadget'
         cmd = colorize("gem update #{name}")
-        STDERR.puts msg + "\n" + "Update with: $ #{cmd}"
+        OneGadget::Logger.info(msg + "\n" + "Update with: $ #{cmd}" + "\n")
       end
     end
     extend ClassMethods
