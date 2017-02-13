@@ -54,7 +54,8 @@ module OneGadget
         offset = lines.first.scan(/^([\da-f]+):/)[0][0].to_i(16)
         # fetch those might be constraints lines.
         important_lines = lines.select(&block).map do |line|
-          line.split("\t").last.gsub(/\s+/, ' ')
+          ar = line.split("\t")
+          "#{ar.first} #{ar.last.gsub(/\s+/, ' ')}"
         end
         OneGadget::Gadget::Gadget.new(offset, constraints: important_lines)
       end

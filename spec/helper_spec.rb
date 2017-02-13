@@ -17,4 +17,9 @@ describe OneGadget::Helper do
   it 'colorize' do
     expect(OneGadget::Helper.colorize('123', sev: :integer)).to eq "\e[38;5;12m123\e[0m"
   end
+
+  it 'architecture' do
+    expect(OneGadget::Helper.architecture(@libcpath)).to be :amd64
+    expect(OneGadget::Helper.architecture(__FILE__)).to be :unknown
+  end
 end
