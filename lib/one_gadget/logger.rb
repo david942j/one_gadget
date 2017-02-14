@@ -14,6 +14,10 @@ module OneGadget
       "[#{OneGadget::Helper.colorize('OneGadget', sev: :reg)}] #{message.join}"
     end
 
+    # The logger info.
+    # @param [String] msg
+    #   Message to be logged.
+    # @return [void]
     def self.info(msg)
       @logger.info(msg)
     end

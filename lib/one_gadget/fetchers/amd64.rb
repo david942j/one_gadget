@@ -3,6 +3,8 @@ module OneGadget
   module Fetcher
     # Fetcher for amd64.
     class Amd64 < OneGadget::Fetcher::Base
+      # Gadgets for amd64 glibc.
+      # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
       def find
         bin_sh_hex = str_offset('/bin/sh').to_s(16)
         cands = candidates do |candidate|

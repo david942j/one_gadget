@@ -3,6 +3,8 @@ module OneGadget
   module Fetcher
     # Fetcher for i386.
     class I386 < OneGadget::Fetcher::Base
+      # Gadgets for i386 glibc.
+      # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
       def find
         rw_off = rw_offset
         bin_sh = str_offset('/bin/sh')

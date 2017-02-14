@@ -4,12 +4,17 @@ module OneGadget
   module Fetcher
     # define common methods for gadget fetchers.
     class Base
+      # The absolute path of glibc.
+      # @return [String] The filename.
       attr_reader :file
+      # Instantiate a fetcher object.
       # @param [String] file Absolute path of target libc.
       def initialize(file)
         @file = ::Shellwords.escape(file)
       end
 
+      # Method need to be implemented in inheritors.
+      # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
       def find; raise NotImplementedError
       end
 
