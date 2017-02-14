@@ -15,8 +15,6 @@ Also provides the command-line tool `one_gadget` for easy usage.
 
 Note: Supports amd64 and i386!
 
-Note2: still work in progress, the gem version might update frequently :p.
-
 ## Install
 
 Available on RubyGems.org!
