@@ -68,10 +68,10 @@ module OneGadget
       # Fetch the latest release version's tag name.
       # @return [String] The tag name, in form +vx.x.x+.
       def latest_tag
-        latest = url_request('https://github.com/david942j/one_gadget/releases').scan(%r{/tree/v([\d.]+)"}).map do |tag|
+        releases_url = 'https://github.com/david942j/one_gadget/releases'
+        @latest_tag ||= 'v' + url_request(releases_url).scan(%r{/tree/v([\d.]+)"}).map do |tag|
           Gem::Version.new(tag.first)
         end.max.to_s
-        'v' + latest
       end
 
       # Get the url which can fetch +filename+ from remote repo.
@@ -97,14 +97,13 @@ module OneGadget
       # Get the latest builds list from repo.
       # @return [Array<String>] List of build ids.
       def remote_builds
-        url_request(url_of_file('builds_list')).lines.map(&:strip)
+        @remote_builds ||= url_request(url_of_file('builds_list')).lines.map(&:strip)
       end
 
       # Get request.
       # @param [String] url The url.
       # @return [String] The request response body.
       def url_request(url)
-        # TODO: add timeout to handle github crashed or in no network environment.
         uri = URI.parse(url)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = true
@@ -113,7 +112,11 @@ module OneGadget
         request = Net::HTTP::Get.new(uri.request_uri)
 
         response = http.request(request)
+        raise ArgumentError, "Fail to get response of #{url}" unless response.code == '200'
         response.body
+      rescue NoMethodError, SocketError, ArgumentError => e
+        p e
+        nil
       end
 
       # Show the message of ask user to update gem.

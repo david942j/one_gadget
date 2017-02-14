@@ -18,6 +18,10 @@ describe OneGadget::Helper do
     expect(OneGadget::Helper.colorize('123', sev: :integer)).to eq "\e[38;5;12m123\e[0m"
   end
 
+  it 'url_request' do
+    expect(OneGadget::Helper.url_request('oao')).to be nil
+  end
+
   it 'architecture' do
     expect(OneGadget::Helper.architecture(@libcpath)).to be :amd64
     expect(OneGadget::Helper.architecture(__FILE__)).to be :unknown
