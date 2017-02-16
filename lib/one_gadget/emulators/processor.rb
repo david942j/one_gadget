@@ -5,7 +5,7 @@ module OneGadget
   module Emulators
     # Base class of a processor.
     class Processor
-      attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}]
+      attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
       # Instantiate a {Processor} object.
       # @param [Array<String>] registers Registers that supported in the architecture.
       def initialize(registers)
