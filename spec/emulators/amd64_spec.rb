@@ -1,8 +1,8 @@
 require 'one_gadget/emulators/amd64'
 
-describe OneGadget::Emulators::AMD64 do
+describe OneGadget::Emulators::Amd64 do
   before(:each) do
-    @processor = OneGadget::Emulators::AMD64.new
+    @processor = OneGadget::Emulators::Amd64.new
   end
 
   describe 'process' do

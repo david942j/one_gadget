@@ -1,4 +1,4 @@
-require 'one_gadget/emulators/instruction'
+require 'one_gadget/emulators/lambda'
 
 module OneGadget
   # Instruction emulator to solve the constraint of gadgets.

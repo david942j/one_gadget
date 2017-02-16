@@ -1,9 +1,10 @@
 require 'one_gadget/emulators/processor'
+require 'one_gadget/emulators/instruction'
 
 module OneGadget
   module Emulators
     # Emulator of amd64 instruction set.
-    class AMD64 < Processor
+    class Amd64 < Processor
       REGISTERS = %w(rax rbx rcx rdx rdi rsi rbp rsp rip) + 7.upto(15).map { |i| "r#{i}" }
       def initialize
         super(REGISTERS)
