@@ -2,13 +2,19 @@ module OneGadget
   module Emulators
     # Define instruction name and it's argument count.
     class Instruction
-      attr_reader :inst # @return [String]
-      attr_reader :argc # @return [Integer]
+      attr_reader :inst # @return [String]  The instruction name.
+      attr_reader :argc # @return [Integer] Count of arguments.
+      # Instantiate a n{Instruction} object.
+      # @param [String] inst The instruction name.
+      # @param [Integer] argc Count of arguments.
       def initialize(inst, argc)
         @inst = inst
         @argc = argc
       end
 
+      # Extract arguments from command.
+      # @param [String] cmd
+      # @return [Array<String>] Arguments.
       def fetch_args(cmd)
         idx = cmd.index(inst)
         cmd = cmd[0...cmd.rindex('#')] if cmd.rindex('#')
@@ -19,8 +25,11 @@ module OneGadget
         end
       end
 
-      def match?(str)
-        str.include?(inst)
+      # If the command contains this instruction.
+      # @param [String] cmd
+      # @return [Boolean]
+      def match?(cmd)
+        cmd.include?(inst)
       end
     end
   end

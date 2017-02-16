@@ -6,10 +6,16 @@ module OneGadget
     # Emulator of amd64 instruction set.
     class Amd64 < Processor
       REGISTERS = %w(rax rbx rcx rdx rdi rsi rbp rsp rip) + 7.upto(15).map { |i| "r#{i}" }
+
+      # Instantiate a {Amd64} object.
       def initialize
         super(REGISTERS)
       end
 
+      # Process one command.
+      # @param [String] cmd
+      #   One line from result of objdump.
+      # @return [void]
       def process(cmd)
         inst, args = parse(cmd)
         # where should this be defined..?
@@ -24,6 +30,8 @@ module OneGadget
         @registers[tar] = src
       end
 
+      # Support instruction set.
+      # @return [Array<Instruction>] The support instructions.
       def instructions
         [
           Instruction.new('mov', 2),

@@ -8,15 +8,20 @@ module OneGadget
     # 3. {Lambda} + {Numeric}
     # 4. dereference {Lambda}
     class Lambda
-      attr_accessor :obj # @return [String, Lambda]
-      attr_accessor :immi # @return [Integer]
+      attr_accessor :obj # @return [String, Lambda] The object currently related to.
+      attr_accessor :immi # @return [Integer] The immidiate value currently added.
       attr_accessor :deref_count # @return [Integer] The times of dereference.
-      def initialize(val)
+      # Instantiate a {Lambda} object.
+      # @param [Lambda, String] obj
+      def initialize(obj)
         @immi = 0
-        @obj = val
+        @obj = obj
         @deref_count = 0
       end
 
+      # Implement addition with +Numeric+.
+      # @param [Numeric] other Value to add.
+      # @return [Lambda] The result.
       def +(other)
         raise ArgumentError, 'Expect other to be Numeric.' unless other.is_a?(Numeric)
         if deref_count > 0
@@ -29,19 +34,28 @@ module OneGadget
         ret
       end
 
+      # Implement substract with +Numeric+.
+      # @param [Numeric] other Value to substract.
+      # @return [Lambda] The result.
       def -(other)
         self.+(-other)
       end
 
+      # Increase dreference count with 1.
+      # @return [void]
       def deref!
         @deref_count += 1
       end
 
+      # Decrease dreference count with 1.
+      # @return [void]
       def ref!
         raise ArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
         @deref_count -= 1
       end
 
+      # A new {Lambda} object with dreference count increase 1.
+      # @return [Lambda]
       def deref
         ret = Lambda.new(obj)
         ret.immi = immi
@@ -49,6 +63,8 @@ module OneGadget
         ret
       end
 
+      # Expand the lambda presentation.
+      # @return [String] The expand result.
       def to_s
         str = ''
         str += '[' * deref_count

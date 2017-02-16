@@ -23,6 +23,10 @@ Available on RubyGems.org!
 gem install one_gadget
 ```
 
+## Implementation
+
+OneGadget use simple self-implement symbolic execution to find the constraints of gadgets.
+
 ## Usage
 
 ### Command Line Tool
