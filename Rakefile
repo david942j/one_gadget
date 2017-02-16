@@ -6,7 +6,6 @@ task default: %i(rubocop spec gen_builds_list)
 
 RuboCop::RakeTask.new(:rubocop) do |task|
   task.patterns = ['lib/**/*.rb', 'spec/**/*.rb', 'bin/*']
-  task.formatters = ['files']
 end
 
 RSpec::Core::RakeTask.new(:spec) do |task|

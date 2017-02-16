@@ -54,6 +54,11 @@ module OneGadget
         match.split.first.to_i(16)
       end
 
+      def offset_of(assembly)
+        lines = assembly.lines
+        lines.first.scan(/^([\da-f]+):/)[0][0].to_i(16)
+      end
+
       def convert_to_gadget(assembly, &block)
         lines = assembly.lines
         offset = lines.first.scan(/^([\da-f]+):/)[0][0].to_i(16)
