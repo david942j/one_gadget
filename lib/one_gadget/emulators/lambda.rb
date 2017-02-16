@@ -8,7 +8,7 @@ module OneGadget
     # 3. {Lambda} + {Numeric}
     # 4. dereference {Lambda}
     class Lambda
-      attr_reader :obj # @return [String, Lambda]
+      attr_accessor :obj # @return [String, Lambda]
       attr_accessor :immi # @return [Integer]
       attr_accessor :deref_count # @return [Integer] The times of dereference.
       def initialize(val)
@@ -37,6 +37,11 @@ module OneGadget
         @deref_count += 1
       end
 
+      def ref!
+        raise ArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
+        @deref_count -= 1
+      end
+
       def deref
         ret = Lambda.new(obj)
         ret.immi = immi
@@ -51,6 +56,33 @@ module OneGadget
         str += OneGadget::Helper.hex(immi, psign: true) unless immi.zero?
         str += ']' * deref_count
         str
+      end
+
+      class << self
+        # Target: parse something like +[rsp+0x50]+ into a {Lambda} object.
+        # @param [String] arg
+        # @param [Hash{String => Lambda}] predefined
+        # @return [OneGadget::Emulators::Lambda, Integer]
+        #   If +arg+ contains number only, return it.
+        #   Otherwise, return a {Lambda} object.
+        # @example
+        #   parse('[rsp+0x50]') #=> #<Lambda @obj='rsp', @immi=80, @deref_count=1>
+        def parse(arg, predefined: {})
+          ret = Lambda.new('tmp')
+          if arg[0] == '[' # a little hack because there should nerver something like +[[rsp+1]+2]+ to parse.
+            arg = arg[1..-2]
+            ret.deref_count += 1
+          end
+          return Integer(arg) if OneGadget::Helper.integer?(arg)
+          sign = arg =~ /[+-]/
+          raise ArgumentError, "Not support #{arg}" if sign && !OneGadget::Helper.integer?(arg[sign..-1])
+          if sign
+            ret.immi = Integer(arg[sign..-1])
+            arg = arg[0, sign]
+          end
+          ret.obj = predefined[arg] || arg
+          ret
+        end
       end
     end
   end

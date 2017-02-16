@@ -21,7 +21,7 @@ describe OneGadget::Emulators::Lambda do
     end
   end
 
-  it 'dereference' do 
+  it 'dereference' do
     drsp = @rsp.deref
     expect(@rsp.to_s).to eq 'rsp'
     expect(drsp.to_s).to eq '[rsp]'
@@ -31,6 +31,15 @@ describe OneGadget::Emulators::Lambda do
   end
 
   it 'mixed' do
-    expect((((@rsp+0x50).deref - 0x30).deref).to_s).to eq '[[rsp+0x50]-0x30]'
+    expect(((@rsp + 0x50).deref - 0x30).deref.to_s).to eq '[[rsp+0x50]-0x30]'
+  end
+
+  it 'parse' do
+    expect(OneGadget::Emulators::Lambda.parse('[rsp+0x50]').to_s).to eq '[rsp+0x50]'
+    expect(OneGadget::Emulators::Lambda.parse('[rsp+80]').to_s).to eq '[rsp+0x50]'
+    expect(OneGadget::Emulators::Lambda.parse('esp').to_s).to eq 'esp'
+    expect(OneGadget::Emulators::Lambda.parse('esp-10').to_s).to eq 'esp-0xa'
+    expect(OneGadget::Emulators::Lambda.parse('123')).to be 123
+    expect(OneGadget::Emulators::Lambda.parse('0xabc123')).to be 0xabc123
   end
 end

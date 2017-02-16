@@ -152,6 +152,22 @@ module OneGadget
         return format("#{psign ? '+' : ''}0x%x", val) if val >= 0
         format('-0x%x', -val)
       end
+
+      # For checking a string is actually an integer.
+      # @param [String] str String to be checked.
+      # @return [Boolean] If +str+ can be converted into integer.
+      # @example
+      #   Helper.integer? '1234'
+      #   # => true
+      #   Helper.integer? '0x1234'
+      #   # => true
+      #   Helper.integer? '0xheapoverflow'
+      #   # => false
+      def integer?(str)
+        true if Integer(str)
+      rescue ArgumentError, TypeError
+        false
+      end
     end
     extend ClassMethods
   end

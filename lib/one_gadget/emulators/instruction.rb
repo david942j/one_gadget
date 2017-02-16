@@ -18,6 +18,10 @@ module OneGadget
           arg.gsub(/QWORD|DWORD|WORD|BYTE|PTR/, '').strip
         end
       end
+
+      def match?(str)
+        str.include?(inst)
+      end
     end
   end
 end
