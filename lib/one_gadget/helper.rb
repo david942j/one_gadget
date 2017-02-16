@@ -137,6 +137,21 @@ module OneGadget
         return :i386 if str.include?('Intel 80386')
         :unknown
       end
+
+      # Present number in hex format.
+      # @param [Integer] val The number.
+      # @param [Boolean] psign Need to show plus sign when +val >= 0+.
+      # @return [String] string in hex format.
+      # @example
+      #   hex(32) #=> 0x20
+      #   hex(32, psign: true) #=> +0x20
+      #   hex(-40) #=> -0x28
+      #   hex(0) #=> 0x0
+      #   hex(0, psign: true) #=> +0x0
+      def hex(val, psign: false)
+        return format("#{psign ? '+' : ''}0x%x", val) if val >= 0
+        format('-0x%x', -val)
+      end
     end
     extend ClassMethods
   end
