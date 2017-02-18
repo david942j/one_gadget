@@ -8,11 +8,11 @@ describe 'one_gadget' do
   end
 
   it 'from file libc-2.19' do
-    expect(OneGadget.gadgets(file: @libcpath19, force_file: true)).to eq [0x3fd27, 0x64c60, 0x1244a6]
+    expect(OneGadget.gadgets(file: @libcpath19, force_file: true)).to eq [0x3fd27, 0x64c64, 0x64c6a, 0x64c6e]
   end
 
   it 'from file libc-2.23' do
-    expect(OneGadget.gadgets(file: @libcpath23, force_file: true)).to eq [0x3ac69, 0x5fbbe, 0x12036c]
+    expect(OneGadget.gadgets(file: @libcpath23, force_file: true)).to eq [0x3ac69, 0x5fbc5, 0x5fbc6]
   end
 
   describe 'from build id' do

@@ -1,4 +1,6 @@
 require 'one_gadget/fetchers/base'
+require 'one_gadget/emulators/i386'
+
 module OneGadget
   module Fetcher
     # Fetcher for i386.
@@ -8,43 +10,52 @@ module OneGadget
       def find
         rw_off = rw_offset
         bin_sh = str_offset('/bin/sh')
-        minus_c = str_offset('-c')
         rel_sh_hex = (rw_off - bin_sh).to_s(16)
-        rel_minus_c = (rw_off - minus_c).to_s(16)
         cands = candidates do |candidate|
           next false unless candidate.include?(rel_sh_hex)
           true
         end
-        # remove lines before and with -c appears
-        cands = slice_prefix(cands) do |line|
-          line.include?(rel_minus_c)
-        end
-        # special handle for execl call
-        cands.map! do |cand|
+        gadgets = cands.map do |cand|
           lines = cand.lines
-          next cand unless lines.last.include?('execl')
-          # Find the last three +push+, or mov [esp+0x8], .*
-          # Make it call +execl("/bin/sh", "sh", NULL)+.
-          if cand.include?('esp+0x8')
-            to_rm = lines.index { |c| c.include?('esp+0x8') }
-          else
-            push_cnt = 0
-            to_rm = lines.rindex do |c|
-              push_cnt += 1 if c.include?('push')
-              push_cnt >= 3
-            end
+          # handle execve later
+          next convert_to_gadget(cand) { true } unless lines.last.include?('execl')
+          # special handle for execl call
+          # use processor to find which can lead to a valid execl call.
+          gadgets = []
+          (lines.size - 2).downto(0) do |i|
+            processor = emulate(lines[i..-1])
+            constraints = valid_execl(processor, bin_sh: rw_off - bin_sh)
+            next if constraints.nil?
+            offset = offset_of(lines[i..-1].join)
+            gadgets << OneGadget::Gadget::Gadget.new(offset, constraints: constraints)
           end
-          lines = lines[to_rm..-1] unless to_rm.nil?
-          lines.join
-        end
-        cands.map do |candidate|
-          convert_to_gadget(candidate) do |_|
-            true
-          end
-        end
+          gadgets
+        end.flatten.compact
+        gadgets.uniq(&:constraints).sort_by(&:offset)
       end
 
       private
+
+      def emulate(cmds)
+        cmds.each_with_object(OneGadget::Emulators::I386.new) { |cmd, obj| obj.process(cmd) }
+      end
+
+      # @param [Integer] sh The related offset refer to /bin/sh.
+      # @return [Array<String>, NilClass] The constraints to be a valid +execl+ call.
+      def valid_execl(processor, bin_sh: 0)
+        cur_top = processor.registers['esp'].evaluate('esp' => 0)
+        arg = processor.stack[cur_top]
+        # arg0 must be /bin/sh
+        return nil unless arg.to_s.include?(bin_sh.to_s(16))
+        rw_base = arg.deref.obj.to_s # this should be esi or ebx..
+        arg = processor.stack[cur_top + 4]
+        # arg1 can be a lambda or sh
+        sh = bin_sh - 5 # /bin/ sh
+        arg = processor.stack[cur_top + 8] if arg.to_s.include?(sh.to_s(16))
+        return nil if arg.to_s.include?(rw_base) # we don't want base-related constraints
+        # now arg is the constraint.
+        ["#{rw_base} is the address of `rw-p` area of libc", "#{arg} == NULL"]
+      end
 
       def rw_offset
         # How to find this offset correctly..?
