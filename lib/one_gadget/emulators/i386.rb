@@ -9,6 +9,7 @@ module OneGadget
           32
         end
 
+        # @return [String] esp.
         def stack_pointer
           'esp'
         end

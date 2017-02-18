@@ -15,23 +15,23 @@ module OneGadget
           next false unless candidate.include?(rel_sh_hex)
           true
         end
-        gadgets = cands.map do |cand|
+        cands.map do |cand|
           lines = cand.lines
-          # handle execve later
-          next convert_to_gadget(cand) { true } unless lines.last.include?('execl')
-          # special handle for execl call
-          # use processor to find which can lead to a valid execl call.
+          # use processor to find which can lead to a valid one-gadget call.
           gadgets = []
           (lines.size - 2).downto(0) do |i|
             processor = emulate(lines[i..-1])
-            constraints = valid_execl(processor, bin_sh: rw_off - bin_sh)
+            if lines.last.include?('execl')
+              constraints = valid_execl(processor, bin_sh: rw_off - bin_sh)
+            elsif lines.last.include?('execve')
+              constraints = valid_execve(processor, bin_sh: rw_off - bin_sh)
+            end
             next if constraints.nil?
             offset = offset_of(lines[i..-1].join)
             gadgets << OneGadget::Gadget::Gadget.new(offset, constraints: constraints)
           end
           gadgets
         end.flatten.compact
-        gadgets.uniq(&:constraints).sort_by(&:offset)
       end
 
       private
@@ -57,10 +57,38 @@ module OneGadget
         ["#{rw_base} is the address of `rw-p` area of libc", "#{arg} == NULL"]
       end
 
+      # @param [Integer] sh The related offset refer to /bin/sh.
+      # @return [Array<String>, NilClass] The constraints to be a valid +execl+ call.
+      def valid_execve(processor, bin_sh: 0)
+        cur_top = processor.registers['esp'].evaluate('esp' => 0)
+        arg = processor.stack[cur_top]
+        # arg0 must be /bin/sh
+        return nil unless arg.to_s.include?(bin_sh.to_s(16))
+        rw_base = arg.deref.obj.to_s # this should be esi or ebx..
+        arg1 = processor.stack[cur_top + 4]
+        arg2 = processor.stack[cur_top + 8]
+        # arg1 == NULL || [arg1] == NULL
+        # arg2 == NULL or arg2 is environ
+        cons = ["#{rw_base} is the address of `rw-p` area of libc"]
+        cons << should_null(arg1.to_s)
+        envp = arg2.to_s
+        unless envp.include?('[[') && envp.include?(rw_base) # anyway...
+          return nil if envp.include?('[') # don't like this :(
+          cons << should_null(envp)
+        end
+        cons
+      end
+
       def rw_offset
         # How to find this offset correctly..?
         line = `readelf -d #{file}|grep PLTGOT`
         line.scan(/0x[\da-f]+/).last.to_i(16) & -0x1000
+      end
+
+      def should_null(str)
+        ret = "[#{str}] == NULL"
+        ret += " || #{str} == NULL" unless str.include?('esp')
+        ret
       end
     end
   end

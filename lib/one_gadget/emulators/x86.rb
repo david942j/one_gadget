@@ -41,9 +41,13 @@ module OneGadget
       end
 
       class << self
+        # 32 or 64.
+        # @return [Integer] 32 or 64.
         def bits; raise NotImplementedError
         end
 
+        # The name of stake frame register.
+        # @return [String] +esp+ or +rsp+.
         def stack_pointer; raise NotImplementedError
         end
       end

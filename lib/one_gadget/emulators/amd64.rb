@@ -5,6 +5,7 @@ module OneGadget
     # Emulator of amd64 instruction set.
     class Amd64 < X86
       class << self
+        # @return [String] rsp.
         def stack_pointer
           'rsp'
         end

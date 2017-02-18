@@ -39,8 +39,23 @@ module OneGadget
           i386: OneGadget::Fetcher::I386,
           unknown: OneGadget::Fetcher::Base
         }[OneGadget::Helper.architecture(file)].new(file).find
+        gadgets = trim_gadgets(gadgets)
         return gadgets if details
         gadgets.map(&:offset)
+      end
+
+      private
+
+      # Unique, remove gadgets with harder constraints.
+      def trim_gadgets(gadgets)
+        gadgets = gadgets.uniq(&:constraints).sort_by { |g| g.constraints.size }
+        res = []
+        gadgets.each_with_index do |g, i|
+          res << g unless i.times.any? do |j|
+            (gadgets[j].constraints - g.constraints).empty?
+          end
+        end
+        res.sort_by(&:offset)
       end
     end
     extend ClassMethods
