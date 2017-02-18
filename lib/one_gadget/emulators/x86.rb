@@ -5,6 +5,7 @@ module OneGadget
   module Emulators
     # Super class for amd64 and i386 processor.
     class X86 < Processor
+      # Constructor for a x86 processor.
       def initialize(*)
         super
         @stack = Hash.new do |h, k|
@@ -33,6 +34,7 @@ module OneGadget
           Instruction.new('mov', 2),
           Instruction.new('lea', 2),
           Instruction.new('add', 2),
+          Instruction.new('sub', 2),
           Instruction.new('push', 1),
           Instruction.new('call', 1)
         ]
@@ -72,6 +74,11 @@ module OneGadget
       def inst_add(tar, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: @registers)
         @registers[tar] += src
+      end
+
+      def inst_sub(tar, src)
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: @registers)
+        @registers[tar] -= src
       end
 
       def bytes

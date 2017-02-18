@@ -26,5 +26,36 @@ describe OneGadget::Emulators::I386 do
       expect(@processor.stack[8].to_s).to eq '[[esi-0xb8]]'
       expect(@processor.stack[3].to_s).to eq '[esp+0x3]'
     end
+
+    it 'libc-2.23-execl' do
+      gadget = <<-EOS
+   5ef3e:       50                      push   eax
+   5ef3f:       8d 86 a4 a0 fa ff       lea    eax,[esi-0x55f5c]
+   5ef45:       50                      push   eax
+   5ef46:       8d 86 9f a0 fa ff       lea    eax,[esi-0x55f61]
+   5ef4c:       50                      push   eax
+   5ef4d:       e8 be 07 05 00          call   af710 <execl@@GLIBC_2.0>
+    EOS
+      gadget.lines.each { |s| @processor.process(s) }
+      expect(@processor.registers['esp'].to_s).to eq 'esp-0xc'
+      expect(@processor.stack[-0xc].to_s).to eq 'esi-0x55f61'
+      expect(@processor.stack[-0x8].to_s).to eq 'esi-0x55f5c'
+      expect(@processor.stack[-0x4].to_s).to eq 'eax'
+    end
+
+    it 'add sub push' do
+      @processor.process('push 1')
+      expect(@processor.registers['esp'].to_s).to eq 'esp-0x4'
+      @processor.process('push 2')
+      expect(@processor.registers['esp'].to_s).to eq 'esp-0x8'
+      @processor.process('sub esp, 0x30')
+      expect(@processor.registers['esp'].to_s).to eq 'esp-0x38'
+      @processor.process('push 1337')
+      expect(@processor.registers['esp'].to_s).to eq 'esp-0x3c'
+      @processor.process('add esp, 0x3c')
+      expect(@processor.registers['esp'].to_s).to eq 'esp'
+      expect(@processor.stack[-0x3c].to_s).to eq '1337'
+      expect(@processor.stack[-0x4].to_s).to eq '1'
+    end
   end
 end
