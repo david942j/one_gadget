@@ -50,9 +50,22 @@ module OneGadget
 
       private
 
+      def register?(reg)
+        @registers.include?(reg)
+      end
+
       def inst_mov(tar, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: @registers)
-        @registers[tar] = src
+        if register?(tar)
+          @registers[tar] = src
+        else
+          # Just ignore strange case...
+          return unless tar.include?(self.class.stack_pointer)
+          tar = OneGadget::Emulators::Lambda.parse(tar, predefined: @registers)
+          return if tar.deref_count != 1 # should not happened
+          tar.ref!
+          @stack[tar.evaluate(eval_dict)] = src
+        end
       end
 
       def inst_lea(tar, src)
@@ -64,9 +77,7 @@ module OneGadget
       def inst_push(val)
         val = OneGadget::Emulators::Lambda.parse(val, predefined: @registers)
         @registers[self.class.stack_pointer] -= bytes
-        dict = {}
-        dict[self.class.stack_pointer] = 0
-        cur_top = @registers[self.class.stack_pointer].evaluate(dict)
+        cur_top = @registers[self.class.stack_pointer].evaluate(eval_dict)
         raise ArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
         @stack[cur_top] = val
       end
@@ -83,6 +94,12 @@ module OneGadget
 
       def bytes
         self.class.bits / 8
+      end
+
+      def eval_dict
+        dict = {}
+        dict[self.class.stack_pointer] = 0
+        dict
       end
     end
   end

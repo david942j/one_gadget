@@ -24,6 +24,7 @@ describe OneGadget::Emulators::I386 do
       expect(@processor.stack[0].to_s).to eq 'esi-0x55f61'
       expect(@processor.stack[4].to_s).to eq 'esp+0x34'
       expect(@processor.stack[8].to_s).to eq '[[esi-0xb8]]'
+      # The defualt value of stack is a lambda
       expect(@processor.stack[3].to_s).to eq '[esp+0x3]'
     end
 
@@ -56,6 +57,22 @@ describe OneGadget::Emulators::I386 do
       expect(@processor.registers['esp'].to_s).to eq 'esp'
       expect(@processor.stack[-0x3c].to_s).to eq '1337'
       expect(@processor.stack[-0x4].to_s).to eq '1'
+    end
+
+    it 'libc-2.19' do
+      gadget = <<-'EOS'
+  64c60: mov DWORD PTR [esp+0x8],eax
+  64c64: lea eax,[ebx-0x4956f]
+  64c6a: mov DWORD PTR [esp+0x4],eax
+  64c6e: lea eax,[ebx-0x49574]
+  64c74: mov DWORD PTR [esp],eax
+  64c77: call b5170 <execl@@GLIBC_2.0>
+      EOS
+      gadget.lines.each { |s| @processor.process(s) }
+      expect(@processor.registers['esp'].to_s).to eq 'esp'
+      expect(@processor.stack[0].to_s).to eq 'ebx-0x49574'
+      expect(@processor.stack[4].to_s).to eq 'ebx-0x4956f'
+      expect(@processor.stack[8].to_s).to eq 'eax'
     end
   end
 end

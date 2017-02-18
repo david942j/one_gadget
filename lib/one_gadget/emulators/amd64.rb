@@ -4,6 +4,12 @@ module OneGadget
   module Emulators
     # Emulator of amd64 instruction set.
     class Amd64 < X86
+      class << self
+        def stack_pointer
+          'rsp'
+        end
+      end
+
       REGISTERS = %w(rax rbx rcx rdx rdi rsi rbp rsp rip) + 7.upto(15).map { |i| "r#{i}" }
 
       # Instantiate a {Amd64} object.
