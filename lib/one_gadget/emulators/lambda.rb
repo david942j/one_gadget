@@ -74,6 +74,17 @@ module OneGadget
         str
       end
 
+      # Eval the value of lambda.
+      # Only support those like +rsp+0x30+.
+      # @param [Hash{String => Integer}] context
+      #   The context.
+      # @return [Integer] Result of evaluation.
+      def evaluate(context)
+        raise ArgumentError, "Can't eval #{self}" if deref_count > 0
+        raise ArgumentError, "Can't eval #{self}" if obj && !context.key?(obj)
+        context[obj] + immi
+      end
+
       class << self
         # Target: parse something like +[rsp+0x50]+ into a {Lambda} object.
         # @param [String] arg
@@ -84,20 +95,21 @@ module OneGadget
         # @example
         #   parse('[rsp+0x50]') #=> #<Lambda @obj='rsp', @immi=80, @deref_count=1>
         def parse(arg, predefined: {})
-          ret = Lambda.new('tmp')
+          deref_count = 0
           if arg[0] == '[' # a little hack because there should nerver something like +[[rsp+1]+2]+ to parse.
             arg = arg[1..-2]
-            ret.deref_count += 1
+            deref_count = 1
           end
           return Integer(arg) if OneGadget::Helper.integer?(arg)
           sign = arg =~ /[+-]/
-          raise ArgumentError, "Not support #{arg}" if sign && !OneGadget::Helper.integer?(arg[sign..-1])
+          val = 0
           if sign
-            ret.immi = Integer(arg[sign..-1])
+            raise ArgumentError, "Not support #{arg}" unless OneGadget::Helper.integer?(arg[sign..-1])
+            val = Integer(arg[sign..-1])
             arg = arg[0, sign]
           end
-          ret.obj = predefined[arg] || arg
-          ret
+          obj = (predefined[arg] || Lambda.new(arg)) + val
+          deref_count.zero? ? obj : obj.deref
         end
       end
     end

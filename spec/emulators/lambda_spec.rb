@@ -41,5 +41,8 @@ describe OneGadget::Emulators::Lambda do
     expect(OneGadget::Emulators::Lambda.parse('esp-10').to_s).to eq 'esp-0xa'
     expect(OneGadget::Emulators::Lambda.parse('123')).to be 123
     expect(OneGadget::Emulators::Lambda.parse('0xabc123')).to be 0xabc123
+
+    predefined = { 'rsp' => OneGadget::Emulators::Lambda.new('rsp') + 0x10 }
+    expect(OneGadget::Emulators::Lambda.parse('rsp+0x20', predefined: predefined).to_s).to eq 'rsp+0x30'
   end
 end
