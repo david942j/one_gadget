@@ -21,7 +21,7 @@ module OneGadget
           gadgets = []
           (lines.size - 2).downto(0) do |i|
             processor = emulate(lines[i..-1])
-            options = gen_constraints(processor, bin_sh: rw_off - bin_sh)
+            options = resolve(processor, bin_sh: rw_off - bin_sh)
             next if options.nil?
             offset = offset_of(lines[i])
             gadgets << OneGadget::Gadget::Gadget.new(offset, options)
@@ -34,6 +34,34 @@ module OneGadget
 
       def emulate(cmds)
         cmds.each_with_object(OneGadget::Emulators::I386.new) { |cmd, obj| obj.process(cmd) }
+      end
+
+      # Generating constraints to be a valid gadget.
+      # @param [OneGadget::Emulators::I386] processor The processor after executing the gadget.
+      # @param [Integer] bin_sh The related offset refer to /bin/sh.
+      # @return [Hash{String => Array<String>, String => String}, NilClass]
+      #   The options to create a {OneGadget::Gadget::Gadget} object.
+      #   Keys might be:
+      #   1. constraints: Array<String> List of constraints.
+      #   2. effect: String Result function call of this gadget.
+      #   If the constraints can never be satisfied, +nil+ is returned.
+      def resolve(processor, bin_sh: 0)
+        call = processor.registers['eip'].to_s
+        cur_top = processor.registers['esp'].evaluate('esp' => 0)
+        arg = processor.stack[cur_top]
+        # arg0 must be /bin/sh
+        return nil unless arg.to_s.include?(bin_sh.to_s(16))
+        rw_base = arg.deref.obj.to_s # this should be esi or ebx..
+        arg1 = processor.stack[cur_top + 4]
+        arg2 = processor.stack[cur_top + 8]
+        options = if call.include?('execve')
+                    valid_execve(arg1, arg2, rw_base: rw_base)
+                  elsif call.include?('execl')
+                    valid_execl(arg1, arg2, rw_base: rw_base, sh: bin_sh - 5)
+                  end
+        return nil if options.nil?
+        options[:constraints].unshift("#{rw_base} is the address of `rw-p` area of libc")
+        options
       end
 
       def valid_execl(arg1, arg2, rw_base: nil, sh: 0)
@@ -61,34 +89,6 @@ module OneGadget
           use_env = false
         end
         { constraints: cons, effect: %(execve("/bin/sh", #{arg1}, #{use_env ? 'environ' : envp})) }
-      end
-
-      # Generating constraints to be a valid gadget.
-      # @param [OneGadget::Emulators::I386] processor The processor after executing the gadget.
-      # @param [Integer] bin_sh The related offset refer to /bin/sh.
-      # @return [Hash{String => Array<String>, String => String}, NilClass]
-      #   The options to create a {OneGadget::Gadget::Gadget} object.
-      #   Keys might be:
-      #   1. constraints: Array<String> List of constraints.
-      #   2. effect: String Result function call of this gadget.
-      #   If the constraints can never be satisfied, +nil+ is returned.
-      def gen_constraints(processor, bin_sh: 0)
-        call = processor.registers['eip'].to_s
-        cur_top = processor.registers['esp'].evaluate('esp' => 0)
-        arg = processor.stack[cur_top]
-        # arg0 must be /bin/sh
-        return nil unless arg.to_s.include?(bin_sh.to_s(16))
-        rw_base = arg.deref.obj.to_s # this should be esi or ebx..
-        arg1 = processor.stack[cur_top + 4]
-        arg2 = processor.stack[cur_top + 8]
-        options = if call.include?('execve')
-                    valid_execve(arg1, arg2, rw_base: rw_base)
-                  elsif call.include?('execl')
-                    valid_execl(arg1, arg2, rw_base: rw_base, sh: bin_sh - 5)
-                  end
-        return nil if options.nil?
-        options[:constraints].unshift("#{rw_base} is the address of `rw-p` area of libc")
-        options
       end
 
       def rw_offset
