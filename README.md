@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/david942j/one_gadget.svg?branch=master)](https://travis-ci.org/david942j/one_gadget)
-![](http://ruby-gem-downloads-badge.herokuapp.com/one_gadget?type=total&color=orange)
+[![Downloads](http://ruby-gem-downloads-badge.herokuapp.com/one_gadget?type=total&color=orange)](https://rubygems.org/gems/one_gadget)
 [![Code Climate](https://codeclimate.com/github/david942j/one_gadget/badges/gpa.svg)](https://codeclimate.com/github/david942j/one_gadget)
 [![Issue Count](https://codeclimate.com/github/david942j/one_gadget/badges/issue_count.svg)](https://codeclimate.com/github/david942j/one_gadget)
 [![Test Coverage](https://codeclimate.com/github/david942j/one_gadget/badges/coverage.svg)](https://codeclimate.com/github/david942j/one_gadget/coverage)
@@ -41,38 +41,43 @@ one_gadget
 #                                      The script will be run as 'exploit-script $offset'.
 
 one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
-# offset: 0x4526a
+# 0x4526a execve("/bin/sh", rsp+0x30, environ)
 # constraints:
 #   [rsp+0x30] == NULL
-#
-# offset: 0xef6c4
+# 
+# 0xef6c4 execve("/bin/sh", rsp+0x50, environ)
 # constraints:
 #   [rsp+0x50] == NULL
-#
-# offset: 0xf0567
+# 
+# 0xf0567 execve("/bin/sh", rsp+0x70, environ)
 # constraints:
 #   [rsp+0x70] == NULL
-#
-# offset: 0xf5b10
+# 
+# 0xcc543 execve("/bin/sh", rcx, r12)
 # constraints:
-#   [rbp-0xf8] == NULL
-#   rcx == NULL
+#   rcx == NULL || [rcx] == NULL
+#   r12 == NULL || [r12] == NULL
+# 
+# 0xf5b10 execve("/bin/sh", rcx, [rbp-0xf8])
+# constraints:
+#   [rbp-0xf8] == NULL || [[rbp-0xf8]] == NULL
+#   rcx == NULL || [rcx] == NULL
 
 one_gadget /lib/i386-linux-gnu/libc.so.6
-# offset: 0x3ac69
+# 0x3ac69 execve("/bin/sh", esp+0x34, environ)
 # constraints:
 #   esi is the address of `rw-p` area of libc
 #   [esp+0x34] == NULL
-#
-# offset: 0x5fbbe
+# 
+# 0x5fbc5 execl("/bin/sh", eax)
 # constraints:
 #   esi is the address of `rw-p` area of libc
 #   eax == NULL
-#
-# offset: 0x12036c
+# 
+# 0x5fbc6 execl("/bin/sh", [esp])
 # constraints:
 #   esi is the address of `rw-p` area of libc
-#   eax == NULL
+#   [esp] == NULL
 
 ```
 
@@ -90,13 +95,18 @@ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-# => [283242, 980676, 984423, 1006352]
+# => [283242, 980676, 984423, 836931, 1006352]
 ```
 
 ## Screenshots
 
 ### Search gadgets from file
+
+#### 64 bit
 ![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file.png?raw=true)
+
+#### 32 bit
+![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file_32bit.png?raw=true)
 
 ### Fetch gadgets from database
 ![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
