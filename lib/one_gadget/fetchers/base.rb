@@ -58,17 +58,6 @@ module OneGadget
         lines = assembly.lines
         lines.first.scan(/^([\da-f]+):/)[0][0].to_i(16)
       end
-
-      def convert_to_gadget(assembly, &block)
-        lines = assembly.lines
-        offset = lines.first.scan(/^([\da-f]+):/)[0][0].to_i(16)
-        # fetch those might be constraints lines.
-        important_lines = lines.select(&block).map do |line|
-          ar = line.split("\t")
-          "#{ar.first} #{ar.last.gsub(/\s+/, ' ')}"
-        end
-        OneGadget::Gadget::Gadget.new(offset, constraints: important_lines)
-      end
     end
   end
 end

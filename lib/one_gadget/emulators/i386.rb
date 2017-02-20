@@ -3,19 +3,21 @@ require 'one_gadget/emulators/x86'
 module OneGadget
   module Emulators
     # Emulator of amd64 instruction set.
-    class Amd64 < X86
+    class I386 < X86
       class << self
-        # @return [String] rsp.
+        def bits
+          32
+        end
+
+        # @return [String] esp.
         def stack_pointer
-          'rsp'
+          'esp'
         end
       end
 
-      REGISTERS = %w(rax rbx rcx rdx rdi rsi rbp rsp rip) + 7.upto(15).map { |i| "r#{i}" }
-
-      # Instantiate a {Amd64} object.
+      REGISTERS = %w(eax ebx ecx edx edi esi ebp esp eip).freeze
+      # Instantiate a {I386} object.
       def initialize
-        @bits = 64
         super(REGISTERS)
       end
     end

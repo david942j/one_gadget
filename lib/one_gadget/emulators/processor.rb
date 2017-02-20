@@ -6,10 +6,12 @@ module OneGadget
     # Base class of a processor.
     class Processor
       attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
+      attr_reader :stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] The content on stack.
       # Instantiate a {Processor} object.
       # @param [Array<String>] registers Registers that supported in the architecture.
       def initialize(registers)
         @registers = registers.map { |reg| [reg, OneGadget::Emulators::Lambda.new(reg)] }.to_h
+        @stack = {}
       end
 
       # Parse one command into instruction and arguments.
