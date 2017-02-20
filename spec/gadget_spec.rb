@@ -14,7 +14,7 @@ describe OneGadget::Gadget do
 
   it 'inspect' do
     expect(OneGadget::Gadget.builds(@build_id).map(&:inspect).join).to eq <<-EOS
-offset: 0x1234	execve("/bin/sh", rsp+0x30, rax)
+0x1234	execve("/bin/sh", rsp+0x30, rax)
 constraints:
   [rsp+0x30] == NULL
   rax == 0

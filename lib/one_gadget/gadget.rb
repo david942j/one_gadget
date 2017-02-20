@@ -26,7 +26,7 @@ module OneGadget
 
       # Show gadget in a pretty way.
       def inspect
-        str = "#{OneGadget::Helper.colorize('offset', sev: :sym)}: #{OneGadget::Helper.hex(offset)}"
+        str = OneGadget::Helper.hex(offset)
         str += effect ? "\t#{effect}\n" : "\n"
         unless constraints.empty?
           str += "#{OneGadget::Helper.colorize('constraints')}:\n  "

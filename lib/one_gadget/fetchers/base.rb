@@ -22,7 +22,7 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&block)
-        cands = `objdump -w -d -M intel #{file}|egrep 'call.*<exec[^+]*>$' -B 20`.split('--').map do |cand|
+        cands = `objdump -w -d -M intel "#{file}"|egrep 'call.*<exec[^+]*>$' -B 20`.split('--').map do |cand|
           cand.lines.map(&:strip).reject(&:empty?).join("\n")
         end
         # remove all calls, jmps
