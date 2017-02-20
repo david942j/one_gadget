@@ -132,8 +132,8 @@ module OneGadget
       # @return [String]
       #   Only supports :amd64, :i386 now.
       def architecture(file)
-        str = `file #{::Shellwords.escape(file)}`
-        return :amd64 if str.include?('x86-64')
+        str = `readelf -h #{::Shellwords.escape(file)}`
+        return :amd64 if str.include?('X86-64')
         return :i386 if str.include?('Intel 80386')
         :unknown
       end

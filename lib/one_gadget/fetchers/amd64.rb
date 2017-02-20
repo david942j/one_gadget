@@ -7,13 +7,7 @@ module OneGadget
       # Gadgets for amd64 glibc.
       # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
       def find
-        bin_sh_hex = str_offset('/bin/sh').to_s(16)
-        cands = candidates do |candidate|
-          next false unless candidate.include?(bin_sh_hex) # works in x86-64
-          next false unless candidate.lines.last.include?('execve') # only care execve
-          true
-        end
-        cands.map do |candidate|
+        candidates.map do |candidate|
           processor = OneGadget::Emulators::Amd64.new
           candidate.lines.each { |l| processor.process(l) }
           offset = offset_of(candidate)
@@ -24,6 +18,31 @@ module OneGadget
       end
 
       private
+
+      def candidates
+        bin_sh_hex = str_offset('/bin/sh').to_s(16)
+        cands = super do |candidate|
+          next false unless candidate.include?(bin_sh_hex) # works in x86-64
+          next false unless candidate.lines.last.include?('execve') # only care execve
+          true
+        end
+        # find gadgets in form:
+        #   lea rdi, '/bin/sh'
+        #   jmp xxx
+        # xxx:
+        #   ...
+        #   call execve
+        cands2 = `#{objdump_cmd}|egrep 'rdi.*# #{bin_sh_hex}' -A 1`.split('--').map do |cand|
+          cand = cand.lines.map(&:strip).reject(&:empty?)
+          next nil unless cand.last.include?('jmp')
+          jmp_addr = cand.last.scan(/jmp\s+([\da-f]+)\s/)[0][0].to_i(16)
+          dump = `#{objdump_cmd(start: jmp_addr, stop: jmp_addr + 100)}|egrep '[0-9a-f]+:'`
+          remain = dump.lines.map(&:strip).reject(&:empty?)
+          remain = remain[0..remain.index { |r| r.match(/call.*<execve[^+]*>/) }]
+          [cand + remain].join("\n")
+        end.compact
+        cands + cands2
+      end
 
       def resolve(processor)
         # check rdi should always related to rip

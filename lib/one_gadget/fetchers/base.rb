@@ -22,7 +22,7 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&block)
-        cands = `objdump -w -d -M intel "#{file}"|egrep 'call.*<exec[^+]*>$' -B 20`.split('--').map do |cand|
+        cands = `#{objdump_cmd}|egrep 'call.*<exec[^+]*>$' -B 20`.split('--').map do |cand|
           cand.lines.map(&:strip).reject(&:empty?).join("\n")
         end
         # remove all calls, jmps
@@ -32,6 +32,13 @@ module OneGadget
       end
 
       private
+
+      def objdump_cmd(start: nil, stop: nil)
+        cmd = %(objdump -w -d -M intel "#{file}")
+        cmd.concat(" --start-address #{start}") if start
+        cmd.concat(" --stop-address #{stop}") if stop
+        cmd
+      end
 
       def slice_prefix(cands)
         cands.map do |cand|

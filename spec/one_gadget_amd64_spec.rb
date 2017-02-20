@@ -9,7 +9,7 @@ describe 'one_gadget' do
   describe 'from file' do
     it 'libc-2.19' do
       path = @data_path['libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so']
-      expect(OneGadget.gadgets(file: path)).to eq [0x4647c, 0xe5765, 0xe66bd]
+      expect(OneGadget.gadgets(file: path)).to eq [0x4647c, 0xc1ba3, 0xe4968, 0xe5765, 0xe66bd]
     end
 
     it 'libc-2.24' do

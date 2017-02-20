@@ -27,6 +27,7 @@ module OneGadget
       def process(cmd)
         inst, args = parse(cmd)
         return registers[pc] = args[0] if inst.inst == 'call'
+        return if inst.inst == 'jmp' # believe the fetcher has handled jmp.
         sym = "inst_#{inst.inst}".to_sym
         send(sym, *args)
       end
@@ -40,7 +41,8 @@ module OneGadget
           Instruction.new('add', 2),
           Instruction.new('sub', 2),
           Instruction.new('push', 1),
-          Instruction.new('call', 1)
+          Instruction.new('call', 1),
+          Instruction.new('jmp', 1)
         ]
       end
 
