@@ -39,7 +39,7 @@ module OneGadget
       # Generating constraints to be a valid gadget.
       # @param [OneGadget::Emulators::I386] processor The processor after executing the gadget.
       # @param [Integer] bin_sh The related offset refer to /bin/sh.
-      # @return [Hash{String => Array<String>, String => String}, NilClass]
+      # @return [Hash{Symbol => Array<String>, String}, NilClass]
       #   The options to create a {OneGadget::Gadget::Gadget} object.
       #   Keys might be:
       #   1. constraints: Array<String> List of constraints.
@@ -64,6 +64,15 @@ module OneGadget
         options
       end
 
+      # Resolve +call execl+ case.
+      # @param [OneGadget::Emulators::Lambda] arg1
+      #   The second argument.
+      # @param [OneGadget::Emulators::Lambda] arg2
+      #   The third argument.
+      # @param [String] rw_base Usually +ebx+ or +esi+.
+      # @param [Integer] sh The relative offset of string 'sh' appears.
+      # @return [Hash{Symbol => Array<String>, String}]
+      #   Same format as {#resolve}.
       def resolve_execl(arg1, arg2, rw_base: nil, sh: 0)
         args = []
         arg = arg1.to_s
@@ -77,6 +86,14 @@ module OneGadget
         { constraints: ["#{arg} == NULL"], effect: %(execl("/bin/sh", #{args.join(', ')})) }
       end
 
+      # Resolve +call execve+ case.
+      # @param [OneGadget::Emulators::Lambda] arg1
+      #   The second argument.
+      # @param [OneGadget::Emulators::Lambda] arg2
+      #   The third argument.
+      # @param [String] rw_base Usually +ebx+ or +esi+.
+      # @return [Hash{Symbol => Array<String>, String}]
+      #   Same format as {#resolve}.
       def resolve_execve(arg1, arg2, rw_base: nil)
         # arg1 == NULL || [arg1] == NULL
         # arg2 == NULL or arg2 is environ
