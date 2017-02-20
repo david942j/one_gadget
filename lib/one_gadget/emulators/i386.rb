@@ -8,17 +8,12 @@ module OneGadget
         def bits
           32
         end
-
-        # @return [String] esp.
-        def stack_pointer
-          'esp'
-        end
       end
 
       REGISTERS = %w(eax ebx ecx edx edi esi ebp esp eip).freeze
       # Instantiate a {I386} object.
       def initialize
-        super(REGISTERS)
+        super(REGISTERS, 'esp', 'eip')
       end
     end
   end

@@ -55,7 +55,7 @@ module OneGadget
             (gadgets[j].constraints - g.constraints).empty?
           end
         end
-        res.sort_by(&:offset)
+        res.sort_by!(&:offset)
       end
     end
     extend ClassMethods

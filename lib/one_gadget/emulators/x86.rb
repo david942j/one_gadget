@@ -5,11 +5,15 @@ module OneGadget
   module Emulators
     # Super class for amd64 and i386 processor.
     class X86 < Processor
+      attr_reader :sp # @return [String] Stack pointer.
+      attr_reader :pc # @return [String] Program counter.
       # Constructor for a x86 processor.
-      def initialize(*)
-        super
+      def initialize(registers, sp, pc)
+        super(registers)
+        @sp = sp
+        @pc = pc
         @stack = Hash.new do |h, k|
-          lmda = OneGadget::Emulators::Lambda.new(self.class.stack_pointer)
+          lmda = OneGadget::Emulators::Lambda.new(sp)
           lmda.immi = k
           lmda.deref!
           h[k] = lmda
@@ -22,7 +26,7 @@ module OneGadget
       # @return [void]
       def process(cmd)
         inst, args = parse(cmd)
-        return if inst.inst == 'call' # later
+        return registers[pc] = args[0] if inst.inst == 'call'
         sym = "inst_#{inst.inst}".to_sym
         send(sym, *args)
       end
@@ -45,11 +49,6 @@ module OneGadget
         # @return [Integer] 32 or 64.
         def bits; raise NotImplementedError
         end
-
-        # The name of stake frame register.
-        # @return [String] +esp+ or +rsp+.
-        def stack_pointer; raise NotImplementedError
-        end
       end
 
       private
@@ -64,7 +63,7 @@ module OneGadget
           @registers[tar] = src
         else
           # Just ignore strange case...
-          return unless tar.include?(self.class.stack_pointer)
+          return unless tar.include?(sp)
           tar = OneGadget::Emulators::Lambda.parse(tar, predefined: @registers)
           return if tar.deref_count != 1 # should not happened
           tar.ref!
@@ -80,8 +79,8 @@ module OneGadget
 
       def inst_push(val)
         val = OneGadget::Emulators::Lambda.parse(val, predefined: @registers)
-        @registers[self.class.stack_pointer] -= bytes
-        cur_top = @registers[self.class.stack_pointer].evaluate(eval_dict)
+        @registers[sp] -= bytes
+        cur_top = @registers[sp].evaluate(eval_dict)
         raise ArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
         @stack[cur_top] = val
       end
@@ -102,7 +101,7 @@ module OneGadget
 
       def eval_dict
         dict = {}
-        dict[self.class.stack_pointer] = 0
+        dict[sp] = 0
         dict
       end
     end
