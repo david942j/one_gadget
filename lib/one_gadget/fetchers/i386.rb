@@ -55,16 +55,16 @@ module OneGadget
         arg1 = processor.stack[cur_top + 4]
         arg2 = processor.stack[cur_top + 8]
         options = if call.include?('execve')
-                    valid_execve(arg1, arg2, rw_base: rw_base)
+                    resolve_execve(arg1, arg2, rw_base: rw_base)
                   elsif call.include?('execl')
-                    valid_execl(arg1, arg2, rw_base: rw_base, sh: bin_sh - 5)
+                    resolve_execl(arg1, arg2, rw_base: rw_base, sh: bin_sh - 5)
                   end
         return nil if options.nil?
         options[:constraints].unshift("#{rw_base} is the address of `rw-p` area of libc")
         options
       end
 
-      def valid_execl(arg1, arg2, rw_base: nil, sh: 0)
+      def resolve_execl(arg1, arg2, rw_base: nil, sh: 0)
         args = []
         arg = arg1.to_s
         if arg.include?(sh.to_s(16))
@@ -77,7 +77,7 @@ module OneGadget
         { constraints: ["#{arg} == NULL"], effect: %(execl("/bin/sh", #{args.join(', ')})) }
       end
 
-      def valid_execve(arg1, arg2, rw_base: nil)
+      def resolve_execve(arg1, arg2, rw_base: nil)
         # arg1 == NULL || [arg1] == NULL
         # arg2 == NULL or arg2 is environ
         cons = [should_null(arg1.to_s)]
