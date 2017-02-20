@@ -54,45 +54,45 @@ module OneGadget
       private
 
       def register?(reg)
-        @registers.include?(reg)
+        registers.include?(reg)
       end
 
       def inst_mov(tar, src)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: @registers)
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         if register?(tar)
-          @registers[tar] = src
+          registers[tar] = src
         else
           # Just ignore strange case...
           return unless tar.include?(sp)
-          tar = OneGadget::Emulators::Lambda.parse(tar, predefined: @registers)
+          tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
           return if tar.deref_count != 1 # should not happened
           tar.ref!
-          @stack[tar.evaluate(eval_dict)] = src
+          stack[tar.evaluate(eval_dict)] = src
         end
       end
 
       def inst_lea(tar, src)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: @registers)
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         src.ref!
-        @registers[tar] = src
+        registers[tar] = src
       end
 
       def inst_push(val)
-        val = OneGadget::Emulators::Lambda.parse(val, predefined: @registers)
-        @registers[sp] -= bytes
-        cur_top = @registers[sp].evaluate(eval_dict)
+        val = OneGadget::Emulators::Lambda.parse(val, predefined: registers)
+        registers[sp] -= bytes
+        cur_top = registers[sp].evaluate(eval_dict)
         raise ArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
-        @stack[cur_top] = val
+        stack[cur_top] = val
       end
 
       def inst_add(tar, src)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: @registers)
-        @registers[tar] += src
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        registers[tar] += src
       end
 
       def inst_sub(tar, src)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: @registers)
-        @registers[tar] -= src
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        registers[tar] -= src
       end
 
       def bytes

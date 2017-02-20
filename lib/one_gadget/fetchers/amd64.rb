@@ -17,9 +17,9 @@ module OneGadget
           processor = OneGadget::Emulators::Amd64.new
           candidate.lines.each { |l| processor.process(l) }
           offset = offset_of(candidate)
-          constraints = gen_constraints(processor)
-          next nil if constraints.nil? # impossible be a gadget
-          OneGadget::Gadget::Gadget.new(offset, constraints: constraints)
+          options = gen_constraints(processor)
+          next nil if options.nil? # impossible be a gadget
+          OneGadget::Gadget::Gadget.new(offset, options)
         end.compact
       end
 
@@ -29,10 +29,15 @@ module OneGadget
         # check rdi should always related to rip
         return unless processor.registers['rdi'].to_s.include?('rip')
         # rsi or [rsi] should be zero
-        [
-          should_null(processor.registers['rsi'].to_s),
-          should_null(processor.registers['rdx'].to_s, allow_global: true)
-        ].compact
+        rsi = processor.registers['rsi'].to_s
+        cons = [should_null(rsi)]
+        rdx = processor.registers['rdx'].to_s
+        use_env = true
+        if should_null(rdx, allow_global: true)
+          cons << should_null(rdx, allow_global: true)
+          use_env = false
+        end
+        { constraints: cons, effect: %(execve("/bin/sh", #{rsi}, #{use_env ? 'environ' : rdx})) }
       end
 
       def should_null(str, allow_global: false)

@@ -21,10 +21,10 @@ module OneGadget
           gadgets = []
           (lines.size - 2).downto(0) do |i|
             processor = emulate(lines[i..-1])
-            constraints = gen_constraints(processor, bin_sh: rw_off - bin_sh)
-            next if constraints.nil?
-            offset = offset_of(lines[i..-1].join)
-            gadgets << OneGadget::Gadget::Gadget.new(offset, constraints: constraints)
+            options = gen_constraints(processor, bin_sh: rw_off - bin_sh)
+            next if options.nil?
+            offset = offset_of(lines[i])
+            gadgets << OneGadget::Gadget::Gadget.new(offset, options)
           end
           gadgets
         end.flatten.compact
@@ -37,11 +37,16 @@ module OneGadget
       end
 
       def valid_execl(arg1, arg2, rw_base: nil, sh: 0)
+        args = []
         arg = arg1.to_s
-        arg = arg2.to_s if arg.include?(sh.to_s(16))
+        if arg.include?(sh.to_s(16))
+          arg = arg2.to_s
+          args << '"sh"'
+        end
+        args << arg
         return nil if arg.include?(rw_base) || arg.include?('eip') # we don't want base-related constraints
         # now arg is the constraint.
-        ["#{arg} == NULL"]
+        { constraints: ["#{arg} == NULL"], effect: %(execl("/bin/sh", #{args.join(', ')})) }
       end
 
       def valid_execve(arg1, arg2, rw_base: nil)
@@ -49,19 +54,24 @@ module OneGadget
         # arg2 == NULL or arg2 is environ
         cons = [should_null(arg1.to_s)]
         envp = arg2.to_s
+        use_env = true
         unless envp.include?('[[') && envp.include?(rw_base) # hope this is environ_ptr_0
           return nil if envp.include?('[') # we don't like this :(
           cons << should_null(envp)
+          use_env = false
         end
-        cons
+        { constraints: cons, effect: %(execve("/bin/sh", #{arg1}, #{use_env ? 'environ' : envp})) }
       end
 
       # Generating constraints to be a valid gadget.
       # @param [OneGadget::Emulators::I386] processor The processor after executing the gadget.
       # @param [Integer] bin_sh The related offset refer to /bin/sh.
-      # @return [Array<String>, NilClass]
-      #   List of constraints.
-      #   If constraints can never be statified, +nil+ is returned.
+      # @return [Hash{String => Array<String>, String => String}, NilClass]
+      #   The options to create a {OneGadget::Gadget::Gadget} object.
+      #   Keys might be:
+      #   1. constraints: Array<String> List of constraints.
+      #   2. effect: String Result function call of this gadget.
+      #   If the constraints can never be satisfied, +nil+ is returned.
       def gen_constraints(processor, bin_sh: 0)
         call = processor.registers['eip'].to_s
         cur_top = processor.registers['esp'].evaluate('esp' => 0)
@@ -71,13 +81,14 @@ module OneGadget
         rw_base = arg.deref.obj.to_s # this should be esi or ebx..
         arg1 = processor.stack[cur_top + 4]
         arg2 = processor.stack[cur_top + 8]
-        cons = if call.include?('execve')
-                 valid_execve(arg1, arg2, rw_base: rw_base)
-               elsif call.include?('execl')
-                 valid_execl(arg1, arg2, rw_base: rw_base, sh: bin_sh - 5)
-               end
-        return nil if cons.nil?
-        ["#{rw_base} is the address of `rw-p` area of libc"] + cons
+        options = if call.include?('execve')
+                    valid_execve(arg1, arg2, rw_base: rw_base)
+                  elsif call.include?('execl')
+                    valid_execl(arg1, arg2, rw_base: rw_base, sh: bin_sh - 5)
+                  end
+        return nil if options.nil?
+        options[:constraints].unshift("#{rw_base} is the address of `rw-p` area of libc")
+        options
       end
 
       def rw_offset

@@ -55,8 +55,7 @@ module OneGadget
       end
 
       def offset_of(assembly)
-        lines = assembly.lines
-        lines.first.scan(/^([\da-f]+):/)[0][0].to_i(16)
+        assembly.scan(/^([\da-f]+):/)[0][0].to_i(16)
       end
     end
   end

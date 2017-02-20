@@ -1,4 +1,5 @@
 require 'one_gadget/emulators/x86'
+require 'one_gadget/abi'
 
 module OneGadget
   module Emulators
@@ -10,10 +11,9 @@ module OneGadget
         end
       end
 
-      REGISTERS = %w(eax ebx ecx edx edi esi ebp esp eip).freeze
-      # Instantiate a {I386} object.
+      # Instantiate an {I386} object.
       def initialize
-        super(REGISTERS, 'esp', 'eip')
+        super(OneGadget::ABI.i386, 'esp', 'eip')
       end
     end
   end

@@ -1,15 +1,13 @@
 require 'one_gadget/emulators/x86'
+require 'one_gadget/abi'
 
 module OneGadget
   module Emulators
     # Emulator of amd64 instruction set.
     class Amd64 < X86
-      REGISTERS = %w(rax rbx rcx rdx rdi rsi rbp rsp rip) + 7.upto(15).map { |i| "r#{i}" }
-
-      # Instantiate a {Amd64} object.
+      # Instantiate an {Amd64} object.
       def initialize
-        @bits = 64
-        super(REGISTERS, 'rsp', 'rip')
+        super(OneGadget::ABI.amd64, 'rsp', 'rip')
       end
     end
   end

@@ -9,6 +9,8 @@ module OneGadget
       attr_accessor :offset
       # @return [Array<String>] The constraints need for this gadget.
       attr_accessor :constraints
+      # @return [String] The final result of this gadget.
+      attr_accessor :effect
 
       # Initialize method of {Gadget} instance.
       # @param [Integer] offset The relative address offset of this gadget.
@@ -19,17 +21,19 @@ module OneGadget
       def initialize(offset, **options)
         @offset = offset
         @constraints = options[:constraints] || []
+        @effect = options[:effect]
       end
 
       # Show gadget in a pretty way.
       def inspect
-        str = format("#{OneGadget::Helper.colorize('offset', sev: :sym)}: 0x%x\n", offset)
+        str = "#{OneGadget::Helper.colorize('offset', sev: :sym)}: #{OneGadget::Helper.hex(offset)}"
+        str += effect ? "\t#{effect}\n" : "\n"
         unless constraints.empty?
           str += "#{OneGadget::Helper.colorize('constraints')}:\n  "
           str += constraints.join("\n  ")
         end
         str.gsub!(/0x[\da-f]+/) { |s| OneGadget::Helper.colorize(s, sev: :integer) }
-        OneGadget::ABI.registers.each { |reg| str.gsub!(reg, OneGadget::Helper.colorize(reg, sev: :reg)) }
+        OneGadget::ABI.all.each { |reg| str.gsub!(reg, OneGadget::Helper.colorize(reg, sev: :reg)) }
         str + "\n"
       end
     end
