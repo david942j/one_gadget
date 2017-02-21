@@ -58,6 +58,11 @@ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 #   rcx == NULL || [rcx] == NULL
 #   r12 == NULL || [r12] == NULL
 # 
+# 0xcc618 execve("/bin/sh", rax, r12)
+# constraints:
+#   rax == NULL || [rax] == NULL
+#   r12 == NULL || [r12] == NULL
+# 
 # 0xf5b10 execve("/bin/sh", rcx, [rbp-0xf8])
 # constraints:
 #   [rbp-0xf8] == NULL || [[rbp-0xf8]] == NULL
@@ -95,7 +100,7 @@ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-# => [283242, 980676, 984423, 836931, 1006352]
+# => [283242, 980676, 984423, 836931, 837144, 1006352]
 ```
 
 ## Screenshots
