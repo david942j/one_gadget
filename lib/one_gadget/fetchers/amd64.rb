@@ -48,6 +48,8 @@ module OneGadget
       end
 
       def resolve(processor)
+        # must end with execve
+        return unless processor.registers['rip'].to_s.include?('execve')
         # check rdi should always related to rip
         return unless processor.registers['rdi'].to_s.include?('rip')
         # rsi or [rsi] should be zero

@@ -21,15 +21,26 @@ module OneGadget
       end
 
       # Process one command.
+      # Will raise exceptions when encounter unhandled instruction.
       # @param [String] cmd
       #   One line from result of objdump.
       # @return [void]
-      def process(cmd)
+      def process!(cmd)
         inst, args = parse(cmd)
         return registers[pc] = args[0] if inst.inst == 'call'
         return if inst.inst == 'jmp' # believe the fetcher has handled jmp.
         sym = "inst_#{inst.inst}".to_sym
         send(sym, *args)
+      end
+
+      # Process one command, without raising any exceptions.
+      # @param [String] cmd
+      #   See {#process!} for more information.
+      # @return [void]
+      def process(cmd)
+        process!(cmd)
+      rescue ArgumentError
+        nil
       end
 
       # Support instruction set.

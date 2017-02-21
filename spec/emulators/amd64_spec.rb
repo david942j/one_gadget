@@ -31,5 +31,10 @@ describe OneGadget::Emulators::Amd64 do
       expect(@processor.registers['rdx'].to_s).to eq 'rdx-0x30'
       expect(@processor.registers['rax'].to_s).to eq 'rdx'
     end
+
+    it 'invalid instruction' do
+      expect(@processor.process('oao')).to be nil
+      expect { @processor.process!('oao') }.to raise_error ArgumentError
+    end
   end
 end
