@@ -28,13 +28,16 @@ module OneGadget
         end
         # find gadgets in form:
         #   lea rdi, '/bin/sh'
+        #   ...
         #   jmp xxx
         # xxx:
         #   ...
         #   call execve
-        cands2 = `#{objdump_cmd}|egrep 'rdi.*# #{bin_sh_hex}' -A 1`.split('--').map do |cand|
+        cands2 = `#{objdump_cmd}|egrep 'rdi.*# #{bin_sh_hex}' -A 3`.split('--').map do |cand|
           cand = cand.lines.map(&:strip).reject(&:empty?)
-          next nil unless cand.last.include?('jmp')
+          jmp_at = cand.index { |c| c.include?('jmp') }
+          next nil if jmp_at.nil?
+          cand = cand[0..jmp_at]
           jmp_addr = cand.last.scan(/jmp\s+([\da-f]+)\s/)[0][0].to_i(16)
           dump = `#{objdump_cmd(start: jmp_addr, stop: jmp_addr + 100)}|egrep '[0-9a-f]+:'`
           remain = dump.lines.map(&:strip).reject(&:empty?)
