@@ -24,6 +24,10 @@ describe 'one_gadget' do
       expect(OneGadget.gadgets(build_id: @build_id)).not_to be_empty
     end
 
+    it 'alias' do
+      expect(one_gadget(build_id: @build_id)).to eq OneGadget.gadgets(build_id: @build_id)
+    end
+
     it 'invalid' do
       expect { OneGadget.gadgets(build_id: '^_^') }.to raise_error(ArgumentError, 'invalid BuildID format: "^_^"')
     end

@@ -37,6 +37,15 @@ module OneGadget
   end
 end
 
+# Shorter way to use one gadget.
+# @param [Mixed] args
+#   See {OneGadget#gadgets} for more information.
+# @return [Array<OneGadget::Gadget::Gadget>, Array<Integer>]
+#   The gadgets found.
+def one_gadget(*args)
+  OneGadget.gadgets(*args)
+end
+
 require 'one_gadget/fetcher'
 require 'one_gadget/helper'
 require 'one_gadget/logger'
