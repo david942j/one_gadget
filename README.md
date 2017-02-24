@@ -27,6 +27,8 @@ gem install one_gadget
 
 OneGadget use simple self-implement symbolic execution to find the constraints of gadgets.
 
+The article introducing how I developed this tool can be found [here](https://david942j.blogspot.com/2017/02/project-one-gadget-in-glibc.html).
+
 ## Usage
 
 ### Command Line Tool
