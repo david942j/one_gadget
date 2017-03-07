@@ -47,11 +47,10 @@ module OneGadget
       # Color codes for pretty print
       COLOR_CODE = {
         esc_m: "\e[0m",
-        normal_s: "\e[38;5;1m", # red
-        integer: "\e[38;5;12m", # light blue
-        fatal: "\e[38;5;197m", # dark red
-        reg: "\e[38;5;120m", # light green
-        sym: "\e[38;5;229m", # pry like
+        normal_s: "\e[31m", # red
+        integer: "\e[1m\e[34m", # light blue
+        reg: "\e[32m", # light green
+        sym: "\e[33m", # pry like
       }.freeze
 
       # Wrapper color codes for pretty inspect.

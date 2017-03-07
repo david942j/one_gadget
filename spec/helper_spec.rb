@@ -15,7 +15,7 @@ describe OneGadget::Helper do
   end
 
   it 'colorize' do
-    expect(OneGadget::Helper.colorize('123', sev: :integer)).to eq "\e[38;5;12m123\e[0m"
+    expect(OneGadget::Helper.colorize('123', sev: :integer)).to eq "\e[1m\e[34m123\e[0m"
   end
 
   it 'url_request' do
