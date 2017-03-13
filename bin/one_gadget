@@ -1,4 +1,4 @@
-#!/usr/bun/env ruby
+#!/usr/bin/env ruby
 require 'one_gadget'
 require 'optionparser'
 
