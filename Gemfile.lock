@@ -1,8 +1,8 @@
 PATH
   remote: .
   specs:
-    one_gadget (1.3.2)
-      elftools
+    one_gadget (1.3.3)
+      elftools (~> 0)
 
 GEM
   remote: https://rubygems.org/

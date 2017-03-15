@@ -12,7 +12,7 @@ When playing ctf pwn challenges we usually need the one-gadget of `execve('/bin/
 
 This gem provides such gadget finder, no need to use IDA-pro every time like a fool.
 
-Also provides the command-line tool `one_gadget` for easy usage.
+This work provides the command-line tool `one_gadget` for easy usage.
 
 Note: Supports amd64 and i386!
 
