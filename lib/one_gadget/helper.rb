@@ -1,8 +1,9 @@
-require 'pathname'
-require 'shellwords'
+require 'elftools'
 require 'net/http'
 require 'openssl'
+require 'pathname'
 require 'tempfile'
+
 require 'one_gadget/logger'
 
 module OneGadget
@@ -28,10 +29,7 @@ module OneGadget
       #   build_id_of('/lib/x86_64-linux-gnu/libc-2.23.so')
       #   #=> '60131540dadc6796cab33388349e6e4e68692053'
       def build_id_of(path)
-        cmd = 'readelf -n ' + ::Shellwords.escape(path)
-        bid = `#{cmd}`.scan(/Build ID: (#{BUILD_ID_FORMAT})$/).first
-        return nil if bid.nil?
-        bid.first
+        ELFTools::ELFFile.new(File.open(path)).build_id
       end
 
       # Disable colorize
@@ -131,9 +129,10 @@ module OneGadget
       # @return [String]
       #   Only supports :amd64, :i386 now.
       def architecture(file)
-        str = `readelf -h #{::Shellwords.escape(file)}`
+        str = ELFTools::ELFFile.new(File.open(file)).machine
         return :amd64 if str.include?('X86-64')
         return :i386 if str.include?('Intel 80386')
+      rescue ELFTools::ELFError # not a valid ELF
         :unknown
       end
 

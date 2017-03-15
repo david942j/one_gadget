@@ -1,5 +1,6 @@
 require 'one_gadget/fetchers/base'
 require 'one_gadget/emulators/i386'
+require 'elftools'
 
 module OneGadget
   module Fetcher
@@ -109,9 +110,9 @@ module OneGadget
       end
 
       def rw_offset
+        elf = ELFTools::ELFFile.new(File.open(file))
         # How to find this offset correctly..?
-        line = `readelf -d #{file}|grep PLTGOT`
-        line.scan(/0x[\da-f]+/).last.to_i(16) & -0x1000
+        elf.segment_by_type(:dynamic).tag_by_type(:pltgot).header.d_val & -0x1000
       end
 
       def should_null(str)
