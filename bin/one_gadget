@@ -1,10 +1,10 @@
 #!/usr/bin/env ruby
 require 'one_gadget'
-require 'optionparser'
+require 'optparse'
 
 options = { raw: false }
 usage = 'Usage: one_gadget [file] [options]'
-parser = OptionParser.new do |opts|
+parser = OptParse.new do |opts|
   opts.banner = usage
 
   opts.on('-b', '--build-id BuildID', 'BuildID[sha1] of libc.') do |b|
