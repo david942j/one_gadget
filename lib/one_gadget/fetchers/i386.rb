@@ -112,7 +112,7 @@ module OneGadget
       def rw_offset
         elf = ELFTools::ELFFile.new(File.open(file))
         # How to find this offset correctly..?
-        elf.segment_by_type(:dynamic).tag_by_type(:pltgot).header.d_val
+        elf.segment_by_type(:dynamic).tag_by_type(:pltgot).value
       end
 
       def should_null(str)
