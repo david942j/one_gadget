@@ -34,7 +34,7 @@ module OneGadget
       private
 
       def objdump_cmd(start: nil, stop: nil)
-        cmd = %(objdump -w -d -M intel "#{file}")
+        cmd = %(objdump -w -d -M intel #{file}) # +file+ has been escaped
         cmd.concat(" --start-address #{start}") if start
         cmd.concat(" --stop-address #{stop}") if stop
         cmd
