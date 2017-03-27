@@ -3,8 +3,8 @@ require 'one_gadget'
 describe 'one_gadget' do
   before(:each) do
     @build_id = '926eb99d49cab2e5622af38ab07395f5b32035e9'
-    @libcpath19 = File.join(File.dirname(__FILE__), 'data', 'libc-2.19-fd51b20e670e9a9f60dc3b06dc9761fb08c9358b.so')
-    @libcpath23 = File.join(File.dirname(__FILE__), 'data', 'libc-2.23-926eb99d49cab2e5622af38ab07395f5b32035e9.so')
+    @libcpath19 = File.join(__dir__, 'data', 'libc-2.19-fd51b20e670e9a9f60dc3b06dc9761fb08c9358b.so')
+    @libcpath23 = File.join(__dir__, 'data', 'libc-2.23-926eb99d49cab2e5622af38ab07395f5b32035e9.so')
   end
 
   it 'from file libc-2.19' do

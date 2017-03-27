@@ -132,8 +132,9 @@ module OneGadget
         str = ELFTools::ELFFile.new(File.open(file)).machine
         return :amd64 if str.include?('X86-64')
         return :i386 if str.include?('Intel 80386')
-      rescue ELFTools::ELFError # not a valid ELF
         :unknown
+      rescue ELFTools::ELFError # not a valid ELF
+        :invalid
       end
 
       # Present number in hex format.

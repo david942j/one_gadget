@@ -34,12 +34,12 @@ module OneGadget
       #   contains offset only.
       #   Otherwise, array of gadgets is returned.
       def from_file(file, details: false)
-        gadgets = {
+        klass = {
           amd64: OneGadget::Fetcher::Amd64,
-          i386: OneGadget::Fetcher::I386,
-          unknown: OneGadget::Fetcher::Base
-        }[OneGadget::Helper.architecture(file)].new(file).find
-        gadgets = trim_gadgets(gadgets)
+          i386: OneGadget::Fetcher::I386
+        }[OneGadget::Helper.architecture(file)]
+        raise ArgumentError, 'Unsupported architecture!' if klass.nil?
+        gadgets = trim_gadgets(klass.new(file).find)
         return gadgets if details
         gadgets.map(&:offset)
       end

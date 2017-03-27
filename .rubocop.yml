@@ -1,3 +1,7 @@
+AllCops:
+  DisplayCopNames: true
+  DisplayStyleGuide: true
+
 Metrics/AbcSize:
   Enabled: false
 

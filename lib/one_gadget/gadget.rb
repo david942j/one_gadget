@@ -40,7 +40,7 @@ module OneGadget
 
     # Define class methods here.
     module ClassMethods
-      BUILDS_PATH = File.join(File.dirname(__FILE__), 'builds').freeze
+      BUILDS_PATH = File.join(__dir__, 'builds').freeze
       BUILDS = Hash.new { |h, k| h[k] = [] }
       # Get gadgets from pre-defined corpus.
       # @param [String] build_id Desired build id.

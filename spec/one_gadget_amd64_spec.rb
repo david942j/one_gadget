@@ -3,7 +3,7 @@ require 'one_gadget'
 describe 'one_gadget' do
   before(:each) do
     @build_id = '60131540dadc6796cab33388349e6e4e68692053'
-    @data_path = ->(file) { File.join(File.dirname(__FILE__), 'data', file) }
+    @data_path = ->(file) { File.join(__dir__, 'data', file) }
   end
 
   describe 'from file' do
