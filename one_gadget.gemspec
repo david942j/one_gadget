@@ -13,7 +13,7 @@ Gem::Specification.new do |s|
 
   This gem provides such gadget finder, no need to use IDA-pro every time like a fool :p.
 
-  Also provides the command-line tool +one_gadget+ for easy usage.
+  Typing `one_gadget filename` in terminal and having fun!
   EOS
   s.license       = 'MIT'
   s.authors       = ['david942j']
