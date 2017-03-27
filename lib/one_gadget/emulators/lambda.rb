@@ -3,10 +3,10 @@ require 'one_gadget/helper'
 module OneGadget
   module Emulators
     # A {Lambda} object can be:
-    # 1. {String} # variable name
-    # 2. {Numeric}
-    # 3. {Lambda} + {Numeric}
-    # 4. dereference {Lambda}
+    # 1. +String+ (variable name)
+    # 2. +Numeric+
+    # 3. {Lambda} + +Numeric+
+    # 4. dereferenced {Lambda}
     class Lambda
       attr_accessor :obj # @return [String, Lambda] The object currently related to.
       attr_accessor :immi # @return [Integer] The immidiate value currently added.
@@ -49,6 +49,7 @@ module OneGadget
 
       # Decrease dreference count with 1.
       # @return [void]
+      # @raise [ArgumentError] When this object cannot be referenced anymore.
       def ref!
         raise ArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
         @deref_count -= 1
@@ -86,14 +87,18 @@ module OneGadget
       end
 
       class << self
-        # Target: parse something like +[rsp+0x50]+ into a {Lambda} object.
+        # Target: parse things like <tt>[rsp+0x50]</tt> into a {Lambda} object.
         # @param [String] arg
         # @param [Hash{String => Lambda}] predefined
+        #   Predfined values.
         # @return [OneGadget::Emulators::Lambda, Integer]
         #   If +arg+ contains number only, return it.
         #   Otherwise, return a {Lambda} object.
         # @example
-        #   parse('[rsp+0x50]') #=> #<Lambda @obj='rsp', @immi=80, @deref_count=1>
+        #   obj = parse('[rsp+0x50]')
+        #   #=> #<Lambda @obj='rsp', @immi=80, @deref_count=1>
+        #   parse('obj+0x30', predefined: { 'obj' => obj }).to_s
+        #   #=> '[rsp+0x50]+0x30'
         def parse(arg, predefined: {})
           deref_count = 0
           if arg[0] == '[' # a little hack because there should nerver something like +[[rsp+1]+2]+ to parse.

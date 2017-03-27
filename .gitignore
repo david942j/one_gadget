@@ -1,3 +1,5 @@
 *.gem
 /coverage/
 /libcs/
+/doc/
+/.yardoc/

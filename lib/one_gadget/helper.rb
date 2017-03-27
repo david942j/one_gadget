@@ -9,6 +9,7 @@ require 'one_gadget/logger'
 module OneGadget
   # Define some helpful methods here.
   module Helper
+    # Format of build-id, 40 hex numbers.
     BUILD_ID_FORMAT = /[0-9a-f]{40}/
     # Define class methods here.
     module ClassMethods
@@ -125,7 +126,7 @@ module OneGadget
       end
 
       # Fetch the file archiecture of +file+.
-      # @param [String] The target ELF filename.
+      # @param [String] file The target ELF filename.
       # @return [String]
       #   Only supports :amd64, :i386 now.
       def architecture(file)

@@ -2,7 +2,7 @@ require 'shellwords'
 
 module OneGadget
   module Fetcher
-    # define common methods for gadget fetchers.
+    # Define common methods for gadget fetchers.
     class Base
       # The absolute path of glibc.
       # @return [String] The filename.
@@ -19,6 +19,12 @@ module OneGadget
       end
 
       # Fetch candidates that end with call exec*.
+      #
+      # Give a block to filter gadget candidates.
+      # @yieldparam [String] cand
+      #   Is this candidate valid?
+      # @yieldreturn [Boolean]
+      #   True for valid.
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&block)

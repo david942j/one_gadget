@@ -6,6 +6,7 @@ module OneGadget
     # Emulator of amd64 instruction set.
     class I386 < X86
       class << self
+        # Yap, bits.
         def bits
           32
         end
