@@ -15,6 +15,11 @@ describe 'one_gadget' do
     expect(OneGadget.gadgets(file: @libcpath23, force_file: true)).to eq [0x3ac69, 0x5fbc5, 0x5fbc6]
   end
 
+  it 'special filename' do
+    path = File.join(__dir__, 'data', 'filename$with+special&keys')
+    expect(OneGadget.gadgets(file: path)).not_to be_empty
+  end
+
   describe 'from build id' do
     it 'normal' do
       # only check not empty because the gadgets might add frequently.

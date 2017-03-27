@@ -10,7 +10,7 @@ module OneGadget
       # Instantiate a fetcher object.
       # @param [String] file Absolute path of target libc.
       def initialize(file)
-        @file = ::Shellwords.escape(file)
+        @file = file
       end
 
       # Method need to be implemented in inheritors.
@@ -34,7 +34,7 @@ module OneGadget
       private
 
       def objdump_cmd(start: nil, stop: nil)
-        cmd = %(objdump -w -d -M intel #{file}) # +file+ has been escaped
+        cmd = %(objdump -w -d -M intel #{::Shellwords.escape(file)})
         cmd.concat(" --start-address #{start}") if start
         cmd.concat(" --stop-address #{stop}") if stop
         cmd
@@ -55,7 +55,8 @@ module OneGadget
       end
 
       def str_offset(str)
-        match = `strings -tx #{file} -n #{str.size} | grep " #{::Shellwords.escape(str)}"`.lines.map(&:strip).first
+        match = `strings -tx #{::Shellwords.escape(file)} -n #{str.size} | grep #{::Shellwords.escape(' ' + str)}`
+        match = match.lines.map(&:strip).first
         return nil if match.nil?
         # 17c8c3 /bin/sh
         match.split.first.to_i(16)
