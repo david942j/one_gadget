@@ -46,10 +46,13 @@ module OneGadget
       BUILDS = Hash.new { |h, k| h[k] = [] }
       # Get gadgets from pre-defined corpus.
       # @param [String] build_id Desired build id.
+      # @param [Boolean] remote
+      #   When local not found, try search in latest version?
       # @return [Array<Gadget::Gadget>] Gadgets.
-      def builds(build_id)
+      def builds(build_id, remote: true)
         require_all if BUILDS.empty?
         return BUILDS[build_id] if BUILDS.key?(build_id)
+        return [] unless remote
         # fetch remote builds
         table = OneGadget::Helper.remote_builds.find { |c| c.include?(build_id) }
         return [] if table.nil? # remote doesn't have this one either.

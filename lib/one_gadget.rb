@@ -28,7 +28,7 @@ module OneGadget
         file = OneGadget::Helper.abspath(file)
         build_id = OneGadget::Helper.build_id_of(file)
         if !force_file && build_id
-          gadgets = OneGadget::Fetcher.from_build_id(build_id, details: details)
+          gadgets = OneGadget::Fetcher.from_build_id(build_id, details: details, remote: false)
           return gadgets unless gadgets.empty?
         end
         OneGadget::Fetcher.from_file(file, details: details)
