@@ -1,8 +1,38 @@
 require 'one_gadget/gadget'
-# Ubuntu GLIBC 2.23-0ubuntu3
-# ELF 64-bit LSB shared object, x86-64
+# Advanced Micro Devices X86-64
+# 
+# GNU C Library (Ubuntu GLIBC 2.23-0ubuntu3) stable release version 2.23, by Roland McGrath et al.
+# Copyright (C) 2016 Free Software Foundation, Inc.
+# This is free software; see the source for copying conditions.
+# There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.
+# Compiled by GNU CC version 5.3.1 20160413.
+# Available extensions:
+# 	crypt add-on version 2.1 by Michael Glad and others
+# 	GNU Libidn by Simon Josefsson
+# 	Native POSIX Threads Library by Ulrich Drepper et al
+# 	BIND-8.2.3-T5B
+# libc ABIs: UNIQUE IFUNC
+# For bug reporting instructions, please see:
+# <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
+
 build_id = File.basename(__FILE__, '.rb').split('-').last
-OneGadget::Gadget.add(build_id, 0x4525a, constraints: ['[rsp+0x30] == NULL'])
-OneGadget::Gadget.add(build_id, 0xef9f4, constraints: ['[rsp+0x50] == NULL'])
-OneGadget::Gadget.add(build_id, 0xf0897, constraints: ['[rsp+0x70] == NULL'])
-OneGadget::Gadget.add(build_id, 0xf5e40, constraints: ['[rbp-0xf8] == NULL', 'rcx == NULL'])
+OneGadget::Gadget.add(build_id, 283226,
+                      constraints: ["[rsp+0x30] == NULL"],
+                      effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
+OneGadget::Gadget.add(build_id, 837235,
+                      constraints: ["[rcx] == NULL || rcx == NULL", "[r12] == NULL || r12 == NULL"],
+                      effect: "execve(\"/bin/sh\", rcx, r12)")
+OneGadget::Gadget.add(build_id, 837448,
+                      constraints: ["[rax] == NULL || rax == NULL", "[r12] == NULL || r12 == NULL"],
+                      effect: "execve(\"/bin/sh\", rax, r12)")
+OneGadget::Gadget.add(build_id, 981492,
+                      constraints: ["[rsp+0x50] == NULL"],
+                      effect: "execve(\"/bin/sh\", rsp+0x50, environ)")
+OneGadget::Gadget.add(build_id, 985239,
+                      constraints: ["[rsp+0x70] == NULL"],
+                      effect: "execve(\"/bin/sh\", rsp+0x70, environ)")
+OneGadget::Gadget.add(build_id, 1007168,
+                      constraints: ["[rcx] == NULL || rcx == NULL", "[[rbp-0xf8]] == NULL || [rbp-0xf8] == NULL"],
+                      effect: "execve(\"/bin/sh\", rcx, [rbp-0xf8])")
+
