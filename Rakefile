@@ -6,6 +6,8 @@ import 'tasks/builds/generate.rake'
 task default: %i(rubocop spec builds:list)
 
 RuboCop::RakeTask.new(:rubocop) do |task|
+  task.patterns = ['lib/**/*.rb', 'spec/**/*.rb', 'bin/*', 'tasks/**/*.rake']
+  task.options += ['--force-exclusion', 'lib/one_gadget/builds/*.rb']
 end
 
 RSpec::Core::RakeTask.new(:spec) do |task|
