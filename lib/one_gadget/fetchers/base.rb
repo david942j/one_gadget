@@ -61,11 +61,7 @@ module OneGadget
       end
 
       def str_offset(str)
-        match = `strings -tx #{::Shellwords.escape(file)} -n #{str.size} | grep #{::Shellwords.escape(' ' + str)}`
-        match = match.lines.map(&:strip).first
-        return nil if match.nil?
-        # 17c8c3 /bin/sh
-        match.split.first.to_i(16)
+        IO.binread(file).index(str + "\x00")
       end
 
       def offset_of(assembly)
