@@ -18,6 +18,7 @@ namespace :builds do
       next failed('parse info fail') if info.nil? # error when fetching info
       next failed('build id not found') if info[:build_id].nil? # no .note.gnu.build.id section
       version = info[:info].scan(/version ([\d.]+)/).flatten.first
+      next skipped('version too old') if Gem::Version.new(version) < Gem::Version.new('2.19')
       filename = File.join(path, "libc-#{version}-#{info[:build_id]}.rb")
       next skipped('file exists') if File.file?(filename)
       gadgets = OneGadget.gadgets(file: libc_file, force_file: true, details: true)
