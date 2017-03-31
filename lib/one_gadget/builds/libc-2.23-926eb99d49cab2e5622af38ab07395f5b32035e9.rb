@@ -1,10 +1,29 @@
 require 'one_gadget/gadget'
-# Ubuntu GLIBC 2.23-0ubuntu5
-# ELF 32-bit LSB shared object, Intel 80386
+# Intel 80386
+# 
+# GNU C Library (Ubuntu GLIBC 2.23-0ubuntu5) stable release version 2.23, by Roland McGrath et al.
+# Copyright (C) 2016 Free Software Foundation, Inc.
+# This is free software; see the source for copying conditions.
+# There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.
+# Compiled by GNU CC version 5.4.0 20160609.
+# Available extensions:
+# 	crypt add-on version 2.1 by Michael Glad and others
+# 	GNU Libidn by Simon Josefsson
+# 	Native POSIX Threads Library by Ulrich Drepper et al
+# 	BIND-8.2.3-T5B
+# libc ABIs: UNIQUE IFUNC
+# For bug reporting instructions, please see:
+# <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
+
 build_id = File.basename(__FILE__, '.rb').split('-').last
-rw_area_constraint = 'esi is the address of `rw-p` area of libc'
-OneGadget::Gadget.add(build_id, 0x3ac69, constraints: [rw_area_constraint, '[esp+0x34] == NULL'])
-OneGadget::Gadget.add(build_id, 0x5fbbe, constraints: [rw_area_constraint, 'eax == NULL'])
-OneGadget::Gadget.add(build_id, 0x5fbbf, constraints: [rw_area_constraint, '[esp] == NULL'])
-OneGadget::Gadget.add(build_id, 0x12036c, constraints: [rw_area_constraint, 'eax == NULL'])
-OneGadget::Gadget.add(build_id, 0x12036d, constraints: [rw_area_constraint, '[esp] == NULL'])
+OneGadget::Gadget.add(build_id, 240745,
+                      constraints: ["esi is the address of `rw-p` area of libc", "[esp+0x34] == NULL"],
+                      effect: "execve(\"/bin/sh\", esp+0x34, environ)")
+OneGadget::Gadget.add(build_id, 392133,
+                      constraints: ["esi is the address of `rw-p` area of libc", "eax == NULL"],
+                      effect: "execl(\"/bin/sh\", eax)")
+OneGadget::Gadget.add(build_id, 392134,
+                      constraints: ["esi is the address of `rw-p` area of libc", "[esp] == NULL"],
+                      effect: "execl(\"/bin/sh\", [esp])")
+
