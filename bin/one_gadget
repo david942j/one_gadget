@@ -23,8 +23,17 @@ parser = OptionParser.new do |opts|
           'The script will be run as \'exploit-script $offset\'.') do |script|
     options[:script] = script
   end
+
+  opts.on('--version', 'Current gem version.') do |v|
+    options[:version] = v
+  end
 end
 parser.parse!
+
+if options[:version]
+  puts "OneGadget Version #{OneGadget::VERSION}"
+  exit(0)
+end
 
 def execute(script, offset)
   pid = fork do
