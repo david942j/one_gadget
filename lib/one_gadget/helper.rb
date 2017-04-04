@@ -46,15 +46,14 @@ module OneGadget
       # Color codes for pretty print
       COLOR_CODE = {
         esc_m: "\e[0m",
-        normal_s: "\e[31m", # red
-        integer: "\e[1m\e[34m", # light blue
-        reg: "\e[32m", # light green
-        sym: "\e[33m", # pry like
+        normal_s: "\e[38;5;203m", # red
+        integer: "\e[38;5;189m", # light purple
+        reg: "\e[38;5;82m", # light green
       }.freeze
 
       # Wrapper color codes for pretty inspect.
       # @param [String] str Contents to colorize.
-      # @option [Symbol] sev Specific which kind of color want to use, valid symbols are defined in +COLOR_CODE+.
+      # @param [Symbol] sev Specific which kind of color want to use, valid symbols are defined in +COLOR_CODE+.
       # @return [String] Wrapper with color codes.
       def colorize(str, sev: :normal_s)
         return str if @disable_color
