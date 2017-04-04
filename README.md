@@ -42,34 +42,35 @@ one_gadget
 #     -r, --[no-]raw                   Output gadgets offset only, split with one space.
 #     -s, --script exploit-script      Run exploit script with all possible gadgets.
 #                                      The script will be run as 'exploit-script $offset'.
+#         --version                    Current gem version.
 
 one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 # 0x4526a execve("/bin/sh", rsp+0x30, environ)
 # constraints:
 #   [rsp+0x30] == NULL
-# 
+#
+# 0xcc543 execve("/bin/sh", rcx, r12)
+# constraints:
+#   [rcx] == NULL || rcx == NULL
+#   [r12] == NULL || r12 == NULL
+#
+# 0xcc618 execve("/bin/sh", rax, r12)
+# constraints:
+#   [rax] == NULL || rax == NULL
+#   [r12] == NULL || r12 == NULL
+#
 # 0xef6c4 execve("/bin/sh", rsp+0x50, environ)
 # constraints:
 #   [rsp+0x50] == NULL
-# 
+#
 # 0xf0567 execve("/bin/sh", rsp+0x70, environ)
 # constraints:
 #   [rsp+0x70] == NULL
-# 
-# 0xcc543 execve("/bin/sh", rcx, r12)
-# constraints:
-#   rcx == NULL || [rcx] == NULL
-#   r12 == NULL || [r12] == NULL
-# 
-# 0xcc618 execve("/bin/sh", rax, r12)
-# constraints:
-#   rax == NULL || [rax] == NULL
-#   r12 == NULL || [r12] == NULL
-# 
+#
 # 0xf5b10 execve("/bin/sh", rcx, [rbp-0xf8])
 # constraints:
-#   [rbp-0xf8] == NULL || [[rbp-0xf8]] == NULL
-#   rcx == NULL || [rcx] == NULL
+#   [rcx] == NULL || rcx == NULL
+#   [[rbp-0xf8]] == NULL || [rbp-0xf8] == NULL
 
 one_gadget /lib/i386-linux-gnu/libc.so.6
 # 0x3ac69 execve("/bin/sh", esp+0x34, environ)
