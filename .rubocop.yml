@@ -7,24 +7,33 @@ AllCops:
 Metrics/AbcSize:
   Enabled: false
 
-Metrics/ClassLength:
-  Enabled: false
-
-Metrics/MethodLength:
-  Enabled: false
-
 Metrics/BlockLength:
   Enabled: false
 
-Metrics/CyclomaticComplexity:
+Metrics/ClassLength:
   Enabled: false
 
-Rails:
+Metrics/CyclomaticComplexity:
   Enabled: false
 
 Metrics/LineLength:
   Enabled: true
   Max: 120
 
+Metrics/MethodLength:
+  Enabled: false
+
+Rails:
+  Enabled: false
+
+Style/EndOfLine:
+  EnforcedStyle: lf
+
 Style/FileName:
+  Enabled: false
+
+Style/IndentHeredoc:
+  Enabled: false
+
+Style/PercentLiteralDelimiters:
   Enabled: false

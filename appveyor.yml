@@ -1,0 +1,28 @@
+version: 1.0.{build}-{branch}
+
+environment:
+  matrix:
+    - RUBY_VERSION: '21'
+    - RUBY_VERSION: '21-x64'
+    - RUBY_VERSION: '22'
+    - RUBY_VERSION: '22-x64'
+    - RUBY_VERSION: '23'
+    - RUBY_VERSION: '23-x64'
+
+install:
+  - set PATH=C:\Ruby%RUBY_VERSION%\bin;%PATH%
+  - bundle install
+
+build: off
+
+branches:
+  only:
+    - master
+
+before_test:
+  - bundle exec ruby -v
+  - bundle exec gem -v
+  - bundle -v
+
+test_script:
+  - bundle exec rake
