@@ -1,3 +1,5 @@
+require 'mkmf'
+
 require 'one_gadget'
 
 describe 'one_gadget' do
@@ -7,6 +9,10 @@ describe 'one_gadget' do
   end
 
   describe 'from file' do
+    before(:each) do
+      skip 'binutils not installed' if find_executable0('objdump').nil?
+    end
+
     it 'libc-2.19' do
       path = @data_path['libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so']
       expect(OneGadget.gadgets(file: path, force_file: true))
