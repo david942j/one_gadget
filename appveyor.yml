@@ -17,7 +17,7 @@ build: off
 
 branches:
   only:
-    - misc/try-appveyor
+    - master
 
 before_test:
   - bundle exec ruby -v
