@@ -1,6 +1,7 @@
-require 'one_gadget/fetchers/base'
-require 'one_gadget/emulators/i386'
 require 'elftools'
+
+require 'one_gadget/emulators/i386'
+require 'one_gadget/fetchers/base'
 
 module OneGadget
   module Fetcher

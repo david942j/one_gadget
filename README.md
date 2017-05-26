@@ -11,9 +11,9 @@
 When playing ctf pwn challenges we usually need the one-gadget RCE (remote code execution),
 which leads to call `execve('/bin/sh', NULL, NULL)`.
 
-This gem provides such gadgets finder, no need to use objdump or IDA-pro every time like a fool :wink:.
+This gem provides such gadgets finder, no need to use objdump or IDA-pro every time like a fool :wink:
 
-To use this tool, just type `one_gadget` in command line and enjoy the magic :laughing:!
+To use this tool, just type `one_gadget /path/to/libc` in command line and enjoy the magic :laughing:
 
 Note: Supports amd64 and i386!
 
@@ -24,13 +24,13 @@ Available on RubyGems.org!
 gem install one_gadget
 ```
 
-Note: you need to have ruby version >= 2.1.0, you can use `ruby --version` to check.
+Note: require ruby version >= 2.1.0, you can use `ruby --version` to check.
 
 ## Implementation
 
 OneGadget use simple self-implement symbolic execution to find the constraints of gadgets.
 
-The article introducing how I developed this tool can be found [here](https://david942j.blogspot.com/2017/02/project-one-gadget-in-glibc.html).
+The article introducing how I develop this tool can be found [here](https://david942j.blogspot.com/2017/02/project-one-gadget-in-glibc.html).
 
 ## Usage
 
@@ -134,4 +134,4 @@ one_gadget('60131540dadc6796cab33388349e6e4e68692053')
 Any suggestion or feature request is welcome! Feel free to send a pull request.
 
 Please let me know if you find any libc that make OneGadget fail to find gadgets.
-And, if you like this work, I'll be happy to be [stared](https://github.com/david942j/one_gadget/stargazers) :grimacing:.
+And, if you like this work, I'll be happy to be [stared](https://github.com/david942j/one_gadget/stargazers) :grimacing:

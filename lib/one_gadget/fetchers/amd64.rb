@@ -1,5 +1,6 @@
-require 'one_gadget/fetchers/base'
 require 'one_gadget/emulators/amd64'
+require 'one_gadget/fetchers/base'
+
 module OneGadget
   module Fetcher
     # Fetcher for amd64.

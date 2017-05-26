@@ -1,4 +1,5 @@
 require 'logger'
+
 require 'one_gadget/helper'
 
 module OneGadget

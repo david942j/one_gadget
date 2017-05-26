@@ -1,5 +1,6 @@
 require 'one_gadget/gadget'
 require 'one_gadget/helper'
+
 describe OneGadget::Gadget do
   before(:all) do
     @build_id = 'fake_id'

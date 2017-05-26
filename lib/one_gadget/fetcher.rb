@@ -1,7 +1,7 @@
-require 'one_gadget/helper'
 require 'one_gadget/fetchers/amd64'
 require 'one_gadget/fetchers/i386'
 require 'one_gadget/gadget'
+require 'one_gadget/helper'
 
 module OneGadget
   # To find gadgets.

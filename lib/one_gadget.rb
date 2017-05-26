@@ -1,7 +1,6 @@
 # OneGadget - To find the execve(/bin/sh, 0, 0) in glibc.
 #
 # @author david942j
-require 'one_gadget/helper'
 
 # Main module.
 module OneGadget
@@ -45,8 +44,6 @@ end
 #   Can be either +build_id+ or path to libc.
 # @param [Mixed] options
 #   See {OneGadget#gadgets} for ore information.
-# @param [String] build_id
-#   Libc's +build_id+.
 # @return [Array<OneGadget::Gadget::Gadget>, Array<Integer>]
 #   The gadgets found.
 # @example
