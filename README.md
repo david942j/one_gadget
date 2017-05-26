@@ -13,7 +13,7 @@ which leads to call `execve('/bin/sh', NULL, NULL)`.
 
 This gem provides such gadgets finder, no need to use objdump or IDA-pro every time like a fool :wink:.
 
-To use this tool, just type +one_gadget+ in command line and enjoy the magic :laughing:!
+To use this tool, just type `one_gadget` in command line and enjoy the magic :laughing:!
 
 Note: Supports amd64 and i386!
 
