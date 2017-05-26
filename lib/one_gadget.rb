@@ -1,6 +1,9 @@
 # OneGadget - To find the execve(/bin/sh, 0, 0) in glibc.
 #
 # @author david942j
+require 'one_gadget/helper'
+
+# Main module.
 module OneGadget
   class << self
     # The man entry of gem +one_gadget+.
@@ -38,12 +41,27 @@ module OneGadget
 end
 
 # Shorter way to use one gadget.
-# @param [Mixed] args
-#   See {OneGadget#gadgets} for more information.
+# @param [String?] arg
+#   Can be either +build_id+ or path to libc.
+# @param [Mixed] options
+#   See {OneGadget#gadgets} for ore information.
+# @param [String] build_id
+#   Libc's +build_id+.
 # @return [Array<OneGadget::Gadget::Gadget>, Array<Integer>]
 #   The gadgets found.
-def one_gadget(*args)
-  OneGadget.gadgets(*args)
+# @example
+#   one_gadget('./libc.so.6')
+#   one_gadget('cbfa941a8eb7a11e4f90e81b66fcd5a820995d7c')
+#   one_gadget('./libc.so.6', details: true)
+def one_gadget(arg = nil, **options)
+  unless arg.nil?
+    if arg =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/
+      options[:build_id] = arg
+    else
+      options[:file] = arg
+    end
+  end
+  OneGadget.gadgets(**options)
 end
 
 require 'one_gadget/fetcher'
