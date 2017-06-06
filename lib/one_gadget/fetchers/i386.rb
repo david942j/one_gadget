@@ -62,7 +62,7 @@ module OneGadget
                     resolve_execl(arg1, arg2, rw_base: rw_base, sh: bin_sh - 5)
                   end
         return nil if options.nil?
-        options[:constraints].unshift("#{rw_base} is the address of `rw-p` area of libc")
+        options[:constraints].unshift("#{rw_base} is the GOT address of libc")
         options
       end
 

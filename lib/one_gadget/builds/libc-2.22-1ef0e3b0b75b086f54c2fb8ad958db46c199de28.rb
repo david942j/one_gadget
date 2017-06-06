@@ -18,18 +18,18 @@ require 'one_gadget/gadget'
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 240748,
-                      constraints: ["ebx is the address of `rw-p` area of libc", "[esp+0x34] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "[esp+0x34] == NULL"],
                       effect: "execve(\"/bin/sh\", esp+0x34, environ)")
 OneGadget::Gadget.add(build_id, 401431,
-                      constraints: ["ebx is the address of `rw-p` area of libc", "eax == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "eax == NULL"],
                       effect: "execl(\"/bin/sh\", eax)")
 OneGadget::Gadget.add(build_id, 401432,
-                      constraints: ["ebx is the address of `rw-p` area of libc", "[esp] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "[esp] == NULL"],
                       effect: "execl(\"/bin/sh\", [esp])")
 OneGadget::Gadget.add(build_id, 1192963,
-                      constraints: ["esi is the address of `rw-p` area of libc", "eax == NULL"],
+                      constraints: ["esi is the GOT address of libc", "eax == NULL"],
                       effect: "execl(\"/bin/sh\", eax)")
 OneGadget::Gadget.add(build_id, 1192964,
-                      constraints: ["esi is the address of `rw-p` area of libc", "[esp] == NULL"],
+                      constraints: ["esi is the GOT address of libc", "[esp] == NULL"],
                       effect: "execl(\"/bin/sh\", [esp])")
 
