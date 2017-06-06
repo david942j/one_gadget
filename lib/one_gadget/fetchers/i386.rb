@@ -62,7 +62,7 @@ module OneGadget
                     resolve_execl(arg1, arg2, rw_base: rw_base, sh: bin_sh - 5)
                   end
         return nil if options.nil?
-        options[:constraints].unshift("#{rw_base} is the address of `rw-p` area of libc")
+        options[:constraints].unshift("#{rw_base} is the GOT address of libc")
         options
       end
 
@@ -111,9 +111,10 @@ module OneGadget
       end
 
       def rw_offset
-        elf = ELFTools::ELFFile.new(File.open(file))
-        # How to find this offset correctly..?
-        elf.segment_by_type(:dynamic).tag_by_type(:pltgot).value
+        File.open(file) do |f|
+          elf = ELFTools::ELFFile.new(f)
+          elf.segment_by_type(:dynamic).tag_by_type(:pltgot).value
+        end
       end
 
       def should_null(str)
