@@ -18,15 +18,15 @@ require 'one_gadget/gadget'
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 248615,
-                      constraints: ["ebx is the address of `rw-p` area of libc", "[esp+0x38] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "[esp+0x38] == NULL"],
                       effect: "execve(\"/bin/sh\", esp+0x38, environ)")
 OneGadget::Gadget.add(build_id, 408836,
-                      constraints: ["ebx is the address of `rw-p` area of libc", "[esp+0x8] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "[esp+0x8] == NULL"],
                       effect: "execl(\"/bin/sh\", \"sh\", [esp+0x8])")
 OneGadget::Gadget.add(build_id, 408842,
-                      constraints: ["ebx is the address of `rw-p` area of libc", "eax == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "eax == NULL"],
                       effect: "execl(\"/bin/sh\", eax)")
 OneGadget::Gadget.add(build_id, 408846,
-                      constraints: ["ebx is the address of `rw-p` area of libc", "[esp+0x4] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "[esp+0x4] == NULL"],
                       effect: "execl(\"/bin/sh\", [esp+0x4])")
 
