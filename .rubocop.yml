@@ -4,6 +4,12 @@ AllCops:
   Exclude:
     - lib/one_gadget/builds/*.rb
 
+Layout/EndOfLine:
+  EnforcedStyle: lf
+
+Layout/IndentHeredoc:
+  Enabled: false
+
 Metrics/AbcSize:
   Enabled: false
 
@@ -26,13 +32,7 @@ Metrics/MethodLength:
 Rails:
   Enabled: false
 
-Style/EndOfLine:
-  EnforcedStyle: lf
-
 Style/FileName:
-  Enabled: false
-
-Style/IndentHeredoc:
   Enabled: false
 
 Style/PercentLiteralDelimiters:
