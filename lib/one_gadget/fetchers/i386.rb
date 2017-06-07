@@ -41,7 +41,7 @@ module OneGadget
       # Generating constraints to be a valid gadget.
       # @param [OneGadget::Emulators::I386] processor The processor after executing the gadget.
       # @param [Integer] bin_sh The related offset refer to /bin/sh.
-      # @return [Hash{Symbol => Array<String>, String}, NilClass]
+      # @return [Hash{Symbol => Array<String>, String}?]
       #   The options to create a {OneGadget::Gadget::Gadget} object.
       #   Keys might be:
       #   1. constraints: Array<String> List of constraints.

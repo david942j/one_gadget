@@ -33,16 +33,21 @@ module OneGadget
         ELFTools::ELFFile.new(File.open(path)).build_id
       end
 
-      # Disable colorize
+      # Disable colorize.
+      # @return [void]
       def color_off!
         @disable_color = true
       end
 
-      # Enable colorize
+      # Enable colorize.
+      # @return [void]
       def color_on!
         @disable_color = false
       end
 
+      # Is colorify output enabled?
+      # @return [Boolean]
+      #   True or false.
       def enable_color
         # if not set, use tty to check
         return $stdout.tty? if @disable_color.nil?
