@@ -33,14 +33,25 @@ module OneGadget
         ELFTools::ELFFile.new(File.open(path)).build_id
       end
 
-      # Disable colorize
+      # Disable colorize.
+      # @return [void]
       def color_off!
         @disable_color = true
       end
 
-      # Enable colorize
+      # Enable colorize.
+      # @return [void]
       def color_on!
         @disable_color = false
+      end
+
+      # Is colorify output enabled?
+      # @return [Boolean]
+      #   True or false.
+      def enable_color
+        # if not set, use tty to check
+        return $stdout.tty? if @disable_color.nil?
+        !@disable_color
       end
 
       # Color codes for pretty print
@@ -56,7 +67,7 @@ module OneGadget
       # @param [Symbol] sev Specific which kind of color want to use, valid symbols are defined in +COLOR_CODE+.
       # @return [String] Wrapper with color codes.
       def colorize(str, sev: :normal_s)
-        return str if @disable_color
+        return str unless enable_color
         cc = COLOR_CODE
         color = cc.key?(sev) ? cc[sev] : ''
         "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"

@@ -50,6 +50,7 @@ GEM
       simplecov-html (~> 0.10.0)
     simplecov-html (0.10.1)
     unicode-display_width (1.2.1)
+    yard (0.9.9)
 
 PLATFORMS
   ruby
@@ -61,6 +62,7 @@ DEPENDENCIES
   rspec (~> 3.5)
   rubocop (~> 0.49)
   simplecov (~> 0.13.0)
+  yard (~> 0.9)
 
 BUNDLED WITH
    1.15.1
