@@ -1,4 +1,4 @@
-desc 'To auto generate the builds_list file'
+desc 'To auto generate README.md from README.tpl'
 task :readme do
   next if ENV['CI']
   @tpl = IO.binread('README.tpl')

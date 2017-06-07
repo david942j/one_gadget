@@ -56,10 +56,8 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 RUBY_OUTPUT_OF(OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6'))
-
 # or in shorter way
 RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6'))
-
 # from build id
 RUBY_OUTPUT_OF(one_gadget('60131540dadc6796cab33388349e6e4e68692053'))
 ```

@@ -10,9 +10,9 @@ module OneGadget
       # Gadgets for i386 glibc.
       # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
       def find
-        rw_off = rw_offset
+        got_off = got_offset
         bin_sh = str_offset('/bin/sh')
-        rel_sh_hex = (rw_off - bin_sh).to_s(16)
+        rel_sh_hex = (got_off - bin_sh).to_s(16)
         cands = candidates do |candidate|
           next false unless candidate.include?(rel_sh_hex)
           true
@@ -23,7 +23,7 @@ module OneGadget
           gadgets = []
           (lines.size - 2).downto(0) do |i|
             processor = emulate(lines[i..-1])
-            options = resolve(processor, bin_sh: rw_off - bin_sh)
+            options = resolve(processor, bin_sh: got_off - bin_sh)
             next if options.nil?
             offset = offset_of(lines[i])
             gadgets << OneGadget::Gadget::Gadget.new(offset, options)
@@ -53,16 +53,16 @@ module OneGadget
         arg = processor.stack[cur_top]
         # arg0 must be /bin/sh
         return nil unless arg.to_s.include?(bin_sh.to_s(16))
-        rw_base = arg.deref.obj.to_s # this should be esi or ebx..
+        got_base = arg.deref.obj.to_s # this should be esi or ebx..
         arg1 = processor.stack[cur_top + 4]
         arg2 = processor.stack[cur_top + 8]
         options = if call.include?('execve')
-                    resolve_execve(arg1, arg2, rw_base: rw_base)
+                    resolve_execve(arg1, arg2, got_base: got_base)
                   elsif call.include?('execl')
-                    resolve_execl(arg1, arg2, rw_base: rw_base, sh: bin_sh - 5)
+                    resolve_execl(arg1, arg2, got_base: got_base, sh: bin_sh - 5)
                   end
         return nil if options.nil?
-        options[:constraints].unshift("#{rw_base} is the GOT address of libc")
+        options[:constraints].unshift("#{got_base} is the GOT address of libc")
         options
       end
 
@@ -71,11 +71,11 @@ module OneGadget
       #   The second argument.
       # @param [OneGadget::Emulators::Lambda] arg2
       #   The third argument.
-      # @param [String] rw_base Usually +ebx+ or +esi+.
+      # @param [String] got_base Usually +ebx+ or +esi+.
       # @param [Integer] sh The relative offset of string 'sh' appears.
       # @return [Hash{Symbol => Array<String>, String}]
       #   Same format as {#resolve}.
-      def resolve_execl(arg1, arg2, rw_base: nil, sh: 0)
+      def resolve_execl(arg1, arg2, got_base: nil, sh: 0)
         args = []
         arg = arg1.to_s
         if arg.include?(sh.to_s(16))
@@ -83,7 +83,7 @@ module OneGadget
           args << '"sh"'
         end
         args << arg
-        return nil if arg.include?(rw_base) || arg.include?('eip') # we don't want base-related constraints
+        return nil if arg.include?(got_base) || arg.include?('eip') # we don't want base-related constraints
         # now arg is the constraint.
         { constraints: ["#{arg} == NULL"], effect: %(execl("/bin/sh", #{args.join(', ')})) }
       end
@@ -93,16 +93,16 @@ module OneGadget
       #   The second argument.
       # @param [OneGadget::Emulators::Lambda] arg2
       #   The third argument.
-      # @param [String] rw_base Usually +ebx+ or +esi+.
+      # @param [String] got_base Usually +ebx+ or +esi+.
       # @return [Hash{Symbol => Array<String>, String}]
       #   Same format as {#resolve}.
-      def resolve_execve(arg1, arg2, rw_base: nil)
+      def resolve_execve(arg1, arg2, got_base: nil)
         # arg1 == NULL || [arg1] == NULL
         # arg2 == NULL or arg2 is environ
         cons = [should_null(arg1.to_s)]
         envp = arg2.to_s
         use_env = true
-        unless envp.include?('[[') && envp.include?(rw_base) # hope this is environ_ptr_0
+        unless envp.include?('[[') && envp.include?(got_base) # hope this is environ_ptr_0
           return nil if envp.include?('[') # we don't like this :(
           cons << should_null(envp)
           use_env = false
@@ -110,7 +110,7 @@ module OneGadget
         { constraints: cons, effect: %(execve("/bin/sh", #{arg1}, #{use_env ? 'environ' : envp})) }
       end
 
-      def rw_offset
+      def got_offset
         File.open(file) do |f|
           elf = ELFTools::ELFFile.new(f)
           elf.segment_by_type(:dynamic).tag_by_type(:pltgot).value
