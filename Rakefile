@@ -1,9 +1,11 @@
 require 'rspec/core/rake_task'
 require 'rubocop/rake_task'
-import 'tasks/builds/list.rake'
-import 'tasks/builds/generate.rake'
 
-task default: %i(rubocop spec builds:list)
+import 'tasks/builds/generate.rake'
+import 'tasks/builds/list.rake'
+import 'tasks/readme.rake'
+
+task default: %i(readme rubocop spec builds:list)
 
 RuboCop::RakeTask.new(:rubocop) do |task|
   task.patterns = ['lib/**/*.rb', 'spec/**/*.rb', 'bin/*', 'tasks/**/*.rake']

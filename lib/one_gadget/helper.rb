@@ -43,6 +43,12 @@ module OneGadget
         @disable_color = false
       end
 
+      def enable_color
+        # if not set, use tty to check
+        return $stdout.tty? if @disable_color.nil?
+        !@disable_color
+      end
+
       # Color codes for pretty print
       COLOR_CODE = {
         esc_m: "\e[0m",
@@ -56,7 +62,7 @@ module OneGadget
       # @param [Symbol] sev Specific which kind of color want to use, valid symbols are defined in +COLOR_CODE+.
       # @return [String] Wrapper with color codes.
       def colorize(str, sev: :normal_s)
-        return str if @disable_color
+        return str unless enable_color
         cc = COLOR_CODE
         color = cc.key?(sev) ? cc[sev] : ''
         "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"
