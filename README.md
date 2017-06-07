@@ -38,57 +38,57 @@ The article introducing how I develop this tool can be found [here](https://davi
 
 ```bash
 $ one_gadget
-Usage: one_gadget [file] [options]
-    -b, --build-id BuildID           BuildID[sha1] of libc.
-    -f, --[no-]force-file            Force search gadgets in file instead of build id first.
-    -r, --[no-]raw                   Output gadgets offset only, split with one space.
-    -s, --script exploit-script      Run exploit script with all possible gadgets.
-                                     The script will be run as 'exploit-script $offset'.
-        --version                    Current gem version.
+# Usage: one_gadget [file] [options]
+#     -b, --build-id BuildID           BuildID[sha1] of libc.
+#     -f, --[no-]force-file            Force search gadgets in file instead of build id first.
+#     -r, --[no-]raw                   Output gadgets offset only, split with one space.
+#     -s, --script exploit-script      Run exploit script with all possible gadgets.
+#                                      The script will be run as 'exploit-script $offset'.
+#         --version                    Current gem version.
 
 $ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
-0x4526a	execve("/bin/sh", rsp+0x30, environ)
-constraints:
-  [rsp+0x30] == NULL
-
-0xcc543	execve("/bin/sh", rcx, r12)
-constraints:
-  [rcx] == NULL || rcx == NULL
-  [r12] == NULL || r12 == NULL
-
-0xcc618	execve("/bin/sh", rax, r12)
-constraints:
-  [rax] == NULL || rax == NULL
-  [r12] == NULL || r12 == NULL
-
-0xef6c4	execve("/bin/sh", rsp+0x50, environ)
-constraints:
-  [rsp+0x50] == NULL
-
-0xf0567	execve("/bin/sh", rsp+0x70, environ)
-constraints:
-  [rsp+0x70] == NULL
-
-0xf5b10	execve("/bin/sh", rcx, [rbp-0xf8])
-constraints:
-  [rcx] == NULL || rcx == NULL
-  [[rbp-0xf8]] == NULL || [rbp-0xf8] == NULL
+# 0x4526a	execve("/bin/sh", rsp+0x30, environ)
+# constraints:
+#   [rsp+0x30] == NULL
+#
+# 0xcc543	execve("/bin/sh", rcx, r12)
+# constraints:
+#   [rcx] == NULL || rcx == NULL
+#   [r12] == NULL || r12 == NULL
+#
+# 0xcc618	execve("/bin/sh", rax, r12)
+# constraints:
+#   [rax] == NULL || rax == NULL
+#   [r12] == NULL || r12 == NULL
+#
+# 0xef6c4	execve("/bin/sh", rsp+0x50, environ)
+# constraints:
+#   [rsp+0x50] == NULL
+#
+# 0xf0567	execve("/bin/sh", rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL
+#
+# 0xf5b10	execve("/bin/sh", rcx, [rbp-0xf8])
+# constraints:
+#   [rcx] == NULL || rcx == NULL
+#   [[rbp-0xf8]] == NULL || [rbp-0xf8] == NULL
 
 $ one_gadget /lib/i386-linux-gnu/libc.so.6
-0x3ac69	execve("/bin/sh", esp+0x34, environ)
-constraints:
-  esi is the GOT address of libc
-  [esp+0x34] == NULL
-
-0x5fbc5	execl("/bin/sh", eax)
-constraints:
-  esi is the GOT address of libc
-  eax == NULL
-
-0x5fbc6	execl("/bin/sh", [esp])
-constraints:
-  esi is the GOT address of libc
-  [esp] == NULL
+# 0x3ac69	execve("/bin/sh", esp+0x34, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x34] == NULL
+#
+# 0x5fbc5	execl("/bin/sh", eax)
+# constraints:
+#   esi is the GOT address of libc
+#   eax == NULL
+#
+# 0x5fbc6	execl("/bin/sh", [esp])
+# constraints:
+#   esi is the GOT address of libc
+#   [esp] == NULL
 
 ```
 
@@ -106,15 +106,18 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-# => [283242, 980676, 984423, 836931, 837144, 1006352]
+#=> [283242, 836931, 837144, 980676, 984423, 1006352]
+
 
 # or in shorter way
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
-# => [283242, 980676, 984423, 836931, 837144, 1006352]
+#=> [283242, 836931, 837144, 980676, 984423, 1006352]
+
 
 # from build id
 one_gadget('60131540dadc6796cab33388349e6e4e68692053')
-# => [283242, 980676, 984423, 836931, 837144, 1006352]
+#=> [283242, 836931, 837144, 980676, 984423, 1006352]
+
 ```
 
 ## Screenshots

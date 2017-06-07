@@ -55,16 +55,13 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ### Directly use in script
 ```ruby
 require 'one_gadget'
-OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-# => [283242, 980676, 984423, 836931, 837144, 1006352]
+RUBY_OUTPUT_OF(OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6'))
 
 # or in shorter way
-one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
-# => [283242, 980676, 984423, 836931, 837144, 1006352]
+RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6'))
 
 # from build id
-one_gadget('60131540dadc6796cab33388349e6e4e68692053')
-# => [283242, 980676, 984423, 836931, 837144, 1006352]
+RUBY_OUTPUT_OF(one_gadget('60131540dadc6796cab33388349e6e4e68692053'))
 ```
 
 ## Screenshots
