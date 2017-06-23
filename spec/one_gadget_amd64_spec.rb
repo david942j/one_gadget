@@ -47,5 +47,10 @@ describe 'one_gadget' do
       OneGadget::Gadget::ClassMethods::BUILDS.delete(:a)
       OneGadget::Gadget::ClassMethods::BUILDS[@build_id] = entry unless entry.nil?
     end
+
+    it 'not found' do
+      expect(OneGadget.gadgets(build_id: @build_id.reverse)).to be_empty
+      expect(OneGadget::Gadget.builds(@build_id.reverse)).to be_nil
+    end
   end
 end

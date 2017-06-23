@@ -48,14 +48,14 @@ module OneGadget
       # @param [String] build_id Desired build id.
       # @param [Boolean] remote
       #   When local not found, try search in latest version?
-      # @return [Array<Gadget::Gadget>] Gadgets.
+      # @return [Array<Gadget::Gadget>?] Gadgets.
       def builds(build_id, remote: true)
         require_all if BUILDS.empty?
         return BUILDS[build_id] if BUILDS.key?(build_id)
-        return [] unless remote
+        return build_not_found unless remote
         # fetch remote builds
         table = OneGadget::Helper.remote_builds.find { |c| c.include?(build_id) }
-        return [] if table.nil? # remote doesn't have this one either.
+        return build_not_found if table.nil? # remote doesn't have this one either.
         # builds found in remote! Ask update gem and download remote gadgets.
         OneGadget::Helper.ask_update(msg: 'The desired one-gadget can be found in lastest version!')
         tmp_file = OneGadget::Helper.download_build(table)
@@ -79,6 +79,10 @@ module OneGadget
         Dir.glob(File.join(BUILDS_PATH, '**', '*.rb')).each do |dic|
           require dic
         end
+      end
+
+      def build_not_found
+        nil
       end
     end
     extend ClassMethods

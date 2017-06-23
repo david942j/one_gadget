@@ -6,21 +6,33 @@ module OneGadget
   # A logger for internal usage.
   module Logger
     @logger = ::Logger.new(STDOUT)
-    @logger.formatter = proc do |_severity, _datetime, _progname, msg|
+    @logger.formatter = proc do |severity, _datetime, _progname, msg|
       prep = ' ' * 12
       message = msg.lines.map.with_index do |str, i|
         next str if i.zero?
         prep + str
       end
-      "[#{OneGadget::Helper.colorize('OneGadget', sev: :reg)}] #{message.join}"
+      color = case severity
+              when 'WARN' then :warn
+              when 'INFO' then :reg
+              end
+      "[#{OneGadget::Helper.colorize('OneGadget', sev: color)}] #{message.join}"
     end
 
-    # The logger info.
-    # @param [String] msg
-    #   Message to be logged.
-    # @return [void]
-    def self.info(msg)
-      @logger.info(msg)
+    module_function
+
+    # Show warning message of no such build id in database.
+    # @param [String] build_id
+    #   Build ID.
+    def not_found(build_id)
+      warn("Cannot find BuildID [#{build_id}]")
+      []
+    end
+
+    %i[info warn].each do |sym|
+      define_method(sym) do |msg|
+        @logger.send(sym, msg)
+      end
     end
   end
 end

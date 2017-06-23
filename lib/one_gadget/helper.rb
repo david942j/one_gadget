@@ -60,6 +60,7 @@ module OneGadget
         normal_s: "\e[38;5;203m", # red
         integer: "\e[38;5;189m", # light purple
         reg: "\e[38;5;82m", # light green
+        warn: "\e[38;5;230m" # light yellow
       }.freeze
 
       # Wrapper color codes for pretty inspect.

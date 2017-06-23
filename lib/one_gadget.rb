@@ -25,16 +25,22 @@ module OneGadget
     #   OneGadget.gadgets(build_id: '60131540dadc6796cab33388349e6e4e68692053')
     def gadgets(file: nil, build_id: nil, details: false, force_file: false)
       if build_id
-        OneGadget::Fetcher.from_build_id(build_id, details: details)
+        OneGadget::Fetcher.from_build_id(build_id, details: details) || OneGadget::Logger.not_found(build_id)
       elsif file
         file = OneGadget::Helper.abspath(file)
-        build_id = OneGadget::Helper.build_id_of(file)
-        if !force_file && build_id
-          gadgets = OneGadget::Fetcher.from_build_id(build_id, details: details, remote: false)
-          return gadgets unless gadgets.empty?
-        end
-        OneGadget::Fetcher.from_file(file, details: details)
+        gadgets = try_from_build(file, details) unless force_file
+        gadgets || OneGadget::Fetcher.from_file(file, details: details)
       end
+    end
+
+    private
+
+    def try_from_build(file, details)
+      build_id = OneGadget::Helper.build_id_of(file)
+      return unless build_id
+      gadgets = OneGadget::Fetcher.from_build_id(build_id, details: details, remote: false)
+      return if gadgets.nil?
+      gadgets
     end
   end
 end
