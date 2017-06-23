@@ -28,7 +28,7 @@ Note: require ruby version >= 2.1.0, you can use `ruby --version` to check.
 
 ## Implementation
 
-OneGadget use simple self-implement symbolic execution to find the constraints of gadgets.
+OneGadget uses simple self-implement symbolic execution to find the constraints of gadgets to success.
 
 The article introducing how I develop this tool can be found [here](https://david942j.blogspot.com/2017/02/project-one-gadget-in-glibc.html).
 
