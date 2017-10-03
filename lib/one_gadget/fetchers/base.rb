@@ -13,9 +13,22 @@ module OneGadget
         @file = file
       end
 
-      # Method need to be implemented in inheritors.
+      # Do find gadgets in glibc.
       # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
-      def find; raise NotImplementedError
+      def find
+        candidates.map do |cand|
+          lines = cand.lines
+          # use processor to find which can lead to a valid one-gadget call.
+          gadgets = []
+          (lines.size - 2).downto(0) do |i|
+            processor = emulate(lines[i..-1])
+            options = resolve(processor)
+            next if options.nil? # impossible be a gadget
+            offset = offset_of(lines[i])
+            gadgets << OneGadget::Gadget::Gadget.new(offset, options)
+          end
+          gadgets
+        end.flatten.compact
       end
 
       # Fetch candidates that end with call exec*.
@@ -38,6 +51,13 @@ module OneGadget
       end
 
       private
+
+      def emulate(cmds)
+        cmds.each_with_object(emulator) { |cmd, obj| break obj unless obj.process!(cmd) }
+      end
+
+      def emulator; raise NotImplementedError
+      end
 
       def objdump_cmd(start: nil, stop: nil)
         cmd = %(objdump --no-show-raw-insn -w -d -M intel #{::Shellwords.escape(file)})

@@ -7,35 +7,18 @@ module OneGadget
   module Fetcher
     # Fetcher for i386.
     class I386 < OneGadget::Fetcher::Base
-      # Gadgets for i386 glibc.
-      # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
-      def find
-        got_off = got_offset
-        bin_sh = str_offset('/bin/sh')
-        rel_sh_hex = (got_off - bin_sh).to_s(16)
-        cands = candidates do |candidate|
+      private
+
+      def candidates
+        rel_sh_hex = rel_sh.to_s(16)
+        super do |candidate|
           next false unless candidate.include?(rel_sh_hex)
           true
         end
-        cands.map do |cand|
-          lines = cand.lines
-          # use processor to find which can lead to a valid one-gadget call.
-          gadgets = []
-          (lines.size - 2).downto(0) do |i|
-            processor = emulate(lines[i..-1])
-            options = resolve(processor, bin_sh: got_off - bin_sh)
-            next if options.nil?
-            offset = offset_of(lines[i])
-            gadgets << OneGadget::Gadget::Gadget.new(offset, options)
-          end
-          gadgets
-        end.flatten.compact
       end
 
-      private
-
-      def emulate(cmds)
-        cmds.each_with_object(OneGadget::Emulators::I386.new) { |cmd, obj| obj.process(cmd) }
+      def emulator
+        OneGadget::Emulators::I386.new
       end
 
       # Generating constraints to be a valid gadget.
@@ -115,6 +98,10 @@ module OneGadget
           elf = ELFTools::ELFFile.new(f)
           elf.segment_by_type(:dynamic).tag_by_type(:pltgot).value
         end
+      end
+
+      def rel_sh
+        @rel_sh ||= got_offset - str_offset('/bin/sh')
       end
 
       def should_null(str)

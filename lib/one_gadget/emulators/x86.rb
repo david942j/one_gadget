@@ -52,6 +52,7 @@ module OneGadget
           Instruction.new('jmp', 1),
           Instruction.new('lea', 2),
           Instruction.new('mov', 2),
+          Instruction.new('nop', -1),
           Instruction.new('push', 1),
           Instruction.new('sub', 2),
           Instruction.new('xor', 2)
@@ -65,7 +66,7 @@ module OneGadget
         end
       end
 
-      def argument(idx); raise NotImplementedError
+      def argument(_idx); raise NotImplementedError
       end
 
       private
@@ -118,6 +119,9 @@ module OneGadget
         registers[tar] -= src
       end
 
+      # yap, nop
+      def inst_nop(*); end
+
       def check_argument(idx, expect)
         case expect
         when :global then argument(idx).to_s.include?(pc) # easy check
@@ -133,11 +137,17 @@ module OneGadget
         # This is the last call
         return registers[pc] = addr if %w[execve execl].any? { |n| addr.include?(n) }
         # TODO: handle some registers would be fucked after call
-        return if %w[sigprocmask __close].any? { |n| addr.include?(n) }
-        return if addr.include?('unsetenv') && check_argument(0, :global)
-        # for __sigaction, need to check current context if this is a valid call.
-        return if addr.include?('__sigaction') && check_argument(1, :global) && check_argument(2, :zero?)
+        checker = {
+          'sigprocmask' => {},
+          '__close' => {},
+          'unsetenv' => { 0 => :global },
+          '__sigaction' => { 1 => :global, 2 => :zero? }
+        }
+        func = checker.keys.find { |n| addr.include?(n) }
         # unhandled case
+        return :fail if func.nil?
+        return if checker[func].all? { |idx, sym| check_argument(idx, sym) }
+        # checker's condition fails
         :fail
       end
 

@@ -5,28 +5,10 @@ module OneGadget
   module Fetcher
     # Fetcher for amd64.
     class Amd64 < OneGadget::Fetcher::Base
-      # Gadgets for amd64 glibc.
-      # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
-      def find
-        candidates.map do |candidate|
-          lines = candidate.lines
-          # use processor to find which can lead to a valid one-gadget call.
-          gadgets = []
-          (lines.size - 2).downto(0) do |i|
-            processor = emulate(lines[i..-1])
-            options = resolve(processor)
-            next if options.nil? # impossible be a gadget
-            offset = offset_of(lines[i])
-            gadgets << OneGadget::Gadget::Gadget.new(offset, options)
-          end
-          gadgets
-        end.flatten
-      end
-
       private
 
-      def emulate(cmds)
-        cmds.each_with_object(OneGadget::Emulators::Amd64.new) { |cmd, obj| break obj unless obj.process!(cmd) }
+      def emulator
+        OneGadget::Emulators::Amd64.new
       end
 
       def candidates
