@@ -1,9 +1,9 @@
 require 'one_gadget/gadget'
-# spec/data/libc-2.23-926eb99d49cab2e5622af38ab07395f5b32035e9.so
+# ubuntu16.04.3-lib-i386-linux-gnu-libc-2.23.so
 # 
 # Intel 80386
 # 
-# GNU C Library (Ubuntu GLIBC 2.23-0ubuntu5) stable release version 2.23, by Roland McGrath et al.
+# GNU C Library (Ubuntu GLIBC 2.23-0ubuntu9) stable release version 2.23, by Roland McGrath et al.
 # Copyright (C) 2016 Free Software Foundation, Inc.
 # This is free software; see the source for copying conditions.
 # There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
