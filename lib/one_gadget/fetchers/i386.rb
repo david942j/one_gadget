@@ -43,7 +43,7 @@ module OneGadget
         str.include?((rel_sh - 5).to_s(16))
       end
 
-      # @base_reg should always be set in resolve()
+      # +@base_reg+ should always be set in resolve()
       def global_var?(str)
         str.include?(@base_reg)
       end

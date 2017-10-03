@@ -15,13 +15,13 @@ describe 'one_gadget' do
 
     it 'libc-2.19' do
       path = @data_path['libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so']
-      expect(OneGadget.gadgets(file: path, force_file: true))
-        .to eq [0x4647c, 0xc1ba3, 0xc1bf2, 0xe4968, 0xe5765, 0xe66bd]
+      expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
+        .to eq [0x46428, 0x4647c, 0xc1ba3, 0xc1bf2, 0xe4968, 0xe5765, 0xe5771, 0xe66bd]
     end
 
     it 'libc-2.24' do
       path = @data_path['libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so']
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f3aa, 0xb8a38, 0xd67e5]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f356, 0x3f3aa, 0xd67e5]
       expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
     end
   end

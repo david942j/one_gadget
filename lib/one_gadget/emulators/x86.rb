@@ -128,7 +128,6 @@ module OneGadget
         case expect
         when :global then argument(idx).to_s.include?(pc) # easy check
         when :zero? then argument(idx).is_a?(Integer) && argument(idx).zero?
-        else false
         end
       end
 

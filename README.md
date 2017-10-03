@@ -36,16 +36,19 @@ The article introducing how I develop this tool can be found [here](https://davi
 
 ### Command Line Interface
 
-Since OneGadget version 2.0.0,
-gadgets would be selected automatically according to difficulty of success constraints.
-Increase option `--level` to show more gadgets found.
+Since OneGadget version 1.5.0,
+much more one-gadgets are found.
+Since gadgets become too many to show them all,
+they would be selected automatically according to the difficulty of constraints.
+Therefore, gadgets shown will be less than previous versions.
+You can use option `--level 1` to show more gadgets found.
 ```bash
 $ one_gadget
 # Usage: one_gadget [file] [options]
 #     -b, --build-id BuildID           BuildID[sha1] of libc.
 #     -f, --[no-]force-file            Force search gadgets in file instead of build id first.
 #     -l, --level OUTPUT_LEVEL         The output level.
-#                                      OneGadget will automatically selects gadgets with higher success probability.
+#                                      OneGadget will automatically selects gadgets with higher successful probability.
 #                                      Increase this level to ask OneGadget show more gadgets it found.
 #                                      Default: 0
 #     -r, --[no-]raw                   Output gadgets offset only, split with one space.
@@ -54,6 +57,10 @@ $ one_gadget
 #         --version                    Current gem version.
 
 $ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
+# 0x45216	execve("/bin/sh", rsp+0x30, environ)
+# constraints:
+#   rax == NULL
+#
 # 0x4526a	execve("/bin/sh", rsp+0x30, environ)
 # constraints:
 #   [rsp+0x30] == NULL
@@ -66,7 +73,7 @@ $ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 # constraints:
 #   [rsp+0x70] == NULL
 
-$ one_gadget /lib32/libc.so.6 --force-file
+$ one_gadget /lib32/libc.so.6
 # 0x3a7cc	execve("/bin/sh", esp+0x28, environ)
 # constraints:
 #   esi is the GOT address of libc
@@ -97,7 +104,7 @@ $ one_gadget /lib32/libc.so.6 --force-file
 #   esi is the GOT address of libc
 #   [esp] == NULL
 
-$ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --force-file
+$ one_gadget /lib/x86_64-linux-gnu/libc.so.6
 # 0x45526	execve("/bin/sh", rsp+0x30, environ)
 # constraints:
 #   rax == NULL
@@ -114,8 +121,8 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --force-file
 # constraints:
 #   [rsp+0x60] == NULL
 
-# higher level
-$ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --force-file --level 1
+# show all gadgets found
+$ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
 # 0x45526	execve("/bin/sh", rsp+0x30, environ)
 # constraints:
 #   rax == NULL
@@ -173,15 +180,15 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-#=> [284026, 988753, 992459]
+#=> [283942, 284026, 988753, 992459]
 
 # or in shorter way
-one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
-#=> [284026, 988753, 992459]
+one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1)
+#=> [283942, 284026, 843329, 844001, 844005, 844009, 988753, 988765, 992459]
 
 # from build id
 one_gadget('60131540dadc6796cab33388349e6e4e68692053')
-#=> [283242, 980676, 984423]
+#=> [283158, 283242, 980676, 984423]
 
 ```
 

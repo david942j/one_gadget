@@ -19,7 +19,8 @@ describe 'one_gadget' do
     end
 
     it 'from file libc-2.23' do
-      expect(OneGadget.gadgets(file: @libcpath23, force_file: true)).to eq [0x3ac69, 0x5fbc5, 0x5fbc6]
+      ans = [0x3ac5c, 0x3ac5e, 0x3ac62, 0x3ac69, 0x5fbc5, 0x5fbc6]
+      expect(OneGadget.gadgets(file: @libcpath23, force_file: true)).to eq ans
     end
 
     it 'special filename' do

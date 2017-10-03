@@ -23,6 +23,8 @@ module OneGadget
       # We need to fetch the stack slots reference to current 'esp'
       # but not original 'esp'.
       # So we need to evaluate the offset of current esp first.
+      # @param [Integer] idx
+      # @return [Lambda, Integer]
       def argument(idx)
         cur_top = registers['esp'].evaluate('esp' => 0)
         stack[cur_top + idx * 4]

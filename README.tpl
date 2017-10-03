@@ -36,16 +36,19 @@ The article introducing how I develop this tool can be found [here](https://davi
 
 ### Command Line Interface
 
-Since OneGadget version 2.0.0,
-gadgets would be selected automatically according to difficulty of success constraints.
-Increase option `--level` to show more gadgets found.
+Since OneGadget version 1.5.0,
+much more one-gadgets are found.
+Since gadgets become too many to show them all,
+they would be selected automatically according to the difficulty of constraints.
+Therefore, gadgets shown will be less than previous versions.
+You can use option `--level 1` to show more gadgets found.
 ```bash
 SHELL_OUTPUT_OF(one_gadget)
 SHELL_OUTPUT_OF(one_gadget -b 60131540dadc6796cab33388349e6e4e68692053)
-SHELL_OUTPUT_OF(one_gadget /lib32/libc.so.6 --force-file)
-SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --force-file)
-# higher level
-SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --force-file --level 1)
+SHELL_OUTPUT_OF(one_gadget /lib32/libc.so.6)
+SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6)
+# show all gadgets found
+SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1)
 ```
 
 #### Combine with exploit script
@@ -63,7 +66,7 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 require 'one_gadget'
 RUBY_OUTPUT_OF(OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6'))
 # or in shorter way
-RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6'))
+RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1))
 # from build id
 RUBY_OUTPUT_OF(one_gadget('60131540dadc6796cab33388349e6e4e68692053'))
 ```

@@ -17,6 +17,9 @@ module OneGadget
         super(OneGadget::ABI.amd64, 'rsp', 'rip')
       end
 
+      # Return the argument value of calling a function.
+      # @param [Integer] idx
+      # @return [Lambda, Integer]
       def argument(idx)
         case idx
         when 0 then registers['rdi']

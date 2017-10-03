@@ -59,7 +59,7 @@ OneGadget::Gadget.add(build_id, OFFSET,
     libc = ELFTools::ELFFile.new(file)
     build_id = libc.build_id
     arch = libc.machine
-    return nil unless arch == 'Advanced Micro Devices X86-64' || arch == 'Intel 80386'
+    return nil unless ['Advanced Micro Devices X86-64', 'Intel 80386'].include?(arch)
     # let's skip amd64 with 32bit, i.e. x32
     return nil if arch.start_with?('Advanced') && libc.elf_class == 32
     str = file.read

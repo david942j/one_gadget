@@ -18,6 +18,9 @@ module OneGadget
     # @param [Boolean] force_file
     #   When +file+ is given, {OneGadget} will search gadgets according its
     #   build id first. +force_file = true+ to disable this feature.
+    # @param [Integer] level
+    #   Output level.
+    #   If +level+ equals to zero, only gadgets with highest successful probability would be output.
     # @return [Array<OneGadget::Gadget::Gadget>, Array<Integer>]
     #   The gadgets found.
     # @example
@@ -26,7 +29,7 @@ module OneGadget
     def gadgets(file: nil, build_id: nil, details: false, force_file: false, level: 0)
       ret = if build_id
               OneGadget::Fetcher.from_build_id(build_id) || OneGadget::Logger.not_found(build_id)
-            elsif file
+            else
               file = OneGadget::Helper.abspath(file)
               gadgets = try_from_build(file) unless force_file
               gadgets || OneGadget::Fetcher.from_file(file)
