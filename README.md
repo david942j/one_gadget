@@ -37,18 +37,19 @@ The article introducing how I develop this tool can be found [here](https://davi
 ### Command Line Interface
 
 Since OneGadget version 1.5.0,
-much more one-gadgets are found.
-Since gadgets become too many to show them all,
+much more one-gadgets have been found.
+And gadgets become too many to show them all,
 they would be selected automatically according to the difficulty of constraints.
-Therefore, gadgets shown will be less than previous versions.
+Therefore, gadgets shown will be less than previous versions (before v1.5.0).
 You can use option `--level 1` to show more gadgets found.
+
 ```bash
 $ one_gadget
 # Usage: one_gadget [file] [options]
 #     -b, --build-id BuildID           BuildID[sha1] of libc.
 #     -f, --[no-]force-file            Force search gadgets in file instead of build id first.
 #     -l, --level OUTPUT_LEVEL         The output level.
-#                                      OneGadget will automatically selects gadgets with higher successful probability.
+#                                      OneGadget automatically selects gadgets with higher successful probability.
 #                                      Increase this level to ask OneGadget show more gadgets it found.
 #                                      Default: 0
 #     -r, --[no-]raw                   Output gadgets offset only, split with one space.

@@ -16,7 +16,7 @@ parser = OptionParser.new do |opts|
   end
 
   opts.on('-l', '--level OUTPUT_LEVEL', Integer, 'The output level.',
-          'OneGadget will automatically selects gadgets with higher successful probability.',
+          'OneGadget automatically selects gadgets with higher successful probability.',
           'Increase this level to ask OneGadget show more gadgets it found.',
           'Default: 0') do |l|
     options[:level] = l

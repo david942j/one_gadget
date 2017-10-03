@@ -12,10 +12,8 @@ module OneGadget
       # @param [String] build_id The targets' BuildID.
       # @param [Boolean] remote
       #   When local not found, try search in latest version?
-      # @return [Array<Integer>, Array<OneGadget::Gadget::Gadget>, nil]
+      # @return [Array<OneGadget::Gadget::Gadget>?]
       #   +nil+ is returned if cannot find target id in database.
-      #   If +details+ is +false+, +Array<Integer>+ is returned, which contains offset only.
-      #   Otherwise, array of gadgets is returned.
       def from_build_id(build_id, remote: true)
         if (build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/).nil?
           raise ArgumentError, format('invalid BuildID format: %p', build_id)
@@ -25,10 +23,8 @@ module OneGadget
 
       # Fetch one-gadget offsets from file.
       # @param [String] file The absolute path of libc file.
-      # @return [Array<Integer>, Array<OneGadget::Gadget::Gadget>]
-      #   If +details+ is +false+, +Array<Integer>+ is returned, which
-      #   contains offset only.
-      #   Otherwise, array of gadgets is returned.
+      # @return [Array<OneGadget::Gadget::Gadget>]
+      #   Array of all found gadgets is returned.
       def from_file(file)
         klass = {
           amd64: OneGadget::Fetcher::Amd64,
