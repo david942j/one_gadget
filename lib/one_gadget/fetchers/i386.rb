@@ -28,7 +28,11 @@ module OneGadget
         return nil unless str_bin_sh?(arg0.to_s)
         @base_reg = arg0.deref.obj.to_s # this should be esi or ebx..
         # now we can let parent to invoke global_var?
-        super
+        res = super
+        return if res.nil?
+        # unshift got constraint into cons
+        res[:constraints].unshift("#{@base_reg} is the GOT address of libc")
+        res
       end
 
       def str_bin_sh?(str)

@@ -141,12 +141,15 @@ module OneGadget
       # @return [String]
       #   Only supports :amd64, :i386 now.
       def architecture(file)
-        str = ELFTools::ELFFile.new(File.open(file)).machine
+        f = File.open(file)
+        str = ELFTools::ELFFile.new(f).machine
         return :amd64 if str.include?('X86-64')
         return :i386 if str.include?('Intel 80386')
         :unknown
       rescue ELFTools::ELFError # not a valid ELF
         :invalid
+      ensure
+        f.close
       end
 
       # Present number in hex format.

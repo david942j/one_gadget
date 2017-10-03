@@ -125,6 +125,7 @@ module OneGadget
           args << '"sh"'
         end
         return nil if global_var?(arg) # we don't want base-related constraints
+        args << arg
         # now arg is the constraint.
         { constraints: ["#{arg} == NULL"], effect: %(execl("/bin/sh", #{args.join(', ')})) }
       end

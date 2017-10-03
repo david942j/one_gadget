@@ -10,41 +10,32 @@ module OneGadget
     module ClassMethods
       # Fetch one-gadget offsets of this build id.
       # @param [String] build_id The targets' BuildID.
-      # @param [Boolean] details
-      #   If needs to return the gadgets' constraints.
       # @param [Boolean] remote
       #   When local not found, try search in latest version?
       # @return [Array<Integer>, Array<OneGadget::Gadget::Gadget>, nil]
       #   +nil+ is returned if cannot find target id in database.
       #   If +details+ is +false+, +Array<Integer>+ is returned, which contains offset only.
       #   Otherwise, array of gadgets is returned.
-      def from_build_id(build_id, details: false, remote: true)
+      def from_build_id(build_id, remote: true)
         if (build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/).nil?
           raise ArgumentError, format('invalid BuildID format: %p', build_id)
         end
-        gadgets = OneGadget::Gadget.builds(build_id, remote: remote)
-        return if gadgets.nil?
-        return gadgets if details
-        gadgets.map(&:offset)
+        OneGadget::Gadget.builds(build_id, remote: remote)
       end
 
       # Fetch one-gadget offsets from file.
       # @param [String] file The absolute path of libc file.
-      # @param [Boolean] details
-      #   If needs to return the gadgets' constraints.
       # @return [Array<Integer>, Array<OneGadget::Gadget::Gadget>]
       #   If +details+ is +false+, +Array<Integer>+ is returned, which
       #   contains offset only.
       #   Otherwise, array of gadgets is returned.
-      def from_file(file, details: false)
+      def from_file(file)
         klass = {
           amd64: OneGadget::Fetcher::Amd64,
           i386: OneGadget::Fetcher::I386
         }[OneGadget::Helper.architecture(file)]
         raise ArgumentError, 'Unsupported architecture!' if klass.nil?
-        gadgets = trim_gadgets(klass.new(file).find)
-        return gadgets if details
-        gadgets.map(&:offset)
+        trim_gadgets(klass.new(file).find)
       end
 
       private

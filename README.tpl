@@ -36,10 +36,16 @@ The article introducing how I develop this tool can be found [here](https://davi
 
 ### Command Line Interface
 
+Since OneGadget version 2.0.0,
+gadgets would be selected automatically according to difficulty of success constraints.
+Increase option `--level` to show more gadgets found.
 ```bash
 SHELL_OUTPUT_OF(one_gadget)
 SHELL_OUTPUT_OF(one_gadget -b 60131540dadc6796cab33388349e6e4e68692053)
-SHELL_OUTPUT_OF(one_gadget /lib/i386-linux-gnu/libc.so.6)
+SHELL_OUTPUT_OF(one_gadget /lib32/libc.so.6 --force-file)
+SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --force-file)
+# higher level
+SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --force-file --level 1)
 ```
 
 #### Combine with exploit script

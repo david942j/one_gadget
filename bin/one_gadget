@@ -15,6 +15,13 @@ parser = OptionParser.new do |opts|
     options[:force_file] = b
   end
 
+  opts.on('-l', '--level OUTPUT_LEVEL', Integer, 'The output level.',
+          'OneGadget will automatically selects gadgets with higher success probability.',
+          'Increase this level to ask OneGadget show more gadgets it found.',
+          'Default: 0') do |l|
+    options[:level] = l
+  end
+
   opts.on('-r', '--[no-]raw', 'Output gadgets offset only, split with one space.') do |v|
     options[:raw] = v
   end
@@ -42,10 +49,11 @@ def execute(script, offset)
   Process.wait pid
 end
 
+level = options[:level] || 0
 if options[:build_id]
-  gadgets = OneGadget.gadgets(build_id: options[:build_id], details: true)
+  gadgets = OneGadget.gadgets(build_id: options[:build_id], details: true, level: level)
 elsif ARGV[0]
-  gadgets = OneGadget.gadgets(file: ARGV[0], details: true, force_file: options[:force_file])
+  gadgets = OneGadget.gadgets(file: ARGV[0], details: true, force_file: options[:force_file], level: level)
 else
   puts parser.help
   exit(1)
