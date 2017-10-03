@@ -27,10 +27,10 @@ module OneGadget
       # @return [void]
       def process!(cmd)
         inst, args = parse(cmd)
-        return registers[pc] = args[0] if inst.inst == 'call'
-        return if inst.inst == 'jmp' # believe the fetcher has handled jmp.
+        # return registers[pc] = args[0] if inst.inst == 'call'
+        return true if inst.inst == 'jmp' # believe the fetcher has handled jmp.
         sym = "inst_#{inst.inst}".to_sym
-        send(sym, *args)
+        send(sym, *args) != :fail
       end
 
       # Process one command, without raising any exceptions.
@@ -40,20 +40,21 @@ module OneGadget
       def process(cmd)
         process!(cmd)
       rescue ArgumentError
-        nil
+        false
       end
 
       # Support instruction set.
       # @return [Array<Instruction>] The support instructions.
       def instructions
         [
-          Instruction.new('mov', 2),
-          Instruction.new('lea', 2),
           Instruction.new('add', 2),
-          Instruction.new('sub', 2),
-          Instruction.new('push', 1),
           Instruction.new('call', 1),
-          Instruction.new('jmp', 1)
+          Instruction.new('jmp', 1),
+          Instruction.new('lea', 2),
+          Instruction.new('mov', 2),
+          Instruction.new('push', 1),
+          Instruction.new('sub', 2),
+          Instruction.new('xor', 2)
         ]
       end
 
@@ -62,6 +63,9 @@ module OneGadget
         # @return [Integer] 32 or 64.
         def bits; raise NotImplementedError
         end
+      end
+
+      def argument(idx); raise NotImplementedError
       end
 
       private
@@ -98,6 +102,12 @@ module OneGadget
         stack[cur_top] = val
       end
 
+      def inst_xor(dst, src)
+        # only supports dst == src
+        raise ArgumentError, 'xor operator only supports dst = src' unless dst == src
+        registers[dst] = 0
+      end
+
       def inst_add(tar, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         registers[tar] += src
@@ -106,6 +116,29 @@ module OneGadget
       def inst_sub(tar, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         registers[tar] -= src
+      end
+
+      def check_argument(idx, expect)
+        case expect
+        when :global then argument(idx).to_s.include?(pc) # easy check
+        when :zero? then argument(idx).zero?
+        else false
+        end
+      end
+
+      # Handle some valid calls.
+      # For example, +sigprocmask+ will always be a valid call
+      # because it just invokes syscall.
+      def inst_call(addr)
+        # This is the last call
+        return registers[pc] = addr if %w[execve execl].any? { |n| addr.include?(n) }
+        # TODO: handle some registers would be fucked after call
+        return if %w[sigprocmask __close].any? { |n| addr.include?(n) }
+        return if addr.include?('unsetenv') && check_argument(0, :global)
+        # for __sigaction, need to check current context if this is a valid call.
+        return if addr.include?('__sigaction') && check_argument(1, :global) && check_argument(2, :zero?)
+        # unhandled case
+        :fail
       end
 
       def bytes

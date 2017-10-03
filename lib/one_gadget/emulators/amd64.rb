@@ -9,6 +9,14 @@ module OneGadget
       def initialize
         super(OneGadget::ABI.amd64, 'rsp', 'rip')
       end
+
+      def argument(idx)
+        case idx
+        when 0 then registers['rdi']
+        when 1 then registers['rsi']
+        when 2 then registers['edx']
+        end
+      end
     end
   end
 end

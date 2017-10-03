@@ -28,10 +28,10 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&block)
-        cands = `#{objdump_cmd}|egrep 'call.*<exec[^+]*>$' -B 20`.split('--').map do |cand|
+        cands = `#{objdump_cmd}|egrep 'call.*<exec[^+]*>$' -B 30`.split('--').map do |cand|
           cand.lines.map(&:strip).reject(&:empty?).join("\n")
         end
-        # remove all calls, jmps
+        # remove all jmps
         cands = slice_prefix(cands, &method(:branch?))
         cands.select!(&block) if block_given?
         cands
@@ -40,7 +40,7 @@ module OneGadget
       private
 
       def objdump_cmd(start: nil, stop: nil)
-        cmd = %(objdump -w -d -M intel #{::Shellwords.escape(file)})
+        cmd = %(objdump --no-show-raw-insn -w -d -M intel #{::Shellwords.escape(file)})
         cmd.concat(" --start-address #{start}") if start
         cmd.concat(" --stop-address #{stop}") if stop
         cmd
@@ -57,7 +57,7 @@ module OneGadget
 
       # If str contains a branch instruction.
       def branch?(str)
-        %w(call jmp je jne jl jb ja jg).any? { |f| str.include?(f) }
+        %w(jmp je jne jl jb ja jg).any? { |f| str.include?(f) }
       end
 
       def str_offset(str)

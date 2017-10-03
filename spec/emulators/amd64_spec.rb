@@ -33,7 +33,7 @@ describe OneGadget::Emulators::Amd64 do
     end
 
     it 'invalid instruction' do
-      expect(@processor.process('oao')).to be nil
+      expect(@processor.process('oao')).to be false
       expect { @processor.process!('oao') }.to raise_error ArgumentError
     end
   end
