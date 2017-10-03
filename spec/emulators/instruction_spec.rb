@@ -2,8 +2,15 @@ require 'one_gadget/emulators/instruction'
 describe OneGadget::Emulators::Instruction do
   before(:all) do
     @mov = OneGadget::Emulators::Instruction.new('mov', 2)
+    @add = OneGadget::Emulators::Instruction.new('add', 2)
     @lea = OneGadget::Emulators::Instruction.new('lea', 2)
     @call = OneGadget::Emulators::Instruction.new('call', 1)
+  end
+
+  it 'match?' do
+    expect(@add.match?('add rax, rax')).to be true
+    expect(@add.match?('41f11:       addr32 call c4590 <execve>')).to be false
+    expect(@call.match?('41f11:       addr32 call c4590 <execve>')).to be true
   end
 
   it 'fetch_args' do

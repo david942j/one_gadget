@@ -29,7 +29,7 @@ module OneGadget
       # @param [String] cmd
       # @return [Boolean]
       def match?(cmd)
-        cmd.include?(inst)
+        cmd.include?(inst + ' ')
       end
     end
   end
