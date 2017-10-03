@@ -55,7 +55,7 @@ module OneGadget
         @deref_count -= 1
       end
 
-      # A new {Lambda} object with dreference count increase 1.
+      # A new {Lambda} object with dereference count increase 1.
       # @return [Lambda]
       def deref
         ret = Lambda.new(obj)

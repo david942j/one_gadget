@@ -106,6 +106,7 @@ module OneGadget
       def inst_xor(dst, src)
         # only supports dst == src
         raise ArgumentError, 'xor operator only supports dst = src' unless dst == src
+        dst[0] = 'r' if self.class.bits == 64 && dst.start_with?('e')
         registers[dst] = 0
       end
 
@@ -125,7 +126,7 @@ module OneGadget
       def check_argument(idx, expect)
         case expect
         when :global then argument(idx).to_s.include?(pc) # easy check
-        when :zero? then argument(idx).zero?
+        when :zero? then argument(idx).is_a?(Integer) && argument(idx).zero?
         else false
         end
       end
@@ -144,10 +145,8 @@ module OneGadget
           '__sigaction' => { 1 => :global, 2 => :zero? }
         }
         func = checker.keys.find { |n| addr.include?(n) }
-        # unhandled case
-        return :fail if func.nil?
-        return if checker[func].all? { |idx, sym| check_argument(idx, sym) }
-        # checker's condition fails
+        return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }
+        # unhandled case or checker's condition fails
         :fail
       end
 

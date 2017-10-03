@@ -13,7 +13,6 @@ module OneGadget
 
       def candidates
         # one basic block case
-        bin_sh_hex = str_offset('/bin/sh').to_s(16)
         cands = super do |candidate|
           next false unless candidate.include?(bin_sh_hex) # works in x86-64
           next false unless candidate.lines.last.include?('execve') # only care execve
@@ -44,37 +43,16 @@ module OneGadget
         end.compact
       end
 
-      def resolve(processor)
-        # must end with execve
-        return unless processor.registers['rip'].to_s.include?('execve')
-        # check rdi should always related to rip
-        return unless processor.registers['rdi'].to_s.include?('rip')
-        rsi, cons = rsi_cons(processor)
-        return if rsi.nil?
-        rdx = processor.registers['rdx'].to_s
-        env_cons = should_null(rdx, allow_global: true)
-        cons << env_cons if env_cons
-        { constraints: cons, effect: %(execve("/bin/sh", #{rsi}, #{env_cons ? rdx : 'environ'})) }
+      def bin_sh_hex
+        @bin_sh_hex ||= str_offset('/bin/sh').to_s(16)
       end
 
-      # rsi or [rsi] should be zero
-      def rsi_cons(processor)
-        rsi = processor.registers['rsi'].to_s
-        return [rsi, [should_null(rsi)]] unless rsi.start_with?('rsp')
-        # now rsi is in form rsp+<num>, let's see if stack[<num>] is defined.
-        num = Integer(rsi[3..-1])
-        # stack slot not defined, back to normal case
-        return [rsi, [should_null(rsi)]] unless processor.stack.key?(num)
-        slot = processor.stack[num].to_s
-        return if slot.include?('rip')
-        [rsi, ["#{slot} == NULL"]]
+      def str_bin_sh?(str)
+        str.include?('rip+0x') # && str.include?(bin_sh_hex)
       end
 
-      def should_null(str, allow_global: false)
-        return nil if allow_global && str.include?('rip')
-        ret = "[#{str}] == NULL"
-        ret += " || #{str} == NULL" unless str.include?('rsp')
-        ret
+      def global_var?(str)
+        str.include?('rip')
       end
     end
   end

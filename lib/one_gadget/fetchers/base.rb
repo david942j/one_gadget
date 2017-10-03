@@ -52,6 +52,92 @@ module OneGadget
 
       private
 
+      # Generating constraints to be a valid gadget.
+      # @param [OneGadget::Emulators::Processor] processor The processor after executing the gadgets.
+      # @return [Hash{Symbol => Array<String>, String}?]
+      #   The options to create a {OneGadget::Gadget::Gadget} object.
+      #   Keys might be:
+      #   1. constraints: Array<String> List of constraints.
+      #   2. effect: String Result function call of this gadget.
+      #   If the constraints can never be satisfied, +nil+ is returned.
+      def resolve(processor)
+        call = processor.registers[processor.pc].to_s
+        # This costs cheaper, so check first.
+        # check call execve / execl
+        return unless %w[execve execl].any? { |n| call.include?(n) }
+        # check first argument contains /bin/sh
+        # since the logic is different between amd64 and i386,
+        # invoke str_bin_sh? for checking
+        return unless str_bin_sh?(processor.argument(0).to_s)
+        if call.include?('execve')
+          resolve_execve(processor)
+        elsif call.include?('execl')
+          resolve_execl(processor)
+        end
+      end
+
+      def resolve_execve(processor)
+        # arg[1] == NULL || [arg[1]] == NULL
+        # arg[2] == NULL || [arg[2]] == NULL || arg[2] == envp
+        arg1 = processor.argument(1).to_s
+        arg2 = processor.argument(2).to_s
+        cons = []
+        cons << check_execve_arg(processor, arg1)
+        return nil unless cons.all?
+        envp = 'environ'
+        return nil unless check_envp(processor, arg2) do |c|
+          cons << c
+          envp = arg2
+        end
+        { constraints: cons, effect: %(execve("/bin/sh", #{arg1}, #{envp})) }
+      end
+
+      # arg[1] == NULL || [arg[1]] == NULL
+      def check_execve_arg(processor, arg)
+        if arg.start_with?(processor.sp) # arg = sp+<num>
+          # in this case, the only constraint is [sp+<num>] == NULL
+          num = Integer(arg[processor.sp.size..-1])
+          slot = processor.stack[num].to_s
+          return if global_var?(slot)
+          "#{slot} == NULL"
+        else
+          "[#{arg}] == NULL || #{arg} == NULL"
+        end
+      end
+
+      def check_envp(processor, arg)
+        # if str starts with [[ and is global var,
+        # believe it is environ
+        # if starts with [[ but not global, drop it.
+        return global_var?(arg) if arg.start_with?('[[')
+        # normal
+        cons = check_execve_arg(processor, arg)
+        return nil if cons.nil?
+        yield cons
+      end
+
+      # Resolve +call execl+ case.
+      def resolve_execl(processor)
+        args = []
+        arg = processor.argument(1).to_s
+        if str_sh?(arg)
+          arg = processor.argument(2).to_s
+          args << '"sh"'
+        end
+        return nil if global_var?(arg) # we don't want base-related constraints
+        # now arg is the constraint.
+        { constraints: ["#{arg} == NULL"], effect: %(execl("/bin/sh", #{args.join(', ')})) }
+      end
+
+      def global_var?(_str); raise NotImplementedError
+      end
+
+      def str_bin_sh?(_str); raise NotImplementedError
+      end
+
+      def str_sh?(_str); raise NotImplementedError
+      end
+
       def emulate(cmds)
         cmds.each_with_object(emulator) { |cmd, obj| break obj unless obj.process!(cmd) }
       end

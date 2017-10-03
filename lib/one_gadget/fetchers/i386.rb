@@ -21,76 +21,27 @@ module OneGadget
         OneGadget::Emulators::I386.new
       end
 
-      # Generating constraints to be a valid gadget.
-      # @param [OneGadget::Emulators::I386] processor The processor after executing the gadget.
-      # @param [Integer] bin_sh The related offset refer to /bin/sh.
-      # @return [Hash{Symbol => Array<String>, String}?]
-      #   The options to create a {OneGadget::Gadget::Gadget} object.
-      #   Keys might be:
-      #   1. constraints: Array<String> List of constraints.
-      #   2. effect: String Result function call of this gadget.
-      #   If the constraints can never be satisfied, +nil+ is returned.
-      def resolve(processor, bin_sh: 0)
-        call = processor.registers['eip'].to_s
-        cur_top = processor.registers['esp'].evaluate('esp' => 0)
-        arg = processor.stack[cur_top]
-        # arg0 must be /bin/sh
-        return nil unless arg.to_s.include?(bin_sh.to_s(16))
-        got_base = arg.deref.obj.to_s # this should be esi or ebx..
-        arg1 = processor.stack[cur_top + 4]
-        arg2 = processor.stack[cur_top + 8]
-        options = if call.include?('execve')
-                    resolve_execve(arg1, arg2, got_base: got_base)
-                  elsif call.include?('execl')
-                    resolve_execl(arg1, arg2, got_base: got_base, sh: bin_sh - 5)
-                  end
-        return nil if options.nil?
-        options[:constraints].unshift("#{got_base} is the GOT address of libc")
-        options
+      def resolve(processor)
+        # use arg(0) to fetch the got base register
+        # first check if argument 0 is '/bin/sh' to prevent error
+        arg0 = processor.argument(0)
+        return nil unless str_bin_sh?(arg0.to_s)
+        @base_reg = arg0.deref.obj.to_s # this should be esi or ebx..
+        # now we can let parent to invoke global_var?
+        super
       end
 
-      # Resolve +call execl+ case.
-      # @param [OneGadget::Emulators::Lambda] arg1
-      #   The second argument.
-      # @param [OneGadget::Emulators::Lambda] arg2
-      #   The third argument.
-      # @param [String] got_base Usually +ebx+ or +esi+.
-      # @param [Integer] sh The relative offset of string 'sh' appears.
-      # @return [Hash{Symbol => Array<String>, String}]
-      #   Same format as {#resolve}.
-      def resolve_execl(arg1, arg2, got_base: nil, sh: 0)
-        args = []
-        arg = arg1.to_s
-        if arg.include?(sh.to_s(16))
-          arg = arg2.to_s
-          args << '"sh"'
-        end
-        args << arg
-        return nil if arg.include?(got_base) || arg.include?('eip') # we don't want base-related constraints
-        # now arg is the constraint.
-        { constraints: ["#{arg} == NULL"], effect: %(execl("/bin/sh", #{args.join(', ')})) }
+      def str_bin_sh?(str)
+        str.include?(rel_sh.to_s(16))
       end
 
-      # Resolve +call execve+ case.
-      # @param [OneGadget::Emulators::Lambda] arg1
-      #   The second argument.
-      # @param [OneGadget::Emulators::Lambda] arg2
-      #   The third argument.
-      # @param [String] got_base Usually +ebx+ or +esi+.
-      # @return [Hash{Symbol => Array<String>, String}]
-      #   Same format as {#resolve}.
-      def resolve_execve(arg1, arg2, got_base: nil)
-        # arg1 == NULL || [arg1] == NULL
-        # arg2 == NULL or arg2 is environ
-        cons = [should_null(arg1.to_s)]
-        envp = arg2.to_s
-        use_env = true
-        unless envp.include?('[[') && envp.include?(got_base) # hope this is environ_ptr_0
-          return nil if envp.include?('[') # we don't like this :(
-          cons << should_null(envp)
-          use_env = false
-        end
-        { constraints: cons, effect: %(execve("/bin/sh", #{arg1}, #{use_env ? 'environ' : envp})) }
+      def str_sh?(str)
+        str.include?((rel_sh - 5).to_s(16))
+      end
+
+      # @base_reg should always be set in resolve()
+      def global_var?(str)
+        str.include?(@base_reg)
       end
 
       def got_offset
@@ -102,12 +53,6 @@ module OneGadget
 
       def rel_sh
         @rel_sh ||= got_offset - str_offset('/bin/sh')
-      end
-
-      def should_null(str)
-        ret = "[#{str}] == NULL"
-        ret += " || #{str} == NULL" unless str.include?('esp')
-        ret
       end
     end
   end
