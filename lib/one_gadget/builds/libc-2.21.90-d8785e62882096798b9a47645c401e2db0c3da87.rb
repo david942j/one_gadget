@@ -1,4 +1,6 @@
 require 'one_gadget/gadget'
+# https://gitlab.com/libcdb/libcdb/blob/master/libc/glibc-2.21.90-10.fc23.i686/lib/libc-2.21.90.so
+# 
 # Intel 80386
 # 
 # GNU C Library (GNU libc) development release version 2.21.90, by Roland McGrath et al.
@@ -19,9 +21,24 @@ require 'one_gadget/gadget'
 # <http://www.gnu.org/software/libc/bugs.html>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 255032,
+                      constraints: ["ebx is the GOT address of libc", "[esp+0x28] == NULL"],
+                      effect: "execve(\"/bin/sh\", esp+0x28, environ)")
+OneGadget::Gadget.add(build_id, 255034,
+                      constraints: ["ebx is the GOT address of libc", "[esp+0x2c] == NULL"],
+                      effect: "execve(\"/bin/sh\", esp+0x2c, environ)")
+OneGadget::Gadget.add(build_id, 255038,
+                      constraints: ["ebx is the GOT address of libc", "[esp+0x30] == NULL"],
+                      effect: "execve(\"/bin/sh\", esp+0x30, environ)")
 OneGadget::Gadget.add(build_id, 255045,
                       constraints: ["ebx is the GOT address of libc", "[esp+0x34] == NULL"],
                       effect: "execve(\"/bin/sh\", esp+0x34, environ)")
+OneGadget::Gadget.add(build_id, 255080,
+                      constraints: ["ebx is the GOT address of libc", "[eax] == NULL || eax == NULL", "[[esp]] == NULL || [esp] == NULL"],
+                      effect: "execve(\"/bin/sh\", eax, [esp])")
+OneGadget::Gadget.add(build_id, 255081,
+                      constraints: ["ebx is the GOT address of libc", "[[esp]] == NULL || [esp] == NULL", "[[esp+0x4]] == NULL || [esp+0x4] == NULL"],
+                      effect: "execve(\"/bin/sh\", [esp], [esp+0x4])")
 OneGadget::Gadget.add(build_id, 417876,
                       constraints: ["ebx is the GOT address of libc", "eax == NULL"],
                       effect: "execl(\"/bin/sh\", eax)")

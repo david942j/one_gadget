@@ -117,6 +117,7 @@ module OneGadget
 
       def inst_sub(tar, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        raise ArgumentError, "Can't handle -= of type #{src.class}" unless src.is_a?(Integer)
         registers[tar] -= src
       end
 

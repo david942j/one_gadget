@@ -1,4 +1,6 @@
 require 'one_gadget/gadget'
+# https://gitlab.com/libcdb/libcdb/blob/master/libc/glibc-2.23-2-x86_64.pkg.tar/usr/lib/libc-2.23.so
+# 
 # Advanced Micro Devices X86-64
 # 
 # GNU C Library (GNU libc) stable release version 2.23, by Roland McGrath et al.
@@ -17,6 +19,9 @@ require 'one_gadget/gadget'
 # <https://bugs.archlinux.org/>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 258870,
+                      constraints: ["rax == NULL"],
+                      effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
 OneGadget::Gadget.add(build_id, 258954,
                       constraints: ["[rsp+0x30] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
@@ -26,4 +31,7 @@ OneGadget::Gadget.add(build_id, 755157,
 OneGadget::Gadget.add(build_id, 876757,
                       constraints: ["[rsp+0x70] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x70, environ)")
+OneGadget::Gadget.add(build_id, 876769,
+                      constraints: ["[rsi] == NULL || rsi == NULL", "[[rax]] == NULL || [rax] == NULL"],
+                      effect: "execve(\"/bin/sh\", rsi, [rax])")
 

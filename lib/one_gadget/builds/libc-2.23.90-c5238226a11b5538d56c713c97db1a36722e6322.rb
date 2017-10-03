@@ -1,4 +1,6 @@
 require 'one_gadget/gadget'
+# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6-amd64-2.23.90+20160725.b898b64-1/lib64/libc-2.23.90.so
+# 
 # Advanced Micro Devices X86-64
 # 
 # GNU C Library (Debian GLIBC 2.23.90+20160725.b898b64-1) development release version 2.23.90, by Roland McGrath et al.
@@ -17,6 +19,9 @@ require 'one_gadget/gadget'
 # <http://www.debian.org/Bugs/>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 258998,
+                      constraints: ["rax == NULL"],
+                      effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
 OneGadget::Gadget.add(build_id, 259082,
                       constraints: ["[rsp+0x30] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
@@ -26,4 +31,7 @@ OneGadget::Gadget.add(build_id, 756488,
 OneGadget::Gadget.add(build_id, 878773,
                       constraints: ["[rsp+0x70] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x70, environ)")
+OneGadget::Gadget.add(build_id, 878785,
+                      constraints: ["[rsi] == NULL || rsi == NULL", "[[rax]] == NULL || [rax] == NULL"],
+                      effect: "execve(\"/bin/sh\", rsi, [rax])")
 

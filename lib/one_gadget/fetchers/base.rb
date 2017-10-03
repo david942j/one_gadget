@@ -140,7 +140,7 @@ module OneGadget
       end
 
       def emulate(cmds)
-        cmds.each_with_object(emulator) { |cmd, obj| break obj unless obj.process!(cmd) }
+        cmds.each_with_object(emulator) { |cmd, obj| break obj unless obj.process(cmd) }
       end
 
       def emulator; raise NotImplementedError

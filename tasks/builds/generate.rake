@@ -3,7 +3,8 @@ namespace :builds do
   task :generate, :pattern do |_t, args|
     require 'elftools'
     require 'one_gadget'
-    total = Dir.glob(args.pattern).size
+    entries = Dir.glob(args.pattern).select { |f| File.file?(f) && !File.symlink?(f) }
+    total = entries.size
     if total > 1
       print "Process #{total} files? (Y/n) "
       s = STDIN.gets
@@ -12,8 +13,8 @@ namespace :builds do
     path = File.join(__dir__, '..', '..', 'lib', 'one_gadget', 'builds')
     @skipped = 0
     @failed = 0
-    Dir.glob(args.pattern).sort.each_with_index do |libc_file, i|
-      print "[#{i + 1}/#{total}] Processing #{libc_file}.. "
+    entries.sort.each_with_index do |libc_file, i|
+      print "[#{i + 1}/#{total}] Processing #{libc_file} .. "
       info = libc_info(libc_file)
       next failed('parse info fail') if info.nil? # error when fetching info
       next failed('build id not found') if info[:build_id].nil? # no .note.gnu.build.id section
@@ -21,7 +22,7 @@ namespace :builds do
       next skipped('version too old') if Gem::Version.new(version) < Gem::Version.new('2.19')
       filename = File.join(path, "libc-#{version}-#{info[:build_id]}.rb")
       next skipped('file exists') if File.file?(filename)
-      gadgets = OneGadget.gadgets(file: libc_file, force_file: true, details: true)
+      gadgets = OneGadget.gadgets(file: libc_file, force_file: true, details: true, level: 100)
       next failed('no gadgets found') if gadgets.empty?
       content = template(info, gadgets)
       File.open(filename, 'w') { |f| f.write(content) }
@@ -55,19 +56,26 @@ OneGadget::Gadget.add(build_id, OFFSET,
 
   def libc_info(filename)
     file = File.open(filename)
-    str = file.read
     libc = ELFTools::ELFFile.new(file)
     build_id = libc.build_id
     arch = libc.machine
-    file.close
+    return nil unless arch == 'Advanced Micro Devices X86-64' || arch == 'Intel 80386'
+    # let's skip amd64 with 32bit, i.e. x32
+    return nil if arch.start_with?('Advanced') && libc.elf_class == 32
+    str = file.read
     st = str.index('GNU C Library')
     return nil if st.nil?
     len = str[st..-1].index("\x00")
     return nil if len.nil?
+    fname = filename.sub('../libcdb', 'https://gitlab.com/libcdb/libcdb/blob/master')
     {
       build_id: build_id,
-      info: arch + "\n\n" + str[st, len]
+      info: fname + "\n\n" + arch + "\n\n" + str[st, len]
     }
+  rescue ELFTools::ELFError, EOFError # corrupted elf file
+    return nil
+  ensure
+    file.close
   end
 
   def failed(msg)

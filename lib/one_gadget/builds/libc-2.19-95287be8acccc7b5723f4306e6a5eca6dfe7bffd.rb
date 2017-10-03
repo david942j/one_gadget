@@ -1,4 +1,6 @@
 require 'one_gadget/gadget'
+# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6_2.19-10ubuntu2.3_amd64/lib/x86_64-linux-gnu/libc-2.19.so
+# 
 # Advanced Micro Devices X86-64
 # 
 # GNU C Library (Ubuntu GLIBC 2.19-10ubuntu2.3) stable release version 2.19, by Roland McGrath et al.
@@ -18,6 +20,9 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 281304,
+                      constraints: ["rax == NULL"],
+                      effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
 OneGadget::Gadget.add(build_id, 281388,
                       constraints: ["[rsp+0x30] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
@@ -30,6 +35,9 @@ OneGadget::Gadget.add(build_id, 793602,
 OneGadget::Gadget.add(build_id, 935269,
                       constraints: ["[rsp+0x50] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x50, environ)")
+OneGadget::Gadget.add(build_id, 935281,
+                      constraints: ["[rsi] == NULL || rsi == NULL", "[[rax]] == NULL || [rax] == NULL"],
+                      effect: "execve(\"/bin/sh\", rsi, [rax])")
 OneGadget::Gadget.add(build_id, 939084,
                       constraints: ["[rsp+0x70] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x70, environ)")
