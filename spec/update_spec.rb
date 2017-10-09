@@ -1,3 +1,4 @@
+require 'logger'
 require 'tempfile'
 
 require 'one_gadget/update'
@@ -14,11 +15,13 @@ describe OneGadget::Update do
     end
 
     @hook_logger = lambda do |&block|
-      logdev = OneGadget::Logger.instance_variable_get(:@logger).instance_variable_get(:@logdev)
-      dev = logdev.dev
-      logdev.reopen($stdout)
+      # no method 'reopen' before ruby 2.3
+      org_logger = OneGadget::Logger.instance_variable_get(:@logger)
+      new_logger = ::Logger.new($stdout)
+      new_logger.formatter = org_logger.formatter
+      OneGadget::Logger.instance_variable_set(:@logger, new_logger)
       block.call
-      logdev.instance_variable_set(:@dev, dev)
+      OneGadget::Logger.instance_variable_set(:@logger, org_logger)
     end
   end
 
