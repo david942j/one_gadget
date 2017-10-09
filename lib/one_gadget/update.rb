@@ -43,7 +43,7 @@ module OneGadget
       def last_check
         cache = cache_file
         return Time.now if cache.nil?
-        File.open(cache).mtime
+        File.open(cache, &:mtime)
       end
 
       def cache_file

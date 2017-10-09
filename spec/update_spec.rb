@@ -1,5 +1,4 @@
 require 'logger'
-require 'tempfile'
 
 require 'one_gadget/update'
 require 'one_gadget/version'
@@ -8,10 +7,9 @@ describe OneGadget::Update do
   before(:all) do
     # precent fail on CI
     @hook_cache_file = lambda do |&block|
-      tmp = Tempfile.new('update')
-      stub_const('OneGadget::Update::CACHE_FILE', tmp.path)
-      block.call(tmp.path)
-      tmp.close
+      tmp = Dir::Tmpname.make_tmpname('/tmp/one_gadget/update', nil)
+      stub_const('OneGadget::Update::CACHE_FILE', tmp)
+      block.call(tmp)
     end
 
     @hook_logger = lambda do |&block|
@@ -25,11 +23,16 @@ describe OneGadget::Update do
     end
   end
 
+  after(:all) do
+    FileUtils.rm_r('/tmp/one_gadget')
+  end
+
   it 'cache_file' do
-    stub_const('OneGadget::Update::CACHE_FILE', '/bin/pusheeeeeen')
-    expect(described_class.send(:cache_file)).to be nil
     @hook_cache_file.call do |path|
       expect(described_class.send(:cache_file)).to eq path
+      File.chmod(0o000, File.dirname(path))
+      expect(described_class.send(:cache_file)).to be nil
+      File.chmod(0o700, File.dirname(path))
     end
   end
 
