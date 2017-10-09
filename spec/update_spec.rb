@@ -7,7 +7,7 @@ describe OneGadget::Update do
   before(:all) do
     # precent fail on CI
     @hook_cache_file = lambda do |&block|
-      tmp = Tempfile.new
+      tmp = Tempfile.new('update')
       stub_const('OneGadget::Update::CACHE_FILE', tmp.path)
       block.call(tmp.path)
       tmp.close
