@@ -30,9 +30,9 @@ describe OneGadget::Update do
   it 'cache_file' do
     @hook_cache_file.call do |path|
       expect(described_class.send(:cache_file)).to eq path
-      File.chmod(0o000, File.dirname(path))
+      FileUtils.chmod(0o000, File.dirname(path))
       expect(described_class.send(:cache_file)).to be nil
-      File.chmod(0o700, File.dirname(path))
+      FileUtils.chmod(0o700, File.dirname(path))
     end
   end
 
