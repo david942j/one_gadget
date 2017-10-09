@@ -28,11 +28,12 @@ describe OneGadget::Update do
   end
 
   it 'cache_file' do
+    skip 'Windows so hard' unless RUBY_PLATFORM =~ /linux/
     @hook_cache_file.call do |path|
       expect(described_class.send(:cache_file)).to eq path
-      FileUtils.chmod(0o000, File.dirname(path))
+      File.chmod(0o000, File.dirname(path))
       expect(described_class.send(:cache_file)).to be nil
-      FileUtils.chmod(0o700, File.dirname(path))
+      File.chmod(0o700, File.dirname(path))
     end
   end
 
