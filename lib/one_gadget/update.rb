@@ -17,6 +17,7 @@ module OneGadget
       # @return [void]
       def check!
         return unless need_check?
+        FileUtils.touch(cache_file)
         OneGadget::Logger.info("Checking for new versions of OneGadget\n" \
                                "To disable this functionality, do\n$ echo never > #{CACHE_FILE}\n\n")
         latest = Helper.latest_tag[1..-1] # remove 'v'
