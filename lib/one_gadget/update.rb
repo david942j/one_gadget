@@ -2,6 +2,7 @@ require 'fileutils'
 
 require 'one_gadget/helper'
 require 'one_gadget/logger'
+require 'one_gadget/version'
 
 module OneGadget
   # For automatically check update.
