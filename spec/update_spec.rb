@@ -52,13 +52,12 @@ describe OneGadget::Update do
     OneGadget::Helper.color_off!
     @hook_cache_file.call do |path|
       allow(described_class).to receive(:need_check?).and_return(true)
-      expect { @hook_logger.call { described_class.check! } }.to output(<<-EOS).to_stdout
+      expect { @hook_logger.call { described_class.check! } }.to output(include(<<-EOS.strip)).to_stdout
 [OneGadget] Checking for new versions of OneGadget
             To disable this functionality, do
             $ echo never > #{path}
 
-[OneGadget] You have the latest version of OneGadget (#{OneGadget::VERSION})!
-
+[OneGadget] You have the latest version of OneGadget
       EOS
       stub_const('OneGadget::VERSION', '0.0.0')
       expect { @hook_logger.call { described_class.check! } }.to output(include(<<-EOS)).to_stdout
