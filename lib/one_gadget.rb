@@ -80,6 +80,9 @@ def one_gadget(arg = nil, **options)
   OneGadget.gadgets(**options)
 end
 
+require 'one_gadget/update'
+OneGadget::Update.check!
+
 require 'one_gadget/fetcher'
 require 'one_gadget/helper'
 require 'one_gadget/logger'

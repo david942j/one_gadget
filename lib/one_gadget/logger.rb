@@ -10,7 +10,7 @@ module OneGadget
       prep = ' ' * 12
       message = msg.lines.map.with_index do |str, i|
         next str if i.zero?
-        prep + str
+        str.strip.empty? ? str : prep + str
       end
       color = case severity
               when 'WARN' then :warn
