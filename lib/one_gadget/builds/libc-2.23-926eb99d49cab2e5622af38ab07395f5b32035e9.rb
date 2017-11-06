@@ -1,4 +1,6 @@
 require 'one_gadget/gadget'
+# spec/data/libc-2.23-926eb99d49cab2e5622af38ab07395f5b32035e9.so
+# 
 # Intel 80386
 # 
 # GNU C Library (Ubuntu GLIBC 2.23-0ubuntu5) stable release version 2.23, by Roland McGrath et al.
@@ -17,9 +19,24 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 240732,
+                      constraints: ["esi is the GOT address of libc", "[esp+0x28] == NULL"],
+                      effect: "execve(\"/bin/sh\", esp+0x28, environ)")
+OneGadget::Gadget.add(build_id, 240734,
+                      constraints: ["esi is the GOT address of libc", "[esp+0x2c] == NULL"],
+                      effect: "execve(\"/bin/sh\", esp+0x2c, environ)")
+OneGadget::Gadget.add(build_id, 240738,
+                      constraints: ["esi is the GOT address of libc", "[esp+0x30] == NULL"],
+                      effect: "execve(\"/bin/sh\", esp+0x30, environ)")
 OneGadget::Gadget.add(build_id, 240745,
                       constraints: ["esi is the GOT address of libc", "[esp+0x34] == NULL"],
                       effect: "execve(\"/bin/sh\", esp+0x34, environ)")
+OneGadget::Gadget.add(build_id, 240780,
+                      constraints: ["esi is the GOT address of libc", "[eax] == NULL || eax == NULL", "[[esp]] == NULL || [esp] == NULL"],
+                      effect: "execve(\"/bin/sh\", eax, [esp])")
+OneGadget::Gadget.add(build_id, 240781,
+                      constraints: ["esi is the GOT address of libc", "[[esp]] == NULL || [esp] == NULL", "[[esp+0x4]] == NULL || [esp+0x4] == NULL"],
+                      effect: "execve(\"/bin/sh\", [esp], [esp+0x4])")
 OneGadget::Gadget.add(build_id, 392133,
                       constraints: ["esi is the GOT address of libc", "eax == NULL"],
                       effect: "execl(\"/bin/sh\", eax)")

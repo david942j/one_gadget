@@ -1,4 +1,6 @@
 require 'one_gadget/gadget'
+# ubuntu17.04-lib-x86_64-linux-gnu-libc-2.24.so
+# 
 # Advanced Micro Devices X86-64
 # 
 # GNU C Library (Ubuntu GLIBC 2.24-9ubuntu2.2) stable release version 2.24, by Roland McGrath et al.
@@ -17,6 +19,9 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 283942,
+                      constraints: ["rax == NULL"],
+                      effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
 OneGadget::Gadget.add(build_id, 284026,
                       constraints: ["[rsp+0x30] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
@@ -26,9 +31,18 @@ OneGadget::Gadget.add(build_id, 843329,
 OneGadget::Gadget.add(build_id, 844001,
                       constraints: ["[[rbp-0x78]] == NULL || [rbp-0x78] == NULL", "[[rbp-0x50]] == NULL || [rbp-0x50] == NULL"],
                       effect: "execve(\"/bin/sh\", [rbp-0x78], [rbp-0x50])")
+OneGadget::Gadget.add(build_id, 844005,
+                      constraints: ["[r9] == NULL || r9 == NULL", "[[rbp-0x50]] == NULL || [rbp-0x50] == NULL"],
+                      effect: "execve(\"/bin/sh\", r9, [rbp-0x50])")
+OneGadget::Gadget.add(build_id, 844009,
+                      constraints: ["[r9] == NULL || r9 == NULL", "[rdx] == NULL || rdx == NULL"],
+                      effect: "execve(\"/bin/sh\", r9, rdx)")
 OneGadget::Gadget.add(build_id, 988753,
                       constraints: ["[rsp+0x40] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x40, environ)")
+OneGadget::Gadget.add(build_id, 988765,
+                      constraints: ["[rsi] == NULL || rsi == NULL", "[[rax]] == NULL || [rax] == NULL"],
+                      effect: "execve(\"/bin/sh\", rsi, [rax])")
 OneGadget::Gadget.add(build_id, 992459,
                       constraints: ["[rsp+0x60] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x60, environ)")

@@ -1,4 +1,6 @@
 require 'one_gadget/gadget'
+# https://gitlab.com/libcdb/libcdb/blob/master/libc/glibc-2.19-3-i686.pkg.tar/usr/lib/libc-2.19.so
+# 
 # Intel 80386
 # 
 # GNU C Library (GNU libc) stable release version 2.19, by Roland McGrath et al.
@@ -21,6 +23,12 @@ build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 255483,
                       constraints: ["ebx is the GOT address of libc", "[esp+0x34] == NULL"],
                       effect: "execve(\"/bin/sh\", esp+0x34, environ)")
+OneGadget::Gadget.add(build_id, 255519,
+                      constraints: ["ebx is the GOT address of libc", "[eax] == NULL || eax == NULL", "[[esp+0x8]] == NULL || [esp+0x8] == NULL"],
+                      effect: "execve(\"/bin/sh\", eax, [esp+0x8])")
+OneGadget::Gadget.add(build_id, 255523,
+                      constraints: ["ebx is the GOT address of libc", "[[esp+0x4]] == NULL || [esp+0x4] == NULL", "[[esp+0x8]] == NULL || [esp+0x8] == NULL"],
+                      effect: "execve(\"/bin/sh\", [esp+0x4], [esp+0x8])")
 OneGadget::Gadget.add(build_id, 417011,
                       constraints: ["ebx is the GOT address of libc", "[esp+0x8] == NULL"],
                       effect: "execl(\"/bin/sh\", \"sh\", [esp+0x8])")
