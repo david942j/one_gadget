@@ -34,14 +34,14 @@ The article introducing how I develop this tool can be found [here](https://davi
 
 ## Usage
 
-### Command Line Interface
-
 Since OneGadget version 1.5.0,
 much more one-gadgets have been found.
 And gadgets become too many to show them all,
 they would be selected automatically according to the difficulty of constraints.
 Therefore, gadgets shown will be less than previous versions (before v1.5.0).
 You can use option `--level 1` to show more gadgets found.
+
+### Command Line Interface
 
 ```bash
 $ one_gadget
