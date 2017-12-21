@@ -53,7 +53,7 @@ module OneGadget
         FileUtils.mkdir_p(dir) unless File.directory?(dir)
         IO.binwrite(CACHE_FILE, '') unless File.exist?(CACHE_FILE)
         CACHE_FILE
-      rescue # prevent dir is not writable
+      rescue Errno::EACCES # prevent dir is not writable
         return nil
       end
     end

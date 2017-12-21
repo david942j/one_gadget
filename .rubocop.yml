@@ -29,11 +29,23 @@ Metrics/LineLength:
 Metrics/MethodLength:
   Enabled: false
 
+Naming/HeredocDelimiterNaming:
+  Enabled: false
+
 Rails:
   Enabled: false
 
 Style/FileName:
   Enabled: false
 
+Style/FormatStringToken:
+  Enabled: false
+
+Style/MixinUsage:
+  Enabled: false
+
 Style/PercentLiteralDelimiters:
+  Enabled: false
+
+Style/TrailingBodyOnMethodDefinition:
   Enabled: false
