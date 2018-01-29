@@ -24,6 +24,12 @@ describe 'one_gadget' do
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f356, 0x3f3aa, 0xd67e5]
       expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
     end
+
+    it 'libc-2.26' do
+      path = @data_path['libc-2.26-ddcc13122ddbfe5e5ef77d4ebe66d124ae5762c2.so']
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x47c46, 0x47c9a, 0xfccde, 0xfdb8e]
+      expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
+    end
   end
 
   describe 'from build id' do

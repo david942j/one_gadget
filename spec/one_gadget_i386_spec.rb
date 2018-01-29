@@ -5,8 +5,7 @@ require 'one_gadget'
 describe 'one_gadget' do
   before(:each) do
     @build_id = '926eb99d49cab2e5622af38ab07395f5b32035e9'
-    @libcpath19 = File.join(__dir__, 'data', 'libc-2.19-fd51b20e670e9a9f60dc3b06dc9761fb08c9358b.so')
-    @libcpath23 = File.join(__dir__, 'data', 'libc-2.23-926eb99d49cab2e5622af38ab07395f5b32035e9.so')
+    @data_path = ->(file) { File.join(__dir__, 'data', file) }
   end
 
   describe 'from file' do
@@ -14,13 +13,21 @@ describe 'one_gadget' do
       skip 'binutils not installed' if find_executable0('objdump').nil?
     end
 
-    it 'from file libc-2.19' do
-      expect(OneGadget.gadgets(file: @libcpath19, force_file: true)).to eq [0x3fd27, 0x64c64, 0x64c6a, 0x64c6e]
+    it 'libc-2.19' do
+      path = @data_path['libc-2.19-fd51b20e670e9a9f60dc3b06dc9761fb08c9358b.so']
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3fd27, 0x64c64, 0x64c6a, 0x64c6e]
     end
 
-    it 'from file libc-2.23' do
+    it 'libc-2.23' do
       ans = [0x3ac5c, 0x3ac5e, 0x3ac62, 0x3ac69, 0x5fbc5, 0x5fbc6]
-      expect(OneGadget.gadgets(file: @libcpath23, force_file: true)).to eq ans
+      path = @data_path['libc-2.23-926eb99d49cab2e5622af38ab07395f5b32035e9.so']
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq ans
+    end
+
+    it 'libc-2.26' do
+      ans = [0x3cc2f, 0x3cc31, 0x3cc35, 0x3cc3c, 0x66e7f, 0x66e80, 0x132fbe, 0x132fbf]
+      path = @data_path['libc-2.26-f65648a832414f2144ce795d75b6045a1ec2e252.so']
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq ans
     end
 
     it 'special filename' do
