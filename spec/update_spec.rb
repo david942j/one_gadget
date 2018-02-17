@@ -5,11 +5,12 @@ require 'one_gadget/version'
 
 describe OneGadget::Update do
   before(:all) do
-    # precent fail on CI
+    # prevent failing on CI
     @hook_cache_file = lambda do |&block|
-      tmp = Dir::Tmpname.make_tmpname('/tmp/one_gadget/update', nil)
-      stub_const('OneGadget::Update::CACHE_FILE', tmp)
-      block.call(tmp)
+      Dir::Tmpname.create('one_gadget/update') do |tmp|
+        stub_const('OneGadget::Update::CACHE_FILE', tmp)
+        block.call(tmp)
+      end
     end
 
     @hook_logger = lambda do |&block|
