@@ -1,19 +1,15 @@
 ---
-engines:
-  bundler-audit:
-    enabled: true
+version: "2"
+plugins:
   duplication:
     enabled: true
+    exclude_paths:
+    - spec/
+checks:
+  method-lines:
+    enabled: false
+  method-complexity:
     config:
-      languages:
-      - ruby
-  fixme:
-    enabled: false
-  rubocop:
-    enabled: false
-ratings:
-  paths:
-  - Gemfile.lock
-  - "**.rb"
-exclude_paths:
+      threshold: 10
+exclude_patterns:
 - spec/

@@ -1,14 +1,15 @@
 language: ruby
 sudo: required
 cache: bundler
+dist: trusty
 os:
 - linux
 rvm:
-  - 2.1.0
   - 2.1
   - 2.2
   - 2.3
-  - 2.4.0
+  - 2.4
+  - 2.5
   - ruby-head
 branches:
   only:
@@ -16,8 +17,15 @@ branches:
 matrix:
   allow_failures:
     - rvm: ruby-head
+
+before_script:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter; chmod +x ./cc-test-reporter; ./cc-test-reporter before-build; fi
+
 before_install:
   - gem update --system
   - gem install bundler
   - gem --version
   - sudo apt-get install -qq --force-yes binutils grep
+
+after_script:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT; fi
