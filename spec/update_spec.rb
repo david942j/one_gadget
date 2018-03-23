@@ -1,4 +1,5 @@
 require 'logger'
+require 'tmpdir'
 
 require 'one_gadget/update'
 require 'one_gadget/version'
@@ -25,7 +26,7 @@ describe OneGadget::Update do
   end
 
   after(:all) do
-    FileUtils.rm_r('/tmp/one_gadget')
+    FileUtils.rm_r(File.join(Dir.tmpdir, 'one_gadget'))
   end
 
   it 'cache_file' do
