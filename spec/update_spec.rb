@@ -6,9 +6,11 @@ require 'one_gadget/version'
 
 describe OneGadget::Update do
   before(:all) do
+    @tmpdir = File.join(Dir.tmpdir, 'one_gadget')
+    FileUtils.mkdir_p(@tmpdir)
     # prevent failing on CI
     @hook_cache_file = lambda do |&block|
-      Dir::Tmpname.create('one_gadget/update') do |tmp|
+      Dir::Tmpname.create('update', @tmpdir) do |tmp|
         stub_const('OneGadget::Update::CACHE_FILE', tmp)
         block.call(tmp)
       end
@@ -26,7 +28,7 @@ describe OneGadget::Update do
   end
 
   after(:all) do
-    FileUtils.rm_r(File.join(Dir.tmpdir, 'one_gadget'))
+    FileUtils.rm_r(@tmpdir)
   end
 
   it 'cache_file' do
