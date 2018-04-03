@@ -54,7 +54,7 @@ module OneGadget
         IO.binwrite(CACHE_FILE, '') unless File.exist?(CACHE_FILE)
         CACHE_FILE
       rescue Errno::EACCES # prevent dir is not writable
-        return nil
+        nil
       end
     end
   end

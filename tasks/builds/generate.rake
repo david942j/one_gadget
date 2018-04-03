@@ -73,7 +73,7 @@ OneGadget::Gadget.add(build_id, OFFSET,
       info: fname + "\n\n" + arch + "\n\n" + str[st, len]
     }
   rescue ELFTools::ELFError, EOFError # corrupted elf file
-    return nil
+    nil
   ensure
     file.close
   end
