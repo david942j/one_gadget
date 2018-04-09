@@ -210,4 +210,4 @@ one_gadget('60131540dadc6796cab33388349e6e4e68692053')
 Any suggestion or feature request is welcome! Feel free to send a pull request.
 
 Please let me know if you find any libc that make OneGadget fail to find gadgets.
-And, if you like this work, I'll be happy to be [stared](https://github.com/david942j/one_gadget/stargazers) :grimacing:
+And, if you like this work, I'll be happy to be [starred](https://github.com/david942j/one_gadget/stargazers) :grimacing:
