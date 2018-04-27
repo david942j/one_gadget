@@ -25,7 +25,7 @@ module OneGadget
     # @param [String] build_id
     #   Build ID.
     def not_found(build_id)
-      warn("Cannot find BuildID [#{build_id}]")
+      warn("Cannot find BuildID [#{build_id}]\n")
       []
     end
 

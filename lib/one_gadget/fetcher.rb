@@ -15,9 +15,7 @@ module OneGadget
       # @return [Array<OneGadget::Gadget::Gadget>?]
       #   +nil+ is returned if cannot find target id in database.
       def from_build_id(build_id, remote: true)
-        if (build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/).nil?
-          raise ArgumentError, format('invalid BuildID format: %p', build_id)
-        end
+        OneGadget::Helper.verify_build_id!(build_id)
         OneGadget::Gadget.builds(build_id, remote: remote)
       end
 

@@ -13,6 +13,28 @@ module OneGadget
     BUILD_ID_FORMAT = /[0-9a-f]{40}/
     # Define class methods here.
     module ClassMethods
+      # Verify if `build_id` is a valid SHA1 hex format.
+      # @param [String] build_id
+      #   BuildID.
+      # @raise [ArgumentError]
+      #   Raises error if invalid.
+      # @return [void]
+      def verify_build_id!(build_id)
+        return if build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/
+        raise ArgumentError, format('invalid BuildID format: %p', build_id)
+      end
+
+      # Fetch lines start with '#'.
+      # @param [String] file
+      #   Filename.
+      # @return [Array<String>]
+      #   Lines of comments.
+      def comments_of_file(file)
+        File.readlines(file).map do |s|
+          s[1..-1].strip if s.start_with?('#')
+        end.compact
+      end
+
       # Get absolute path from relative path. Support symlink.
       # @param [String] path Relative path.
       # @return [String] Absolute path, with symlink resolved.
@@ -97,8 +119,7 @@ module OneGadget
         temp = Tempfile.new(['gadgets', file + '.rb'])
         url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
         temp.write url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
-        temp.close
-        temp
+        temp.tap(&:close)
       end
 
       # Get the latest builds list from repo.
