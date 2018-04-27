@@ -1,8 +1,9 @@
-require 'elftools'
 require 'net/http'
 require 'openssl'
 require 'pathname'
 require 'tempfile'
+
+require 'elftools'
 
 require 'one_gadget/logger'
 
@@ -13,6 +14,26 @@ module OneGadget
     BUILD_ID_FORMAT = /[0-9a-f]{40}/
     # Define class methods here.
     module ClassMethods
+      # Verify if `build_id` is a valid SHA1 hex format.
+      # @param [String] build_id
+      #   BuildID.
+      # @raise [ArgumentError]
+      #   Raises error if invalid.
+      # @return [void]
+      def verify_build_id!(build_id)
+        return if build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/
+        raise ArgumentError, format('invalid BuildID format: %p', build_id)
+      end
+
+      # Fetch lines start with '#'.
+      # @param [String] file
+      #   Filename.
+      # @return [Array<String>]
+      #   Lines of comments.
+      def comments_of_file(file)
+        File.readlines(file).map { |s| s[2..-1].rstrip if s.start_with?('# ') }.compact
+      end
+
       # Get absolute path from relative path. Support symlink.
       # @param [String] path Relative path.
       # @return [String] Absolute path, with symlink resolved.
@@ -30,7 +51,7 @@ module OneGadget
       #   build_id_of('/lib/x86_64-linux-gnu/libc-2.23.so')
       #   #=> '60131540dadc6796cab33388349e6e4e68692053'
       def build_id_of(path)
-        ELFTools::ELFFile.new(File.open(path)).build_id
+        File.open(path) { |f| ELFTools::ELFFile.new(f).build_id }
       end
 
       # Disable colorize.
@@ -48,7 +69,7 @@ module OneGadget
       # Is colorify output enabled?
       # @return [Boolean]
       #   True or false.
-      def enable_color
+      def color_enabled?
         # if not set, use tty to check
         return $stdout.tty? if @disable_color.nil?
         !@disable_color
@@ -68,7 +89,7 @@ module OneGadget
       # @param [Symbol] sev Specific which kind of color want to use, valid symbols are defined in +COLOR_CODE+.
       # @return [String] Wrapper with color codes.
       def colorize(str, sev: :normal_s)
-        return str unless enable_color
+        return str unless color_enabled?
         cc = COLOR_CODE
         color = cc.key?(sev) ? cc[sev] : ''
         "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"
@@ -96,9 +117,8 @@ module OneGadget
       def download_build(file)
         temp = Tempfile.new(['gadgets', file + '.rb'])
         url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
-        temp.write url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
-        temp.close
-        temp
+        temp.write(url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb'))))
+        temp.tap(&:close)
       end
 
       # Get the latest builds list from repo.
@@ -132,14 +152,14 @@ module OneGadget
       # @return [void]
       def ask_update(msg: '')
         name = 'one_gadget'
-        cmd = colorize("gem update #{name}")
+        cmd = colorize("gem update #{name} && gem cleanup #{name}")
         OneGadget::Logger.info(msg + "\n" + "Update with: $ #{cmd}" + "\n")
       end
 
       # Fetch the file archiecture of +file+.
       # @param [String] file The target ELF filename.
-      # @return [String]
-      #   Only supports :amd64, :i386 now.
+      # @return [Symbol]
+      #   Only supports architecture amd64 and i386 now.
       def architecture(file)
         f = File.open(file)
         str = ELFTools::ELFFile.new(f).machine

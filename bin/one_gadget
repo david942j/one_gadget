@@ -31,6 +31,10 @@ parser = OptionParser.new do |opts|
     options[:script] = script
   end
 
+  opts.on('--info BuildID', 'Show version information given BuildID.') do |b|
+    options[:info] = b
+  end
+
   opts.on('--version', 'Current gem version.') do |v|
     options[:version] = v
   end
@@ -47,6 +51,13 @@ def execute(script, offset)
     exec([script, offset.to_s].join(' '))
   end
   Process.wait pid
+end
+
+if options[:info]
+  result = OneGadget::Gadget.builds_info(options[:info])
+  exit(1) if result.nil? # error happend
+  OneGadget::Logger.info("Information of #{options[:info]}:\n#{result.join("\n")}\n")
+  exit(0)
 end
 
 level = options[:level] || 0

@@ -64,6 +64,33 @@ module OneGadget
         BUILDS[build_id]
       end
 
+      # Returns the comments in builds/libc-*-<build_id>*.rb
+      # @param [String] build_id
+      #   Supports give only few starting bytes, but a warning will be shown
+      #   if multiple BulidIDs are matched.
+      # @return [String?]
+      #   Lines of comments.
+      # @example
+      #   puts OneGadget::Gadget.builds_info('3bbdc')
+      #   # https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6-amd64-2.19-18+deb8u4/lib64/libc-2.19.so
+      #   #
+      #   # Advanced Micro Devices X86-64
+      #   # ...
+      def builds_info(build_id)
+        raise ArgumentError, "Invalid BuildID #{build_id.inspect}" if build_id =~ /[^0-9a-f]/
+        files = Dir.glob(File.join(BUILDS_PATH, "*-#{build_id}*.rb")).sort
+        return OneGadget::Logger.not_found(build_id) && nil if files.empty?
+        if files.size > 1
+          OneGadget::Logger.warn("Multiple BuildIDs match /^#{build_id}/\n")
+          show = files.map do |f|
+            File.basename(f, '.rb').reverse.split('-', 2).join(' ').reverse
+          end
+          OneGadget::Logger.warn("Candidates are:\n#{show * "\n"}\n")
+          return nil
+        end
+        OneGadget::Helper.comments_of_file(files.first)
+      end
+
       # Add a gadget, for scripts in builds/ to use.
       # @param [String] build_id The target's build id.
       # @param [Integer] offset The relative address offset of this gadget.

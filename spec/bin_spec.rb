@@ -16,6 +16,7 @@ Usage: one_gadget [file] [options]
     -r, --[no-]raw                   Output gadgets offset only, split with one space.
     -s, --script exploit-script      Run exploit script with all possible gadgets.
                                      The script will be run as 'exploit-script $offset'.
+        --info BuildID               Show version information given BuildID.
         --version                    Current gem version.
     EOS
   end
