@@ -31,7 +31,7 @@ module OneGadget
       #   Lines of comments.
       def comments_of_file(file)
         File.readlines(file).map do |s|
-          s[1..-1].strip if s.start_with?('#')
+          s[2..-1].rstrip if s.start_with?('#')
         end.compact
       end
 
