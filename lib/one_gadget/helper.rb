@@ -1,8 +1,9 @@
-require 'elftools'
 require 'net/http'
 require 'openssl'
 require 'pathname'
 require 'tempfile'
+
+require 'elftools'
 
 require 'one_gadget/logger'
 
@@ -50,7 +51,7 @@ module OneGadget
       #   build_id_of('/lib/x86_64-linux-gnu/libc-2.23.so')
       #   #=> '60131540dadc6796cab33388349e6e4e68692053'
       def build_id_of(path)
-        ELFTools::ELFFile.new(File.open(path)).build_id
+        File.open(path) { |f| ELFTools::ELFFile.new(f).build_id }
       end
 
       # Disable colorize.
@@ -157,8 +158,8 @@ module OneGadget
 
       # Fetch the file archiecture of +file+.
       # @param [String] file The target ELF filename.
-      # @return [String]
-      #   Only supports :amd64, :i386 now.
+      # @return [Symbol]
+      #   Only supports architecture amd64 and i386 now.
       def architecture(file)
         f = File.open(file)
         str = ELFTools::ELFFile.new(f).machine
