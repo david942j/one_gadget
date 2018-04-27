@@ -30,9 +30,7 @@ module OneGadget
       # @return [Array<String>]
       #   Lines of comments.
       def comments_of_file(file)
-        File.readlines(file).map do |s|
-          s[2..-1].rstrip if s.start_with?('#')
-        end.compact
+        File.readlines(file).map { |s| s[2..-1].rstrip if s.start_with?('# ') }.compact
       end
 
       # Get absolute path from relative path. Support symlink.
@@ -70,7 +68,7 @@ module OneGadget
       # Is colorify output enabled?
       # @return [Boolean]
       #   True or false.
-      def enable_color
+      def color_enabled?
         # if not set, use tty to check
         return $stdout.tty? if @disable_color.nil?
         !@disable_color
@@ -90,7 +88,7 @@ module OneGadget
       # @param [Symbol] sev Specific which kind of color want to use, valid symbols are defined in +COLOR_CODE+.
       # @return [String] Wrapper with color codes.
       def colorize(str, sev: :normal_s)
-        return str unless enable_color
+        return str unless color_enabled?
         cc = COLOR_CODE
         color = cc.key?(sev) ? cc[sev] : ''
         "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"
@@ -118,7 +116,7 @@ module OneGadget
       def download_build(file)
         temp = Tempfile.new(['gadgets', file + '.rb'])
         url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
-        temp.write url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
+        temp.write(url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb'))))
         temp.tap(&:close)
       end
 
@@ -153,7 +151,7 @@ module OneGadget
       # @return [void]
       def ask_update(msg: '')
         name = 'one_gadget'
-        cmd = colorize("gem update #{name}")
+        cmd = colorize("gem update #{name} && gem cleanup #{name}")
         OneGadget::Logger.info(msg + "\n" + "Update with: $ #{cmd}" + "\n")
       end
 

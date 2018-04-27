@@ -67,9 +67,9 @@ module OneGadget
       # Returns the comments in builds/libc-*-<build_id>*.rb
       # @param [String] build_id
       #   Supports give only few starting bytes, but a warning will be shown
-      #   if multiple BulidID is matched.
+      #   if multiple BulidIDs are matched.
       # @return [String?]
-      #   Lines of comment.
+      #   Lines of comments.
       # @example
       #   puts OneGadget::Gadget.builds_info('3bbdc')
       #   # https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6-amd64-2.19-18+deb8u4/lib64/libc-2.19.so
