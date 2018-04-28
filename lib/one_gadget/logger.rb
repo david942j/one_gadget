@@ -31,7 +31,7 @@ module OneGadget
 
     %i[info warn].each do |sym|
       define_method(sym) do |msg|
-        @logger.send(sym, msg)
+        @logger.__send__(sym, msg)
       end
     end
   end
