@@ -32,7 +32,7 @@ module OneGadget
         # return registers[pc] = args[0] if inst.inst == 'call'
         return true if inst.inst == 'jmp' # believe the fetcher has handled jmp.
         sym = "inst_#{inst.inst}".to_sym
-        send(sym, *args) != :fail
+        __send__(sym, *args) != :fail
       end
 
       # Process one command, without raising any exceptions.
@@ -94,21 +94,6 @@ module OneGadget
         end
       end
 
-      # Mov *src to tar[:64]
-      def inst_movq(tar, src)
-        # XXX: here we only support `movq xmm*, [sp+*]`
-        # TODO: DRY
-        raise_unsupported('movq', tar, src) unless tar.start_with?('xmm') && register?(tar) && src.include?(sp)
-        tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        return if src.deref_count != 1 # should not happend
-        src.ref!
-        off = src.evaluate(eval_dict)
-        (64 / self.class.bits).times do |i|
-          tar[i] = stack[off + i * size_t]
-        end
-      end
-
       # This instruction moves 128bits.
       def inst_movaps(tar, src)
         # XXX: here we only support `movaps [sp+*], xmm*`
@@ -123,18 +108,34 @@ module OneGadget
         end
       end
 
+      # Mov *src to tar[:64]
+      def inst_movq(tar, src)
+        # XXX: here we only support `movq xmm*, [sp+*]`
+        tar, src = check_xmm_sp(tar, src) { raise_unsupported('movq', tar, src) }
+        off = src.evaluate(eval_dict)
+        (64 / self.class.bits).times do |i|
+          tar[i] = stack[off + i * size_t]
+        end
+      end
+
       # Move *src to tar[64:128]
       def inst_movhps(tar, src)
         # XXX: here we only support `movhps xmm*, [sp+*]`
-        raise_unsupported('movhps', tar, src) unless tar.start_with?('xmm') && register?(tar) && src.include?(sp)
-        tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        return if src.deref_count != 1 # should not happend
-        src.ref!
+        tar, src = check_xmm_sp(tar, src) { raise_unsupported('movhps', tar, src) }
         off = src.evaluate(eval_dict)
         (64 / self.class.bits).times do |i|
           tar[i + 64 / self.class.bits] = stack[off + i * size_t]
         end
+      end
+
+      # check if (tar, src) in form (xmm*, [sp+*])
+      def check_xmm_sp(tar, src)
+        return yield unless tar.start_with?('xmm') && register?(tar) && src.include?(sp)
+        tar_lm = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
+        src_lm = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        return yield if src_lm.deref_count != 1
+        src_lm.ref!
+        [tar_lm, src_lm]
       end
 
       def inst_lea(tar, src)
@@ -145,7 +146,7 @@ module OneGadget
 
       def inst_push(val)
         val = OneGadget::Emulators::Lambda.parse(val, predefined: registers)
-        registers[sp] -= bytes
+        registers[sp] -= size_t
         cur_top = registers[sp].evaluate(eval_dict)
         raise ArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
         stack[cur_top] = val
@@ -198,10 +199,9 @@ module OneGadget
         :fail
       end
 
-      def bytes
+      def size_t
         self.class.bits / 8
       end
-      alias size_t bytes
 
       def eval_dict
         { sp => 0 }

@@ -32,16 +32,23 @@ describe OneGadget::Emulators::Amd64 do
       expect(@processor.registers['rax'].to_s).to eq 'rdx'
     end
 
-    it 'xmm instruction' do
-      gadget = <<-EOS
+    context 'xmm instruction' do
+      it 'movq/movhps/movaps' do
+        gadget = <<-EOS
         movq xmm0, [rsp+0x8]
         mov [rsp+0x8], rax
         movhps xmm0, [rsp+0x8]
         movaps [rsp+0x40], xmm0
-      EOS
-      gadget.each_line { |s| @processor.process(s) }
-      expect(@processor.stack[0x40].to_s).to eq '[rsp+0x8]'
-      expect(@processor.stack[0x48].to_s).to eq 'rax'
+        EOS
+        gadget.each_line { |s| @processor.process(s) }
+        expect(@processor.stack[0x40].to_s).to eq '[rsp+0x8]'
+        expect(@processor.stack[0x48].to_s).to eq 'rax'
+      end
+
+      it 'unsupported form' do
+        expect { @processor.process!('movaps xmm0, [rsp+0x40]') }
+          .to raise_error(OneGadget::Error::UnsupportedInstructionArguments)
+      end
     end
 
     it 'invalid instruction' do
