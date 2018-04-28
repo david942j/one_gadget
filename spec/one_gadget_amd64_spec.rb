@@ -3,8 +3,7 @@ require 'mkmf'
 require 'one_gadget'
 
 describe 'one_gadget' do
-  before(:each) do
-    @build_id = '60131540dadc6796cab33388349e6e4e68692053'
+  before(:all) do
     @data_path = ->(file) { File.join(__dir__, 'data', file) }
   end
 
@@ -30,9 +29,19 @@ describe 'one_gadget' do
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x47c46, 0x47c9a, 0xfccde, 0xfdb8e]
       expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
     end
+
+    it 'libc-2.27' do
+      path = @data_path['libc-2.27-b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0.so']
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x4f2c5, 0x4f322, 0x10a38c]
+      expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
+    end
   end
 
   describe 'from build id' do
+    before(:all) do
+      @build_id = '60131540dadc6796cab33388349e6e4e68692053'
+    end
+
     it 'normal' do
       # only check not empty because the gadgets might add frequently.
       expect(OneGadget.gadgets(build_id: @build_id)).not_to be_empty

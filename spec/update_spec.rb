@@ -34,21 +34,21 @@ describe OneGadget::Update do
   it 'cache_file' do
     skip 'Windows so hard' unless RUBY_PLATFORM =~ /linux/
     @hook_cache_file.call do |path|
-      expect(described_class.send(:cache_file)).to eq path
+      expect(described_class.__send__(:cache_file)).to eq path
       File.chmod(0o000, File.dirname(path))
-      expect(described_class.send(:cache_file)).to be nil
+      expect(described_class.__send__(:cache_file)).to be nil
       File.chmod(0o700, File.dirname(path))
     end
   end
 
   it 'need_check?' do
     @hook_cache_file.call do |path|
-      expect(described_class.send(:need_check?)).to be false
+      expect(described_class.__send__(:need_check?)).to be false
       now = Time.now
       allow(Time).to receive(:now).and_return(now + 7 * 24 * 3600)
-      expect(described_class.send(:need_check?)).to be true
+      expect(described_class.__send__(:need_check?)).to be true
       IO.binwrite(path, 'never')
-      expect(described_class.send(:need_check?)).to be false
+      expect(described_class.__send__(:need_check?)).to be false
     end
   end
 

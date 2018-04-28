@@ -95,9 +95,9 @@ module OneGadget
         #   If +arg+ contains number only, return it.
         #   Otherwise, return a {Lambda} object.
         # @example
-        #   obj = parse('[rsp+0x50]')
+        #   obj = Lambda.parse('[rsp+0x50]')
         #   #=> #<Lambda @obj='rsp', @immi=80, @deref_count=1>
-        #   parse('obj+0x30', predefined: { 'obj' => obj }).to_s
+        #   Lambda.parse('obj+0x30', predefined: { 'obj' => obj }).to_s
         #   #=> '[rsp+0x50]+0x30'
         def parse(arg, predefined: {})
           deref_count = 0
@@ -110,10 +110,10 @@ module OneGadget
           val = 0
           if sign
             raise ArgumentError, "Not support #{arg}" unless OneGadget::Helper.integer?(arg[sign..-1])
-            val = Integer(arg[sign..-1])
-            arg = arg[0, sign]
+            val = Integer(arg.slice!(sign..-1))
           end
-          obj = (predefined[arg] || Lambda.new(arg)) + val
+          obj = predefined[arg] || Lambda.new(arg)
+          obj += val unless val.zero?
           deref_count.zero? ? obj : obj.deref
         end
       end

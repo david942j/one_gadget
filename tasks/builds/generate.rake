@@ -18,7 +18,7 @@ namespace :builds do
       info = libc_info(libc_file)
       next failed('parse info fail') if info.nil? # error when fetching info
       next failed('build id not found') if info[:build_id].nil? # no .note.gnu.build.id section
-      version = info[:info].scan(/version ([\d.]+)/).flatten.first
+      version = info[:info].scan(/version ([\d.]+\d)/).flatten.first
       next skipped('version too old') if Gem::Version.new(version) < Gem::Version.new('2.19')
       filename = File.join(path, "libc-#{version}-#{info[:build_id]}.rb")
       next skipped('file exists') if File.file?(filename)
@@ -48,7 +48,7 @@ OneGadget::Gadget.add(build_id, OFFSET,
     info_str = info[:info].lines.map { |c| '# ' + c }.join
     gadgets_str = gadgets.map do |gadget|
       %i(offset constraints effect).reduce(GADGET_TEMPLATE) do |str, attr|
-        str.sub(attr.to_s.upcase, gadget.send(attr).inspect)
+        str.sub(attr.to_s.upcase, gadget.__send__(attr).inspect)
       end
     end.join
     TEMPLATE.sub('INFO', info_str).sub('GADGETS', gadgets_str)

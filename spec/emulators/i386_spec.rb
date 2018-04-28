@@ -19,7 +19,7 @@ describe OneGadget::Emulators::I386 do
    3a823:       50                      push   eax
    3a824:       e8 57 4c 07 00          call   af480 <execve@@GLIBC_2.0>
       EOS
-      gadget.lines.each { |s| @processor.process(s) }
+      gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['esp'].to_s).to eq 'esp'
       expect(@processor.stack[0].to_s).to eq 'esi-0x55f61'
       expect(@processor.stack[4].to_s).to eq 'esp+0x34'
@@ -37,7 +37,7 @@ describe OneGadget::Emulators::I386 do
    5ef4c:       50                      push   eax
    5ef4d:       e8 be 07 05 00          call   af710 <execl@@GLIBC_2.0>
     EOS
-      gadget.lines.each { |s| @processor.process(s) }
+      gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['esp'].to_s).to eq 'esp-0xc'
       expect(@processor.stack[-0xc].to_s).to eq 'esi-0x55f61'
       expect(@processor.stack[-0x8].to_s).to eq 'esi-0x55f5c'
@@ -68,7 +68,7 @@ describe OneGadget::Emulators::I386 do
   64c74: mov DWORD PTR [esp],eax
   64c77: call b5170 <execl@@GLIBC_2.0>
       EOS
-      gadget.lines.each { |s| @processor.process(s) }
+      gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['esp'].to_s).to eq 'esp'
       expect(@processor.stack[0].to_s).to eq 'ebx-0x49574'
       expect(@processor.stack[4].to_s).to eq 'ebx-0x4956f'

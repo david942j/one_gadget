@@ -30,6 +30,12 @@ describe 'one_gadget' do
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq ans
     end
 
+    it 'libc-2.27' do
+      ans = [0x3cbea, 0x3cbec, 0x3cbf0, 0x3cbf7, 0x6729f, 0x672a0, 0x13573e, 0x13573f]
+      path = @data_path['libc-2.27-63b3d43ad45e1b0f601848c65b067f9e9b40528b.so']
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq ans
+    end
+
     it 'special filename' do
       path = File.join(__dir__, 'data', 'filename$with+special&keys')
       expect(OneGadget.gadgets(file: path)).not_to be_empty

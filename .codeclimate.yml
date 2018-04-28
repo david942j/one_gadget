@@ -8,8 +8,10 @@ plugins:
 checks:
   method-lines:
     enabled: false
+  method-count:
+    enabled: false
   method-complexity:
     config:
-      threshold: 10
+      threshold: 11
 exclude_patterns:
 - spec/
