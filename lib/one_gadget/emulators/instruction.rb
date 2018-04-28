@@ -4,7 +4,7 @@ module OneGadget
     class Instruction
       attr_reader :inst # @return [String]  The instruction name.
       attr_reader :argc # @return [Integer] Count of arguments.
-      # Instantiate a n{Instruction} object.
+      # Instantiate a {Instruction} object.
       # @param [String] inst The instruction name.
       # @param [Integer] argc
       #   Count of arguments.
@@ -23,7 +23,7 @@ module OneGadget
         args = cmd[idx + inst.size..-1].split(',')
         raise ArgumentError, "Incorrect argument number in #{cmd}, expect: #{argc}" if argc >= 0 && args.size != argc
         args.map do |arg|
-          arg.gsub(/QWORD|DWORD|WORD|BYTE|PTR/, '').strip
+          arg.gsub(/XMMWORD|QWORD|DWORD|WORD|BYTE|PTR/, '').strip
         end
       end
 

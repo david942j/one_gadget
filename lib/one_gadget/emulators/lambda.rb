@@ -113,7 +113,8 @@ module OneGadget
             val = Integer(arg[sign..-1])
             arg = arg[0, sign]
           end
-          obj = (predefined[arg] || Lambda.new(arg)) + val
+          obj = predefined[arg] || Lambda.new(arg)
+          obj += val unless val.zero?
           deref_count.zero? ? obj : obj.deref
         end
       end

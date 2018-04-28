@@ -10,13 +10,13 @@ module OneGadget
       # Instantiate a {Processor} object.
       # @param [Array<String>] registers Registers that supported in the architecture.
       def initialize(registers)
-        @registers = registers.map { |reg| [reg, OneGadget::Emulators::Lambda.new(reg)] }.to_h
+        @registers = registers.map { |reg| [reg, to_lambda(reg)] }.to_h
         @stack = {}
       end
 
       # Parse one command into instruction and arguments.
       # @param [String] cmd One line of result of objdump.
-      # @return [Array(Instruction, Array<String>)]
+      # @return [(Instruction, Array<String>)]
       #   The parsing result.
       def parse(cmd)
         inst = instructions.find { |i| i.match?(cmd) }
@@ -32,6 +32,12 @@ module OneGadget
       # Method need to be implemented in inheritors.
       # @return [Array<Instruction>] The support instructions.
       def instructions; raise NotImplementedError
+      end
+
+      private
+
+      def to_lambda(reg)
+        OneGadget::Emulators::Lambda.new(reg)
       end
     end
   end

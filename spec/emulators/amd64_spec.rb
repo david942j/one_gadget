@@ -14,7 +14,7 @@ describe OneGadget::Emulators::Amd64 do
  d67f8:       48 8b 10                mov    rdx,QWORD PTR [rax]
  d67fb:       e8 70 1c fe ff          call   b8470 <execve>
       EOS
-      gadget.lines.each { |s| @processor.process(s) }
+      gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['rsi'].to_s).to eq 'rsp+0x70'
       expect(@processor.registers['rdx'].to_s).to eq '[[rip+0x2c16b4]]'
     end
@@ -26,10 +26,22 @@ describe OneGadget::Emulators::Amd64 do
         mov rdi, [rdx]
         mov rdx, rax-0x30
       EOS
-      gadget.lines.each { |s| @processor.process(s) }
+      gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['rdi'].to_s).to eq '[[rdx+0x10]]'
       expect(@processor.registers['rdx'].to_s).to eq 'rdx-0x30'
       expect(@processor.registers['rax'].to_s).to eq 'rdx'
+    end
+
+    it 'xmm instruction' do
+      gadget = <<-EOS
+        movq xmm0, [rsp+0x8]
+        mov [rsp+0x8], rax
+        movhps xmm0, [rsp+0x8]
+        movaps [rsp+0x40], xmm0
+      EOS
+      gadget.each_line { |s| @processor.process(s) }
+      expect(@processor.stack[0x40].to_s).to eq '[rsp+0x8]'
+      expect(@processor.stack[0x48].to_s).to eq 'rax'
     end
 
     it 'invalid instruction' do

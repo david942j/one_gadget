@@ -1,5 +1,7 @@
-require 'one_gadget/emulators/processor'
 require 'one_gadget/emulators/instruction'
+require 'one_gadget/emulators/lambda'
+require 'one_gadget/emulators/processor'
+require 'one_gadget/error'
 
 module OneGadget
   module Emulators
@@ -13,10 +15,10 @@ module OneGadget
         @sp = sp
         @pc = pc
         @stack = Hash.new do |h, k|
-          lmda = OneGadget::Emulators::Lambda.new(sp)
-          lmda.immi = k
-          lmda.deref!
-          h[k] = lmda
+          h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
+            lmda.immi = k
+            lmda.deref!
+          end
         end
       end
 
@@ -24,7 +26,7 @@ module OneGadget
       # Will raise exceptions when encounter unhandled instruction.
       # @param [String] cmd
       #   One line from result of objdump.
-      # @return [void]
+      # @return [Boolean]
       def process!(cmd)
         inst, args = parse(cmd)
         # return registers[pc] = args[0] if inst.inst == 'call'
@@ -36,10 +38,10 @@ module OneGadget
       # Process one command, without raising any exceptions.
       # @param [String] cmd
       #   See {#process!} for more information.
-      # @return [void]
+      # @return [Boolean]
       def process(cmd)
         process!(cmd)
-      rescue ArgumentError
+      rescue ArgumentError, OneGadget::Error::Error
         false
       end
 
@@ -55,7 +57,10 @@ module OneGadget
           Instruction.new('nop', -1),
           Instruction.new('push', 1),
           Instruction.new('sub', 2),
-          Instruction.new('xor', 2)
+          Instruction.new('xor', 2),
+          Instruction.new('movq', 2),
+          Instruction.new('movaps', 2),
+          Instruction.new('movhps', 2)
         ]
       end
 
@@ -83,9 +88,52 @@ module OneGadget
           # Just ignore strange case...
           return unless tar.include?(sp)
           tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
-          return if tar.deref_count != 1 # should not happened
+          return if tar.deref_count != 1 # should not happen
           tar.ref!
           stack[tar.evaluate(eval_dict)] = src
+        end
+      end
+
+      # Mov *src to tar[:64]
+      def inst_movq(tar, src)
+        # XXX: here we only support `movq xmm*, [sp+*]`
+        # TODO: DRY
+        raise_unsupported('movq', tar, src) unless tar.start_with?('xmm') && register?(tar) && src.include?(sp)
+        tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        return if src.deref_count != 1 # should not happend
+        src.ref!
+        off = src.evaluate(eval_dict)
+        (64 / self.class.bits).times do |i|
+          tar[i] = stack[off + i * size_t]
+        end
+      end
+
+      # This instruction moves 128bits.
+      def inst_movaps(tar, src)
+        # XXX: here we only support `movaps [sp+*], xmm*`
+        raise_unsupported('movaps', tar, src) unless src.start_with?('xmm') && register?(src) && tar.include?(sp)
+        tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        return if tar.deref_count != 1 # should not happen
+        tar.ref!
+        off = tar.evaluate(eval_dict)
+        (128 / self.class.bits).times do |i|
+          stack[off + i * size_t] = src[i]
+        end
+      end
+
+      # Move *src to tar[64:128]
+      def inst_movhps(tar, src)
+        # XXX: here we only support `movhps xmm*, [sp+*]`
+        raise_unsupported('movhps', tar, src) unless tar.start_with?('xmm') && register?(tar) && src.include?(sp)
+        tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        return if src.deref_count != 1 # should not happend
+        src.ref!
+        off = src.evaluate(eval_dict)
+        (64 / self.class.bits).times do |i|
+          tar[i + 64 / self.class.bits] = stack[off + i * size_t]
         end
       end
 
@@ -153,11 +201,21 @@ module OneGadget
       def bytes
         self.class.bits / 8
       end
+      alias size_t bytes
 
       def eval_dict
-        dict = {}
-        dict[sp] = 0
-        dict
+        { sp => 0 }
+      end
+
+      def raise_unsupported(inst, *args)
+        raise OneGadget::Error::UnsupportedInstructionArguments, "#{inst} #{args.join(', ')}"
+      end
+
+      def to_lambda(reg)
+        return super unless reg =~ /^xmm\d+$/
+        Array.new(128 / self.class.bits) do |i|
+          OneGadget::Emulators::Lambda.new("#{reg}__#{i}")
+        end
       end
     end
   end
