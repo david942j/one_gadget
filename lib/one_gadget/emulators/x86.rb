@@ -97,11 +97,8 @@ module OneGadget
       # This instruction moves 128bits.
       def inst_movaps(tar, src)
         # XXX: here we only support `movaps [sp+*], xmm*`
-        raise_unsupported('movaps', tar, src) unless src.start_with?('xmm') && register?(src) && tar.include?(sp)
-        tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        return if tar.deref_count != 1 # should not happen
-        tar.ref!
+        # TODO: This need an extra constraint: sp & 0xf == 0
+        src, tar = check_xmm_sp(src, tar) { raise_unsupported('movaps', tar, src) }
         off = tar.evaluate(eval_dict)
         (128 / self.class.bits).times do |i|
           stack[off + i * size_t] = src[i]
