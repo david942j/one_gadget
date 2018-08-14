@@ -36,7 +36,7 @@ describe OneGadget::Emulators::I386 do
    5ef46:       8d 86 9f a0 fa ff       lea    eax,[esi-0x55f61]
    5ef4c:       50                      push   eax
    5ef4d:       e8 be 07 05 00          call   af710 <execl@@GLIBC_2.0>
-    EOS
+      EOS
       gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['esp'].to_s).to eq 'esp-0xc'
       expect(@processor.stack[-0xc].to_s).to eq 'esi-0x55f61'
