@@ -35,6 +35,15 @@ describe 'one_gadget' do
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x4f2c5, 0x4f322, 0x10a38c]
       expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
     end
+
+    it 'not ELF' do
+      expect { hook_logger { OneGadget.gadgets(file: __FILE__) } }.to output(<<-EOS.strip).to_stdout
+[OneGadget] Invalid ELF, expected glibc as input
+      EOS
+    end
+
+    it 'not glibc' do
+    end
   end
 
   describe 'from build id' do

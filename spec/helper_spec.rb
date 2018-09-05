@@ -10,6 +10,11 @@ describe OneGadget::Helper do
       .to eq @libcpath
   end
 
+  it 'valid_elf_file?' do
+    expect(OneGadget::Helper.valid_elf_file?('/etc/passwd')).to be false
+    expect(OneGadget::Helper.valid_elf_file?('/lib64/ld-linux-x86-64.so.2')).to be true
+  end
+
   it 'build_id_of' do
     expect(OneGadget::Helper.build_id_of(@libcpath)).to eq '60131540dadc6796cab33388349e6e4e68692053'
   end

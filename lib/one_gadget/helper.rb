@@ -44,6 +44,35 @@ module OneGadget
         Pathname.new(File.expand_path(path)).realpath.to_s
       end
 
+      # Checks if the file of given path is a valid ELF file.
+      #
+      # @param [String] path Path to target file.
+      # @return [Boolean] If the file is an ELF or not.
+      # @example
+      #   valid_elf_file?('/etc/passwd')
+      #   => false
+      #   valid_elf_file?('/lib64/ld-linux-x86-64.so.2')
+      #   => true
+      def valid_elf_file?(path)
+        # A light-weight way to check if is a valid ELF file
+        # Checks at least one phdr should present.
+        File.open(path) { |f| ELFTools::ELFFile.new(f).each_segments.first }
+        true
+      rescue ELFTools::ELFError
+        false
+      end
+
+      # Checks if the file of given path is a valid ELF file
+      # An error message will be shown if given path is not a valid ELF.
+      #
+      # @param [String] path Path to target file.
+      # @return [Boolean] Whether the file is a valid ELF.
+      def verify_elf_file!(path)
+        return true if valid_elf_file?(path)
+        OneGadget::Logger.error('Invalid ELF, expected glibc as input')
+        false
+      end
+
       # Get the Build ID of target ELF.
       # @param [String] path Absolute file path.
       # @return [String] Target build id.
@@ -81,7 +110,8 @@ module OneGadget
         normal_s: "\e[38;5;203m", # red
         integer: "\e[38;5;189m", # light purple
         reg: "\e[38;5;82m", # light green
-        warn: "\e[38;5;230m" # light yellow
+        warn: "\e[38;5;230m", # light yellow
+        error: "\e[38;5;196m" # heavy red
       }.freeze
 
       # Wrapper color codes for pretty inspect.

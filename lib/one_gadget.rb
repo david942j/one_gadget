@@ -29,10 +29,12 @@ module OneGadget
     def gadgets(file: nil, build_id: nil, details: false, force_file: false, level: 0)
       ret = if build_id
               OneGadget::Fetcher.from_build_id(build_id) || OneGadget::Logger.not_found(build_id)
-            else
+            elsif OneGadget::Helper.verify_elf_file!(file)
               file = OneGadget::Helper.abspath(file)
               gadgets = try_from_build(file) unless force_file
               gadgets || OneGadget::Fetcher.from_file(file)
+            else
+              []
             end
       ret = refine_gadgets(ret, level)
       ret.map!(&:offset) unless details
