@@ -1,4 +1,5 @@
 require 'one_gadget/emulators/lambda'
+require 'one_gadget/error'
 
 module OneGadget
   # Instruction emulator to solve the constraint of gadgets.
@@ -20,7 +21,7 @@ module OneGadget
       #   The parsing result.
       def parse(cmd)
         inst = instructions.find { |i| i.match?(cmd) }
-        raise ArgumentError, "Not implemented instruction in #{cmd}" if inst.nil?
+        raise Error::ArgumentError, "Not implemented instruction in #{cmd}" if inst.nil?
         [inst, inst.fetch_args(cmd)]
       end
 

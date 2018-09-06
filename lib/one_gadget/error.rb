@@ -3,7 +3,13 @@ module OneGadget
     class Error < StandardError
     end
 
-    class UnsupportedInstructionArguments < Error
+    class UnsupportedInstructionArgumentsError < Error
+    end
+
+    class UnsupportedArchitectureError < Error
+    end
+
+    class ArgumentError < Error
     end
   end
 end

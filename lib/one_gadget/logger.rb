@@ -15,6 +15,7 @@ module OneGadget
       color = case severity
               when 'WARN' then :warn
               when 'INFO' then :reg
+              when 'ERROR' then :error
               end
       "[#{OneGadget::Helper.colorize('OneGadget', sev: color)}] #{message.join}"
     end
@@ -29,7 +30,7 @@ module OneGadget
       []
     end
 
-    %i[info warn].each do |sym|
+    %i[info warn error].each do |sym|
       define_method(sym) do |msg|
         @logger.__send__(sym, msg)
       end

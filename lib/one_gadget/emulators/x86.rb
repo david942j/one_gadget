@@ -41,7 +41,7 @@ module OneGadget
       # @return [Boolean]
       def process(cmd)
         process!(cmd)
-      rescue ArgumentError, OneGadget::Error::Error
+      rescue OneGadget::Error::Error
         false
       end
 
@@ -145,13 +145,13 @@ module OneGadget
         val = OneGadget::Emulators::Lambda.parse(val, predefined: registers)
         registers[sp] -= size_t
         cur_top = registers[sp].evaluate(eval_dict)
-        raise ArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
+        raise Error::ArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
         stack[cur_top] = val
       end
 
       def inst_xor(dst, src)
         # only supports dst == src
-        raise ArgumentError, 'xor operator only supports dst = src' unless dst == src
+        raise Error::ArgumentError, 'xor operator only supports dst = src' unless dst == src
         dst[0] = 'r' if self.class.bits == 64 && dst.start_with?('e')
         registers[dst] = 0
       end
@@ -163,7 +163,7 @@ module OneGadget
 
       def inst_sub(tar, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        raise ArgumentError, "Can't handle -= of type #{src.class}" unless src.is_a?(Integer)
+        raise Error::ArgumentError, "Can't handle -= of type #{src.class}" unless src.is_a?(Integer)
         registers[tar] -= src
       end
 
@@ -205,7 +205,7 @@ module OneGadget
       end
 
       def raise_unsupported(inst, *args)
-        raise OneGadget::Error::UnsupportedInstructionArguments, "#{inst} #{args.join(', ')}"
+        raise OneGadget::Error::UnsupportedInstructionArgumentsError, "#{inst} #{args.join(', ')}"
       end
 
       def to_lambda(reg)

@@ -1,3 +1,4 @@
+require 'one_gadget/error'
 require 'one_gadget/fetchers/amd64'
 require 'one_gadget/fetchers/i386'
 require 'one_gadget/gadget'
@@ -24,11 +25,12 @@ module OneGadget
       # @return [Array<OneGadget::Gadget::Gadget>]
       #   Array of all found gadgets is returned.
       def from_file(file)
+        arch = OneGadget::Helper.architecture(file)
         klass = {
           amd64: OneGadget::Fetcher::Amd64,
           i386: OneGadget::Fetcher::I386
-        }[OneGadget::Helper.architecture(file)]
-        raise ArgumentError, 'Unsupported architecture!' if klass.nil?
+        }[arch]
+        raise Error::UnsupportedArchitectureError, arch if klass.nil?
         trim_gadgets(klass.new(file).find)
       end
 

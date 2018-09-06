@@ -5,6 +5,7 @@ require 'tempfile'
 
 require 'elftools'
 
+require 'one_gadget/error'
 require 'one_gadget/logger'
 
 module OneGadget
@@ -17,12 +18,12 @@ module OneGadget
       # Verify if `build_id` is a valid SHA1 hex format.
       # @param [String] build_id
       #   BuildID.
-      # @raise [ArgumentError]
+      # @raise [Error::ArgumentError]
       #   Raises error if invalid.
       # @return [void]
       def verify_build_id!(build_id)
         return if build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/
-        raise ArgumentError, format('invalid BuildID format: %p', build_id)
+        raise OneGadget::Error::ArgumentError, format('invalid BuildID format: %p', build_id)
       end
 
       # Fetch lines start with '#'.
@@ -42,6 +43,35 @@ module OneGadget
       #   #=> '/lib/x86_64-linux-gnu/libc-2.23.so'
       def abspath(path)
         Pathname.new(File.expand_path(path)).realpath.to_s
+      end
+
+      # Checks if the file of given path is a valid ELF file.
+      #
+      # @param [String] path Path to target file.
+      # @return [Boolean] If the file is an ELF or not.
+      # @example
+      #   valid_elf_file?('/etc/passwd')
+      #   => false
+      #   valid_elf_file?('/lib64/ld-linux-x86-64.so.2')
+      #   => true
+      def valid_elf_file?(path)
+        # A light-weight way to check if is a valid ELF file
+        # Checks at least one phdr should present.
+        File.open(path) { |f| ELFTools::ELFFile.new(f).each_segments.first }
+        true
+      rescue ELFTools::ELFError
+        false
+      end
+
+      # Checks if the file of given path is a valid ELF file
+      # An error message will be shown if given path is not a valid ELF.
+      #
+      # @param [String] path Path to target file.
+      # @return [void]
+      # @raise [Error::ArgumentError] Raise exception if not a valid ELF.
+      def verify_elf_file!(path)
+        return if valid_elf_file?(path)
+        raise Error::ArgumentError, 'Not an ELF file, expected glibc as input'
       end
 
       # Get the Build ID of target ELF.
@@ -81,7 +111,8 @@ module OneGadget
         normal_s: "\e[38;5;203m", # red
         integer: "\e[38;5;189m", # light purple
         reg: "\e[38;5;82m", # light green
-        warn: "\e[38;5;230m" # light yellow
+        warn: "\e[38;5;230m", # light yellow
+        error: "\e[38;5;196m" # heavy red
       }.freeze
 
       # Wrapper color codes for pretty inspect.
@@ -163,9 +194,13 @@ module OneGadget
       def architecture(file)
         f = File.open(file)
         str = ELFTools::ELFFile.new(f).machine
-        return :amd64 if str.include?('X86-64')
-        return :i386 if str.include?('Intel 80386')
-        :unknown
+        {
+          'Advanced Micro Devices X86-64' => :amd64,
+          'Intel 80386' => :i386,
+          'ARM' => :arm,
+          'AArch64' => :aarch64,
+          'MIPS R3000' => :mips
+        }[str] || :unknown
       rescue ELFTools::ELFError # not a valid ELF
         :invalid
       ensure
