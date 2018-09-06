@@ -11,8 +11,8 @@ describe OneGadget::Helper do
   end
 
   it 'valid_elf_file?' do
-    expect(OneGadget::Helper.valid_elf_file?('/etc/passwd')).to be false
-    expect(OneGadget::Helper.valid_elf_file?('/lib64/ld-linux-x86-64.so.2')).to be true
+    expect(OneGadget::Helper.valid_elf_file?(__FILE__)).to be false
+    expect(OneGadget::Helper.valid_elf_file?(@libcpath)).to be true
   end
 
   it 'build_id_of' do
