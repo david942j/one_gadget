@@ -39,11 +39,14 @@ describe 'one_gadget' do
 
     it 'not ELF' do
       expect { hook_logger { OneGadget.gadgets(file: __FILE__) } }.to output(<<-EOS.strip).to_stdout
-[OneGadget] Invalid ELF, expected glibc as input
+[OneGadget] ArgumentError: Not an ELF file, expected glibc as input
       EOS
     end
 
     it 'not glibc' do
+      expect { hook_logger { OneGadget.gadgets(file: '/bin/ls') } }.to output(<<-EOS.strip).to_stdout
+[OneGadget] ArgumentError: File "/bin/ls" doesn't contain string "/bin/sh", not glibc?
+      EOS
     end
   end
 
@@ -62,9 +65,9 @@ describe 'one_gadget' do
     end
 
     it 'invalid' do
-      expect { OneGadget.gadgets(build_id: '^_^') }.to raise_error(
-        OneGadget::Error::ArgumentError, 'invalid BuildID format: "^_^"'
-      )
+      expect { hook_logger { OneGadget.gadgets(build_id: '^_^') } }.to output(<<-EOS.strip).to_stdout
+[OneGadget] ArgumentError: invalid BuildID format: "^_^"
+      EOS
     end
 
     it 'fetch from remote' do

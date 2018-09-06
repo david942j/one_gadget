@@ -168,7 +168,8 @@ module OneGadget
       end
 
       def str_offset(str)
-        IO.binread(file).index(str + "\x00")
+        IO.binread(file).index(str + "\x00") ||
+          raise(Error::ArgumentError, "File #{file.inspect} doesn't contain string \"/bin/sh\", not glibc?")
       end
 
       def offset_of(assembly)

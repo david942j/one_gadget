@@ -67,11 +67,11 @@ module OneGadget
       # An error message will be shown if given path is not a valid ELF.
       #
       # @param [String] path Path to target file.
-      # @return [Boolean] Whether the file is a valid ELF.
+      # @return [void]
+      # @raise [Error::ArgumentError] Raise exception if not a valid ELF.
       def verify_elf_file!(path)
-        return true if valid_elf_file?(path)
-        OneGadget::Logger.error('Not an ELF file, expected glibc as input')
-        false
+        return if valid_elf_file?(path)
+        raise Error::ArgumentError, 'Not an ELF file, expected glibc as input'
       end
 
       # Get the Build ID of target ELF.
@@ -195,7 +195,10 @@ module OneGadget
         f = File.open(file)
         str = ELFTools::ELFFile.new(f).machine
         return :amd64 if str.include?('X86-64')
-        return :i386 if str.include?('Intel 80386')
+        return :i386 if str == 'Intel 80386'
+        return :arm if str == 'ARM'
+        return :aarch64 if str == 'AArch64'
+        return :mips if str == 'MIPS R3000'
         :unknown
       rescue ELFTools::ELFError # not a valid ELF
         :invalid

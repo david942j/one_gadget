@@ -30,7 +30,12 @@ describe OneGadget::Helper do
   it 'architecture' do
     expect(OneGadget::Helper.architecture(@libcpath)).to be :amd64
     expect(OneGadget::Helper.architecture(__FILE__)).to be :invalid
+    expect(OneGadget::Helper.architecture(File.join(__dir__, 'data', 'aarch-libc-2.24.so'))).to be :aarch64
     # Just use for test unknown =~ =
-    expect(OneGadget::Helper.architecture(File.join(__dir__, 'data', 'aarch-libc-2.24.so'))).to be :unknown
+    Tempfile.create(['tmp', '.elf']) do |f|
+      f.write("\x7fELF\x02\x01\x01" + "\x00" * 9 + "\x01" * 48)
+      f.close
+      expect(OneGadget::Helper.architecture(f.path)).to be :unknown
+    end
   end
 end
