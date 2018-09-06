@@ -1,3 +1,4 @@
+require 'one_gadget/error'
 require 'one_gadget/fetchers/amd64'
 require 'one_gadget/fetchers/i386'
 require 'one_gadget/gadget'
@@ -28,7 +29,7 @@ module OneGadget
           amd64: OneGadget::Fetcher::Amd64,
           i386: OneGadget::Fetcher::I386
         }[OneGadget::Helper.architecture(file)]
-        raise ArgumentError, 'Unsupported architecture!' if klass.nil?
+        raise Error::UnsupportedArchitectureError if klass.nil?
         trim_gadgets(klass.new(file).find)
       end
 

@@ -5,6 +5,7 @@ require 'tempfile'
 
 require 'elftools'
 
+require 'one_gadget/error'
 require 'one_gadget/logger'
 
 module OneGadget
@@ -17,12 +18,12 @@ module OneGadget
       # Verify if `build_id` is a valid SHA1 hex format.
       # @param [String] build_id
       #   BuildID.
-      # @raise [ArgumentError]
+      # @raise [Error::ArgumentError]
       #   Raises error if invalid.
       # @return [void]
       def verify_build_id!(build_id)
         return if build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/
-        raise ArgumentError, format('invalid BuildID format: %p', build_id)
+        raise OneGadget::Error::ArgumentError, format('invalid BuildID format: %p', build_id)
       end
 
       # Fetch lines start with '#'.
@@ -69,7 +70,7 @@ module OneGadget
       # @return [Boolean] Whether the file is a valid ELF.
       def verify_elf_file!(path)
         return true if valid_elf_file?(path)
-        OneGadget::Logger.error('Invalid ELF, expected glibc as input')
+        OneGadget::Logger.error('Not an ELF file, expected glibc as input')
         false
       end
 

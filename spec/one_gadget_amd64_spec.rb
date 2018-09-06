@@ -1,6 +1,7 @@
 require 'mkmf'
 
 require 'one_gadget'
+require 'one_gadget/error'
 
 describe 'one_gadget' do
   before(:all) do
@@ -61,7 +62,9 @@ describe 'one_gadget' do
     end
 
     it 'invalid' do
-      expect { OneGadget.gadgets(build_id: '^_^') }.to raise_error(ArgumentError, 'invalid BuildID format: "^_^"')
+      expect { OneGadget.gadgets(build_id: '^_^') }.to raise_error(
+        OneGadget::Error::ArgumentError, 'invalid BuildID format: "^_^"'
+      )
     end
 
     it 'fetch from remote' do

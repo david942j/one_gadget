@@ -1,4 +1,5 @@
 require 'one_gadget/abi'
+require 'one_gadget/error'
 
 module OneGadget
   # Module for define gadgets.
@@ -77,7 +78,7 @@ module OneGadget
       #   # Advanced Micro Devices X86-64
       #   # ...
       def builds_info(build_id)
-        raise ArgumentError, "Invalid BuildID #{build_id.inspect}" if build_id =~ /[^0-9a-f]/
+        raise Error::ArgumentError, "Invalid BuildID #{build_id.inspect}" if build_id =~ /[^0-9a-f]/
         files = Dir.glob(File.join(BUILDS_PATH, "*-#{build_id}*.rb")).sort
         return OneGadget::Logger.not_found(build_id) && nil if files.empty?
         if files.size > 1

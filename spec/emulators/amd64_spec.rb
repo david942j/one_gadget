@@ -47,13 +47,13 @@ describe OneGadget::Emulators::Amd64 do
 
       it 'unsupported form' do
         expect { @processor.process!('movaps xmm0, [rsp+0x40]') }
-          .to raise_error(OneGadget::Error::UnsupportedInstructionArguments)
+          .to raise_error(OneGadget::Error::UnsupportedInstructionArgumentsError)
       end
     end
 
     it 'invalid instruction' do
       expect(@processor.process('oao')).to be false
-      expect { @processor.process!('oao') }.to raise_error ArgumentError
+      expect { @processor.process!('oao') }.to raise_error OneGadget::Error::ArgumentError
     end
   end
 end

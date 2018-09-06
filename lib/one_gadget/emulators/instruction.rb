@@ -1,3 +1,5 @@
+require 'one_gadget/error'
+
 module OneGadget
   module Emulators
     # Define instruction name and it's argument count.
@@ -21,7 +23,9 @@ module OneGadget
         idx = cmd.index(inst)
         cmd = cmd[0...cmd.rindex('#')] if cmd.rindex('#')
         args = cmd[idx + inst.size..-1].split(',')
-        raise ArgumentError, "Incorrect argument number in #{cmd}, expect: #{argc}" if argc >= 0 && args.size != argc
+        if argc >= 0 && args.size != argc
+          raise Error::ArgumentError, "Incorrect argument number in #{cmd}, expect: #{argc}"
+        end
         args.map do |arg|
           arg.gsub(/XMMWORD|QWORD|DWORD|WORD|BYTE|PTR/, '').strip
         end
