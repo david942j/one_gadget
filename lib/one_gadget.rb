@@ -45,7 +45,7 @@ module OneGadget
     # Try from build id first, then file
     def from_file(path, force: false)
       OneGadget::Helper.verify_elf_file!(path)
-      gadgets = try_from_build(path) unless force_file
+      gadgets = try_from_build(path) unless force
       gadgets || OneGadget::Fetcher.from_file(path)
     end
 
