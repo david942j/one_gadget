@@ -30,10 +30,7 @@ module OneGadget
       ret = if build_id
               OneGadget::Fetcher.from_build_id(build_id) || OneGadget::Logger.not_found(build_id)
             else
-              OneGadget::Helper.verify_elf_file!(file)
-              file = OneGadget::Helper.abspath(file)
-              gadgets = try_from_build(file) unless force_file
-              gadgets || OneGadget::Fetcher.from_file(file)
+              from_file(OneGadget::Helper.abspath(file), force: force_file)
             end
       ret = refine_gadgets(ret, level)
       ret.map!(&:offset) unless details
@@ -44,6 +41,13 @@ module OneGadget
     end
 
     private
+
+    # Try from build id first, then file
+    def from_file(path, force: false)
+      OneGadget::Helper.verify_elf_file!(path)
+      gadgets = try_from_build(path) unless force_file
+      gadgets || OneGadget::Fetcher.from_file(path)
+    end
 
     def try_from_build(file)
       build_id = OneGadget::Helper.build_id_of(file)

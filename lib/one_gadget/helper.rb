@@ -194,12 +194,13 @@ module OneGadget
       def architecture(file)
         f = File.open(file)
         str = ELFTools::ELFFile.new(f).machine
-        return :amd64 if str.include?('X86-64')
-        return :i386 if str == 'Intel 80386'
-        return :arm if str == 'ARM'
-        return :aarch64 if str == 'AArch64'
-        return :mips if str == 'MIPS R3000'
-        :unknown
+        {
+          'Advanced Micro Devices X86-64' => :amd64,
+          'Intel 80386' => :i386,
+          'ARM' => :arm,
+          'AArch64' => :aarch64,
+          'MIPS R3000' => :mips
+        }[str] || :unknown
       rescue ELFTools::ELFError # not a valid ELF
         :invalid
       ensure
