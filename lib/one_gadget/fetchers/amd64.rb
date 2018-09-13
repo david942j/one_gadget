@@ -16,6 +16,7 @@ module OneGadget
         cands = super do |candidate|
           next false unless candidate.include?(bin_sh_hex) # works in x86-64
           next false unless candidate.lines.last.include?('execve') # only care execve
+
           true
         end
         cands + jmp_case_candidates # + sigaction_case_candidates
@@ -34,6 +35,7 @@ module OneGadget
           cand = cand.lines.map(&:strip).reject(&:empty?)
           jmp_at = cand.index { |c| c.include?('jmp') }
           next nil if jmp_at.nil?
+
           cand = cand[0..jmp_at]
           jmp_addr = cand.last.scan(/jmp\s+([\da-f]+)\s/)[0][0].to_i(16)
           dump = `#{objdump_cmd(start: jmp_addr, stop: jmp_addr + 100)}|egrep '[0-9a-f]+:'`

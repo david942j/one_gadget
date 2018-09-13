@@ -31,6 +31,7 @@ module OneGadget
           i386: OneGadget::Fetcher::I386
         }[arch]
         raise Error::UnsupportedArchitectureError, arch if klass.nil?
+
         trim_gadgets(klass.new(file).find)
       end
 

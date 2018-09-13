@@ -54,9 +54,11 @@ module OneGadget
         require_all if BUILDS.empty?
         return BUILDS[build_id] if BUILDS.key?(build_id)
         return build_not_found unless remote
+
         # fetch remote builds
         table = OneGadget::Helper.remote_builds.find { |c| c.include?(build_id) }
         return build_not_found if table.nil? # remote doesn't have this one either.
+
         # builds found in remote! Ask update gem and download remote gadgets.
         OneGadget::Helper.ask_update(msg: 'The desired one-gadget can be found in lastest version!')
         tmp_file = OneGadget::Helper.download_build(table)
@@ -79,8 +81,10 @@ module OneGadget
       #   # ...
       def builds_info(build_id)
         raise Error::ArgumentError, "Invalid BuildID #{build_id.inspect}" if build_id =~ /[^0-9a-f]/
+
         files = Dir.glob(File.join(BUILDS_PATH, "*-#{build_id}*.rb")).sort
         return OneGadget::Logger.not_found(build_id) && nil if files.empty?
+
         if files.size > 1
           OneGadget::Logger.warn("Multiple BuildIDs match /^#{build_id}/\n")
           show = files.map do |f|

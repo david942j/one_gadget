@@ -24,6 +24,7 @@ module OneGadget
             processor = emulate(lines[i..-1])
             options = resolve(processor)
             next if options.nil? # impossible be a gadget
+
             offset = offset_of(lines[i])
             gadgets << OneGadget::Gadget::Gadget.new(offset, options)
           end
@@ -69,6 +70,7 @@ module OneGadget
         # since the logic is different between amd64 and i386,
         # invoke str_bin_sh? for checking
         return unless str_bin_sh?(processor.argument(0).to_s)
+
         if call.include?('execve')
           resolve_execve(processor)
         elsif call.include?('execl')
@@ -84,11 +86,13 @@ module OneGadget
         cons = []
         cons << check_execve_arg(processor, arg1)
         return nil unless cons.all?
+
         envp = 'environ'
         return nil unless check_envp(processor, arg2) do |c|
           cons << c
           envp = arg2
         end
+
         { constraints: cons, effect: %(execve("/bin/sh", #{arg1}, #{envp})) }
       end
 
@@ -99,6 +103,7 @@ module OneGadget
           num = Integer(arg[processor.sp.size..-1])
           slot = processor.stack[num].to_s
           return if global_var?(slot)
+
           "#{slot} == NULL"
         else
           "[#{arg}] == NULL || #{arg} == NULL"
@@ -110,9 +115,11 @@ module OneGadget
         # believe it is environ
         # if starts with [[ but not global, drop it.
         return global_var?(arg) if arg.start_with?('[[')
+
         # normal
         cons = check_execve_arg(processor, arg)
         return nil if cons.nil?
+
         yield cons
       end
 
@@ -125,6 +132,7 @@ module OneGadget
           args << '"sh"'
         end
         return nil if global_var?(arg) # we don't want base-related constraints
+
         args << arg
         # now arg is the constraint.
         { constraints: ["#{arg} == NULL"], effect: %(execl("/bin/sh", #{args.join(', ')})) }

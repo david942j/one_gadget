@@ -31,6 +31,7 @@ module OneGadget
         inst, args = parse(cmd)
         # return registers[pc] = args[0] if inst.inst == 'call'
         return true if inst.inst == 'jmp' # believe the fetcher has handled jmp.
+
         sym = "inst_#{inst.inst}".to_sym
         __send__(sym, *args) != :fail
       end
@@ -87,8 +88,10 @@ module OneGadget
         else
           # Just ignore strange case...
           return unless tar.include?(sp)
+
           tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
           return if tar.deref_count != 1 # should not happen
+
           tar.ref!
           stack[tar.evaluate(eval_dict)] = src
         end
@@ -128,9 +131,11 @@ module OneGadget
       # check if (tar, src) in form (xmm*, [sp+*])
       def check_xmm_sp(tar, src)
         return yield unless tar.start_with?('xmm') && register?(tar) && src.include?(sp)
+
         tar_lm = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
         src_lm = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         return yield if src_lm.deref_count != 1
+
         src_lm.ref!
         [tar_lm, src_lm]
       end
@@ -146,12 +151,14 @@ module OneGadget
         registers[sp] -= size_t
         cur_top = registers[sp].evaluate(eval_dict)
         raise Error::ArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
+
         stack[cur_top] = val
       end
 
       def inst_xor(dst, src)
         # only supports dst == src
         raise Error::ArgumentError, 'xor operator only supports dst = src' unless dst == src
+
         dst[0] = 'r' if self.class.bits == 64 && dst.start_with?('e')
         registers[dst] = 0
       end
@@ -164,6 +171,7 @@ module OneGadget
       def inst_sub(tar, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         raise Error::ArgumentError, "Can't handle -= of type #{src.class}" unless src.is_a?(Integer)
+
         registers[tar] -= src
       end
 
@@ -183,6 +191,7 @@ module OneGadget
       def inst_call(addr)
         # This is the last call
         return registers[pc] = addr if %w[execve execl].any? { |n| addr.include?(n) }
+
         # TODO: handle some registers would be fucked after call
         checker = {
           'sigprocmask' => {},
@@ -192,6 +201,7 @@ module OneGadget
         }
         func = checker.keys.find { |n| addr.include?(n) }
         return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }
+
         # unhandled case or checker's condition fails
         :fail
       end
@@ -210,6 +220,7 @@ module OneGadget
 
       def to_lambda(reg)
         return super unless reg =~ /^xmm\d+$/
+
         Array.new(128 / self.class.bits) do |i|
           OneGadget::Emulators::Lambda.new("#{reg}__#{i}")
         end

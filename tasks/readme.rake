@@ -1,6 +1,7 @@
 desc 'To auto generate README.md from README.tpl'
 task :readme do
   next if ENV['CI']
+
   @tpl = IO.binread('README.tpl')
 
   def replace(prefix)
@@ -12,6 +13,7 @@ task :readme do
   replace('SHELL_OUTPUT_OF') do |cmd|
     '$ ' + cmd + "\n" + `#{cmd}`.lines.map do |c|
       next "#\n" if c.strip.empty?
+
       '# ' + c
     end.join
   end

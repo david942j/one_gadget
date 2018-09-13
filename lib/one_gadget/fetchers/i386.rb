@@ -13,6 +13,7 @@ module OneGadget
         rel_sh_hex = rel_sh.to_s(16)
         super do |candidate|
           next false unless candidate.include?(rel_sh_hex)
+
           true
         end
       end
@@ -26,10 +27,12 @@ module OneGadget
         # first check if argument 0 is '/bin/sh' to prevent error
         arg0 = processor.argument(0)
         return nil unless str_bin_sh?(arg0.to_s)
+
         @base_reg = arg0.deref.obj.to_s # this should be esi or ebx..
         # now we can let parent to invoke global_var?
         res = super
         return if res.nil?
+
         # unshift got constraint into cons
         res[:constraints].unshift("#{@base_reg} is the GOT address of libc")
         res

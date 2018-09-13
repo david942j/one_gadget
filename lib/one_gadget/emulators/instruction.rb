@@ -26,6 +26,7 @@ module OneGadget
         if argc >= 0 && args.size != argc
           raise Error::ArgumentError, "Incorrect argument number in #{cmd}, expect: #{argc}"
         end
+
         args.map do |arg|
           arg.gsub(/XMMWORD|QWORD|DWORD|WORD|BYTE|PTR/, '').strip
         end

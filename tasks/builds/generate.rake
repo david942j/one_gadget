@@ -18,12 +18,16 @@ namespace :builds do
       info = libc_info(libc_file)
       next failed('parse info fail') if info.nil? # error when fetching info
       next failed('build id not found') if info[:build_id].nil? # no .note.gnu.build.id section
+
       version = info[:info].scan(/version ([\d.]+\d)/).flatten.first
       next skipped('version too old') if Gem::Version.new(version) < Gem::Version.new('2.19')
+
       filename = File.join(path, "libc-#{version}-#{info[:build_id]}.rb")
       next skipped('file exists') if File.file?(filename)
+
       gadgets = OneGadget.gadgets(file: libc_file, force_file: true, details: true, level: 100)
       next failed('no gadgets found') if gadgets.empty?
+
       content = template(info, gadgets)
       File.open(filename, 'w') { |f| f.write(content) }
       puts 'done'
@@ -62,11 +66,14 @@ OneGadget::Gadget.add(build_id, OFFSET,
     return nil unless ['Advanced Micro Devices X86-64', 'Intel 80386'].include?(arch)
     # let's skip amd64 with 32bit, i.e. x32
     return nil if arch.start_with?('Advanced') && libc.elf_class == 32
+
     str = file.read
     st = str.index('GNU C Library')
     return nil if st.nil?
+
     len = str[st..-1].index("\x00")
     return nil if len.nil?
+
     fname = filename.sub('../libcdb', 'https://gitlab.com/libcdb/libcdb/blob/master')
     {
       build_id: build_id,

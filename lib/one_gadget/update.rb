@@ -18,6 +18,7 @@ module OneGadget
       # @return [void]
       def check!
         return unless need_check?
+
         FileUtils.touch(cache_file)
         OneGadget::Logger.info("Checking for new versions of OneGadget\n" \
                                "To disable this functionality, do\n$ echo never > #{CACHE_FILE}\n\n")
@@ -39,12 +40,14 @@ module OneGadget
         cache = cache_file
         return false if cache.nil? # cache file fails, no update check.
         return false if IO.binread(cache).strip == 'never'
+
         Time.now >= last_check + FREQUENCY
       end
 
       def last_check
         cache = cache_file
         return Time.now if cache.nil?
+
         File.open(cache, &:mtime)
       end
 
