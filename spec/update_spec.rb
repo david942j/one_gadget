@@ -35,7 +35,8 @@ describe OneGadget::Update do
     @hook_cache_file.call do |path|
       expect(described_class.__send__(:need_check?)).to be false
       now = Time.now
-      allow(Time).to receive(:now).and_return(now + 7 * 24 * 3600)
+      allow(Time).to receive(:now).and_return(now + 30 * 24 * 3600)
+      allow($stdout).to receive(:tty?).and_return(true)
       expect(described_class.__send__(:need_check?)).to be true
       IO.binwrite(path, 'never')
       expect(described_class.__send__(:need_check?)).to be false
