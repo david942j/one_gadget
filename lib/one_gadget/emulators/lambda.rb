@@ -25,6 +25,7 @@ module OneGadget
       # @return [Lambda] The result.
       def +(other)
         raise Error::ArgumentError, 'Expect other to be Numeric.' unless other.is_a?(Numeric)
+
         if deref_count > 0
           ret = Lambda.new(self)
         else
@@ -53,6 +54,7 @@ module OneGadget
       # @raise [Error::ArgumentError] When this object cannot be referenced anymore.
       def ref!
         raise Error::ArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
+
         @deref_count -= 1
       end
 
@@ -84,6 +86,7 @@ module OneGadget
       def evaluate(context)
         raise Error::ArgumentError, "Can't eval #{self}" if deref_count > 0
         raise Error::ArgumentError, "Can't eval #{self}" if obj && !context.key?(obj)
+
         context[obj] + immi
       end
 
@@ -107,10 +110,12 @@ module OneGadget
             deref_count = 1
           end
           return Integer(arg) if OneGadget::Helper.integer?(arg)
+
           sign = arg =~ /[+-]/
           val = 0
           if sign
             raise Error::ArgumentError, "Not support #{arg}" unless OneGadget::Helper.integer?(arg[sign..-1])
+
             val = Integer(arg.slice!(sign..-1))
           end
           obj = predefined[arg] || Lambda.new(arg)

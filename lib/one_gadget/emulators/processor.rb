@@ -22,6 +22,7 @@ module OneGadget
       def parse(cmd)
         inst = instructions.find { |i| i.match?(cmd) }
         raise Error::ArgumentError, "Not implemented instruction in #{cmd}" if inst.nil?
+
         [inst, inst.fetch_args(cmd)]
       end
 

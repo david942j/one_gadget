@@ -52,6 +52,7 @@ module OneGadget
     def try_from_build(file)
       build_id = OneGadget::Helper.build_id_of(file)
       return unless build_id
+
       OneGadget::Fetcher.from_build_id(build_id, remote: false)
     end
 
@@ -59,6 +60,7 @@ module OneGadget
     def refine_gadgets(gadgets, level)
       return [] if gadgets.empty?
       return gadgets if level > 0 # currently only supports level > 0 or not
+
       # remain gadgets with the fewest constraints
       best = gadgets.map { |g| g.constraints.size }.min
       gadgets.select { |g| g.constraints.size == best }

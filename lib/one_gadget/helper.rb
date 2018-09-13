@@ -23,6 +23,7 @@ module OneGadget
       # @return [void]
       def verify_build_id!(build_id)
         return if build_id =~ /\A#{OneGadget::Helper::BUILD_ID_FORMAT}\Z/
+
         raise OneGadget::Error::ArgumentError, format('invalid BuildID format: %p', build_id)
       end
 
@@ -71,6 +72,7 @@ module OneGadget
       # @raise [Error::ArgumentError] Raise exception if not a valid ELF.
       def verify_elf_file!(path)
         return if valid_elf_file?(path)
+
         raise Error::ArgumentError, 'Not an ELF file, expected glibc as input'
       end
 
@@ -102,6 +104,7 @@ module OneGadget
       def color_enabled?
         # if not set, use tty to check
         return $stdout.tty? if @disable_color.nil?
+
         !@disable_color
       end
 
@@ -121,6 +124,7 @@ module OneGadget
       # @return [String] Wrapper with color codes.
       def colorize(str, sev: :normal_s)
         return str unless color_enabled?
+
         cc = COLOR_CODE
         color = cc.key?(sev) ? cc[sev] : ''
         "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"
@@ -173,6 +177,7 @@ module OneGadget
 
         response = http.request(request)
         raise ArgumentError, "Fail to get response of #{url}" unless %w(200 302).include?(response.code)
+
         response.code == '302' ? response['location'] : response.body
       rescue NoMethodError, SocketError, ArgumentError => e
         p e
@@ -219,6 +224,7 @@ module OneGadget
       #   hex(0, psign: true) #=> +0x0
       def hex(val, psign: false)
         return format("#{psign ? '+' : ''}0x%x", val) if val >= 0
+
         format('-0x%x', -val)
       end
 
