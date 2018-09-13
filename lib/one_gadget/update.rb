@@ -7,8 +7,8 @@ require 'one_gadget/version'
 module OneGadget
   # For automatically check update.
   module Update
-    # At least 7 days between check for new version.
-    FREQUENCY = 7 * 24 * 60 * 60
+    # At least 30 days between check for new version.
+    FREQUENCY = 30 * 24 * 60 * 60
     # Path to cache file.
     CACHE_FILE = File.join(ENV['HOME'], '.cache', 'one_gadget', 'update').freeze
 
@@ -28,9 +28,8 @@ module OneGadget
         end
 
         # show update message
-        msg = format("A newer version of OneGadget is available (%s --> %s).\n", OneGadget::VERSION, latest)
-        msg << "Update with: $ gem update one_gadget\n\n"
-        OneGadget::Logger.info(msg)
+        msg = format('A newer version of OneGadget is available (%s --> %s).', OneGadget::VERSION, latest)
+        OneGadget::Helper.ask_update(msg: msg)
       end
 
       private
@@ -38,6 +37,8 @@ module OneGadget
       # check ~/.cache/one_gadget/update
       def need_check?
         cache = cache_file
+        # don't check if not CLI
+        return false unless $stdout.tty?
         return false if cache.nil? # cache file fails, no update check.
         return false if IO.binread(cache).strip == 'never'
 

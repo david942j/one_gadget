@@ -35,7 +35,8 @@ describe OneGadget::Update do
     @hook_cache_file.call do |path|
       expect(described_class.__send__(:need_check?)).to be false
       now = Time.now
-      allow(Time).to receive(:now).and_return(now + 7 * 24 * 3600)
+      allow(Time).to receive(:now).and_return(now + 30 * 24 * 3600)
+      allow($stdout).to receive(:tty?).and_return(true)
       expect(described_class.__send__(:need_check?)).to be true
       IO.binwrite(path, 'never')
       expect(described_class.__send__(:need_check?)).to be false
@@ -53,7 +54,7 @@ describe OneGadget::Update do
 [OneGadget] You have the latest version of OneGadget
       EOS
       stub_const('OneGadget::VERSION', '0.0.0')
-      expect { hook_logger { described_class.check! } }.to output(include(<<-EOS)).to_stdout
+      expect { hook_logger { described_class.check! } }.to output(include(<<-EOS.strip)).to_stdout
 $ gem update one_gadget
       EOS
     end
