@@ -53,7 +53,7 @@ describe OneGadget::Update do
 [OneGadget] You have the latest version of OneGadget
       EOS
       stub_const('OneGadget::VERSION', '0.0.0')
-      expect { hook_logger { described_class.check! } }.to output(include(<<-EOS)).to_stdout
+      expect { hook_logger { described_class.check! } }.to output(include(<<-EOS.strip)).to_stdout
 $ gem update one_gadget
       EOS
     end
