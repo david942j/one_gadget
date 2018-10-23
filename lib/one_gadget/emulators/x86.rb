@@ -72,6 +72,13 @@ module OneGadget
         end
       end
 
+      # To be inherited.
+      #
+      # @param [Integer] _idx
+      #   The idx-th argument.
+      #
+      # @return [Lambda, Integer]
+      #   Return value can be a {Lambda} or an +Integer+.
       def argument(_idx); raise NotImplementedError
       end
 

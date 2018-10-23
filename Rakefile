@@ -20,6 +20,6 @@ RSpec::Core::RakeTask.new(:spec) do |task|
 end
 
 YARD::Rake::YardocTask.new(:doc) do |t|
-  t.files = ['lib/**/*.rb']
+  t.files = Dir['lib/**/*.rb'] - Dir['lib/one_gadget/builds/*.rb']
   t.stats_options = ['--list-undoc']
 end
