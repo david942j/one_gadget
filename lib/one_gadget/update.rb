@@ -29,7 +29,7 @@ module OneGadget
 
         # show update message
         msg = format('A newer version of OneGadget is available (%s --> %s).', OneGadget::VERSION, latest)
-        OneGadget::Helper.ask_update(msg: msg)
+        OneGadget::Logger.ask_update(msg: msg)
       end
 
       private

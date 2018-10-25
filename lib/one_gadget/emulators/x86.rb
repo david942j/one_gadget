@@ -46,8 +46,8 @@ module OneGadget
         false
       end
 
-      # Support instruction set.
-      # @return [Array<Instruction>] The support instructions.
+      # Supported instruction set.
+      # @return [Array<Instruction>] The supported instructions.
       def instructions
         [
           Instruction.new('add', 2),

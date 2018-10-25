@@ -6,7 +6,6 @@ require 'tempfile'
 require 'elftools'
 
 require 'one_gadget/error'
-require 'one_gadget/logger'
 
 module OneGadget
   # Define some helpful methods here.
@@ -182,14 +181,6 @@ module OneGadget
       rescue NoMethodError, SocketError, ArgumentError => e
         p e
         nil
-      end
-
-      # Show the message of ask user to update gem.
-      # @return [void]
-      def ask_update(msg: '')
-        name = 'one_gadget'
-        cmd = colorize("gem update #{name} && gem cleanup #{name}")
-        OneGadget::Logger.info(msg + "\n" + "Update with: $ #{cmd}" + "\n")
       end
 
       # Fetch the file archiecture of +file+.

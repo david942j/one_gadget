@@ -60,7 +60,7 @@ module OneGadget
         return build_not_found if table.nil? # remote doesn't have this one either.
 
         # builds found in remote! Ask update gem and download remote gadgets.
-        OneGadget::Helper.ask_update(msg: 'The desired one-gadget can be found in lastest version!')
+        OneGadget::Logger.ask_update(msg: 'The desired one-gadget can be found in lastest version!')
         tmp_file = OneGadget::Helper.download_build(table)
         require tmp_file.path
         tmp_file.unlink

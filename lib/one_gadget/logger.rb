@@ -31,6 +31,14 @@ module OneGadget
       []
     end
 
+    # Show the message of ask user to update gem.
+    # @return [void]
+    def ask_update(msg: '')
+      name = 'one_gadget'
+      cmd = OneGadget::Helper.colorize("gem update #{name} && gem cleanup #{name}")
+      OneGadget::Logger.info(msg + "\n" + "Update with: $ #{cmd}" + "\n")
+    end
+
     %i[info warn error].each do |sym|
       define_method(sym) do |msg|
         @logger.__send__(sym, msg)

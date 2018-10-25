@@ -19,7 +19,7 @@ module OneGadget
 
           true
         end
-        cands + jmp_case_candidates # + sigaction_case_candidates
+        cands + jmp_case_candidates
       end
 
       # find gadgets in form:
@@ -30,7 +30,6 @@ module OneGadget
       #   ...
       #   call execve
       def jmp_case_candidates
-        bin_sh_hex = str_offset('/bin/sh').to_s(16)
         `#{objdump_cmd}|egrep 'rdi.*# #{bin_sh_hex}' -A 3`.split('--').map do |cand|
           cand = cand.lines.map(&:strip).reject(&:empty?)
           jmp_at = cand.index { |c| c.include?('jmp') }
