@@ -26,7 +26,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = '>= 2.1.0'
 
-  s.add_runtime_dependency 'elftools', '~> 1.0'
+  s.add_runtime_dependency 'elftools', '~> 1.0.2'
 
   s.add_development_dependency 'rake', '~> 12.3'
   s.add_development_dependency 'rspec', '~> 3.7'

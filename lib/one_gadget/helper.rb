@@ -102,7 +102,7 @@ module OneGadget
       #   True or false.
       def color_enabled?
         # if not set, use tty to check
-        return $stdout.tty? if @disable_color.nil?
+        return $stdout.tty? unless instance_variable_defined?(:@disable_color)
 
         !@disable_color
       end
