@@ -11,7 +11,7 @@ module OneGadget
   # Define some helpful methods here.
   module Helper
     # Format of build-id, 40 hex numbers.
-    BUILD_ID_FORMAT = /[0-9a-f]{40}/
+    BUILD_ID_FORMAT = /[0-9a-f]{40}/.freeze
     # Define class methods here.
     module ClassMethods
       # Verify if `build_id` is a valid SHA1 hex format.
