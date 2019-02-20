@@ -117,10 +117,10 @@ module OneGadget
         error: "\e[38;5;196m" # heavy red
       }.freeze
 
-      # Wrapper color codes for pretty inspect.
+      # Wrap string with color codes for pretty inspect.
       # @param [String] str Contents to colorize.
-      # @param [Symbol] sev Specific which kind of color want to use, valid symbols are defined in +COLOR_CODE+.
-      # @return [String] Wrapper with color codes.
+      # @param [Symbol] sev Specify which kind of color to use, valid symbols are defined in {.COLOR_CODE}.
+      # @return [String] String wrapped with color codes.
       def colorize(str, sev: :normal_s)
         return str unless color_enabled?
 
