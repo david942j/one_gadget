@@ -47,7 +47,12 @@ For bug reporting instructions, please see:
     end
 
     it 'multiple matches' do
-      expect(described_class.builds_info('58c')).to be_nil
+      expect { hook_logger { described_class.builds_info('58c') } }.to output(<<-EOS).to_stdout
+[OneGadget] Multiple BuildIDs match /^58c/
+[OneGadget] Candidates are:
+            libc-2.19 58cabb8c6f68b05a1c1c9a707a43f22c3a55a3e9
+            libc-2.25 58c735bc7b19b0aeb395cce70cf63bd62ac75e4a
+      EOS
     end
   end
 end

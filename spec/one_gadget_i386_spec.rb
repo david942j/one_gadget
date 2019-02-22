@@ -2,7 +2,7 @@ require 'mkmf'
 
 require 'one_gadget'
 
-describe 'one_gadget' do
+describe 'one_gadget_i386' do
   before(:each) do
     @build_id = '926eb99d49cab2e5622af38ab07395f5b32035e9'
     @data_path = ->(file) { File.join(__dir__, 'data', file) }
