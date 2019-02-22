@@ -62,7 +62,7 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 
 ![--script](https://github.com/david942j/one_gadget/blob/master/examples/script.png?raw=true)
 
-### Directly use in script
+### Directly use in Ruby scripts
 ```ruby
 require 'one_gadget'
 RUBY_OUTPUT_OF(OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6'))
@@ -70,6 +70,16 @@ RUBY_OUTPUT_OF(OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6'))
 RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1))
 # from build id
 RUBY_OUTPUT_OF(one_gadget('60131540dadc6796cab33388349e6e4e68692053'))
+```
+
+### To Python lovers
+```python
+import subprocess
+def one_gadget(filename):
+  return map(int, subprocess.check_output(['one_gadget', '--raw', filename]).split(' '))
+
+one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
+# [283942, 284026, 988753, 992459]
 ```
 
 ## Screenshots
