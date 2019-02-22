@@ -3,7 +3,7 @@ require 'mkmf'
 require 'one_gadget'
 require 'one_gadget/error'
 
-describe 'one_gadget' do
+describe 'one_gadget_amd64' do
   before(:all) do
     @data_path = ->(file) { File.join(__dir__, 'data', file) }
   end
@@ -73,13 +73,17 @@ describe 'one_gadget' do
     it 'fetch from remote' do
       entry = OneGadget::Gadget::ClassMethods::BUILDS.delete(@build_id)
       OneGadget::Gadget::ClassMethods::BUILDS[:a] = 1
+      # silence the logger
+      allow(OneGadget::Logger).to receive(:ask_update)
       expect(OneGadget.gadgets(build_id: @build_id)).not_to be_empty
       OneGadget::Gadget::ClassMethods::BUILDS.delete(:a)
       OneGadget::Gadget::ClassMethods::BUILDS[@build_id] = entry unless entry.nil?
     end
 
     it 'not found' do
-      expect(OneGadget.gadgets(build_id: @build_id.reverse)).to be_empty
+      expect { hook_logger { OneGadget.gadgets(build_id: @build_id.reverse) } }.to output(<<-EOS).to_stdout
+[OneGadget] Cannot find BuildID [35029686e4e6e94388333bac6976cdad04513106]
+      EOS
       expect(OneGadget::Gadget.builds(@build_id.reverse)).to be_nil
     end
   end
