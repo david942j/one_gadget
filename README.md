@@ -197,8 +197,11 @@ one_gadget('60131540dadc6796cab33388349e6e4e68692053')
 ### To Python lovers
 ```python
 import subprocess
-def one_gadget(file):
-  return subprocess.check_output(['one_gadget', '--raw', file])
+def one_gadget(filename):
+  return map(int, subprocess.check_output(['one_gadget', '--raw', filename]).split(' '))
+
+one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
+# [283942, 284026, 988753, 992459]
 ```
 
 ## Screenshots
