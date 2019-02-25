@@ -1,4 +1,5 @@
 require 'one_gadget/error'
+require 'one_gadget/fetchers/aarch64'
 require 'one_gadget/fetchers/amd64'
 require 'one_gadget/fetchers/i386'
 require 'one_gadget/gadget'
@@ -27,6 +28,7 @@ module OneGadget
       def from_file(file)
         arch = OneGadget::Helper.architecture(file)
         klass = {
+          aarch64: OneGadget::Fetcher::AArch64,
           amd64: OneGadget::Fetcher::Amd64,
           i386: OneGadget::Fetcher::I386
         }[arch]

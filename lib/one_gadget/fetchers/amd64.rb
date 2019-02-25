@@ -1,10 +1,10 @@
 require 'one_gadget/emulators/amd64'
-require 'one_gadget/fetchers/base'
+require 'one_gadget/fetchers/x86'
 
 module OneGadget
   module Fetcher
     # Fetcher for amd64.
-    class Amd64 < OneGadget::Fetcher::Base
+    class Amd64 < OneGadget::Fetcher::X86
       private
 
       def emulator

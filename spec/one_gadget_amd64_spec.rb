@@ -72,11 +72,9 @@ describe 'one_gadget_amd64' do
 
     it 'fetch from remote' do
       entry = OneGadget::Gadget::ClassMethods::BUILDS.delete(@build_id)
-      OneGadget::Gadget::ClassMethods::BUILDS[:a] = 1
       # silence the logger
       allow(OneGadget::Logger).to receive(:ask_update)
       expect(OneGadget.gadgets(build_id: @build_id)).not_to be_empty
-      OneGadget::Gadget::ClassMethods::BUILDS.delete(:a)
       OneGadget::Gadget::ClassMethods::BUILDS[@build_id] = entry unless entry.nil?
     end
 
