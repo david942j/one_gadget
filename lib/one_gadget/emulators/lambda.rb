@@ -24,7 +24,7 @@ module OneGadget
       # @param [Numeric] other Value to add.
       # @return [Lambda] The result.
       def +(other)
-        raise Error::InstructionArgumentError, 'Expect other to be Numeric.' unless other.is_a?(Numeric)
+        raise Error::InstructionArgumentError, "Expect other(#{other}) to be numeric." unless other.is_a?(Numeric)
 
         if deref_count > 0
           ret = Lambda.new(self)
@@ -91,11 +91,11 @@ module OneGadget
 
       class << self
         # Target: parse string like <tt>[rsp+0x50]</tt> into a {Lambda} object.
-        # @param [String] arg
+        # @param [String] argument
         # @param [Hash{String => Lambda}] predefined
         #   Predfined values.
         # @return [OneGadget::Emulators::Lambda, Integer]
-        #   If +arg+ contains number only, returns the value.
+        #   If +argument+ contains number only, returns the value.
         #   Otherwise, returns a {Lambda} object.
         # @example
         #   obj = Lambda.parse('[rsp+0x50]')
@@ -105,8 +105,9 @@ module OneGadget
         # @example
         #   Lambda.parse('[x0, -104]')
         #   #=> #<Lambda @obj='x0', @immi=-104, @deref_count=1>
-        def parse(arg, predefined: {})
+        def parse(argument, predefined: {})
           deref_count = 0
+          arg = argument.dup
           if arg[0] == '[' # a little hack because there should nerver something like +[[rsp+1]+2]+ to parse.
             arg = arg[1...arg.rindex(']')]
             deref_count = 1
@@ -121,7 +122,8 @@ module OneGadget
           sign = (arg =~ /,\s/) + 2 if sign.nil? && arg =~ /,\s/
           val = 0
           if sign
-            raise Error::InstructionArgumentError, arg unless OneGadget::Helper.integer?(arg[sign..-1])
+            # Form [r1+r2] is not supported
+            raise Error::UnsupportedInstructionArgumentError, argument unless OneGadget::Helper.integer?(arg[sign..-1])
 
             val = Integer(arg.slice!(sign..-1))
           end

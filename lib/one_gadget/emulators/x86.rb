@@ -200,10 +200,6 @@ module OneGadget
         { sp => 0 }
       end
 
-      def raise_unsupported(inst, *args)
-        raise OneGadget::Error::UnsupportedInstructionArgumentError, "#{inst} #{args.join(', ')}"
-      end
-
       def to_lambda(reg)
         return super unless reg =~ /^xmm\d+$/
 

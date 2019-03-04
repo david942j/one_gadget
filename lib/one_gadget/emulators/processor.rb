@@ -73,6 +73,10 @@ module OneGadget
       def to_lambda(reg)
         OneGadget::Emulators::Lambda.new(reg)
       end
+
+      def raise_unsupported(inst, *args)
+        raise OneGadget::Error::UnsupportedInstructionArgumentError, "#{inst} #{args.join(', ')}"
+      end
     end
   end
 end
