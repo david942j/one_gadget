@@ -19,10 +19,6 @@ module OneGadget
       # @see {OneGadget::Emulators::X86#process!}
       def process!(cmd)
         inst, args = parse(cmd.gsub(/#-?(0x)?[0-9a-f]+/) { |v| v[1..-1] })
-        puts cmd
-        print "\t=> "
-        print inst.inst + "\t"
-        puts args.join(', ')
         sym = "inst_#{inst.inst}".to_sym
         __send__(sym, *args) != :fail
       end
@@ -41,34 +37,45 @@ module OneGadget
         ]
       end
 
+      # Return the argument value of calling a function.
+      # @param [Integer] idx
+      # @return [Lambda, Integer]
+      def argument(idx)
+        registers["x#{idx}"]
+      end
+
       private
 
       def inst_add(dst, src, op2)
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        op2 = OneGadget::Emulators::Lambda.parse(op2, predefined: registers)
+        registers[dst] = src + op2
       end
 
       def inst_adrp(dst, imm)
+        registers[dst] = libc_base + imm.to_i(16)
       end
 
-      def inst_bl(dst)
+      def inst_bl(target)
+        registers[pc] = target
       end
 
       def inst_ldr(dst, src)
+        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        registers[dst] = src
       end
 
       def inst_mov(dst, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        if register?(dst)
-          registers[dst] = src
-        else
-          raise 'wtf'
-          :fail
-        end
+        registers[dst] = src
       end
 
-      def inst_stp(reg1, reg2, dst)
-      end
+      def inst_stp(reg1, reg2, dst); end
 
-      def inst_str(src, dst)
+      def inst_str(src, dst); end
+
+      def libc_base
+        @libc_base ||= OneGadget::Emulators::Lambda.new('$base')
       end
     end
   end

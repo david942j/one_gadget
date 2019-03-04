@@ -5,14 +5,6 @@ module OneGadget
   module Fetcher
     # Define common methods for gadget fetchers.
     class AArch64 < Base
-      def candidates
-        super do |candidate|
-          puts candidate
-          puts '-----------------------'
-          true
-        end
-      end
-
       private
 
       def emulator
@@ -30,6 +22,18 @@ module OneGadget
 
       def call_str
         'bl'
+      end
+
+      def str_bin_sh?(str)
+        str.include?('$base')
+      end
+
+      def str_sh?(str)
+        str.include?('$base')
+      end
+
+      def global_var?(str)
+        str.include?('$base')
       end
     end
   end
