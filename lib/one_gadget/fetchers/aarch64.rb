@@ -1,3 +1,4 @@
+require 'one_gadget/emulators/aarch64'
 require 'one_gadget/fetchers/base'
 
 module OneGadget
@@ -8,11 +9,15 @@ module OneGadget
         super do |candidate|
           puts candidate
           puts '-----------------------'
-          false
+          true
         end
       end
 
       private
+
+      def emulator
+        OneGadget::Emulators::AArch64.new
+      end
 
       # If str contains a branch instruction.
       def branch?(str)
@@ -20,7 +25,7 @@ module OneGadget
       end
 
       def objdump_bin
-        '~/binutils-2.32/binutils/objdump'
+        '/home/david942j/binutils-2.32/binutils/objdump'
       end
 
       def call_str

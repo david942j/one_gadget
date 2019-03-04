@@ -19,12 +19,14 @@ module OneGadget
       # Extract arguments from command.
       # @param [String] cmd
       # @return [Array<String>] Arguments.
+      # @raise [OneGadget::Error::ArgumentError]
       def fetch_args(cmd)
         idx = cmd.index(inst)
+        cmd = cmd[0...cmd.rindex('//')] if cmd.rindex('//')
         cmd = cmd[0...cmd.rindex('#')] if cmd.rindex('#')
-        args = cmd[idx + inst.size..-1].split(',')
+        args = parse_args(cmd[idx + inst.size..-1])
         if argc >= 0 && args.size != argc
-          raise Error::ArgumentError, "Incorrect argument number in #{cmd}, expect: #{argc}"
+          raise OneGadget::Error::ArgumentError, "Incorrect argument number in #{cmd}, expect: #{argc}"
         end
 
         args.map do |arg|
@@ -36,7 +38,30 @@ module OneGadget
       # @param [String] cmd
       # @return [Boolean]
       def match?(cmd)
-        cmd.include?(inst + ' ')
+        (cmd =~ /#{inst}\s/) != nil
+      end
+
+      private
+
+      def parse_args(str)
+        args = []
+        cur = +''
+        bkt_cnt = 0
+        str.each_char do |c|
+          if c == ',' && bkt_cnt.zero?
+            args << cur
+            cur = +''
+            next
+          end
+
+          cur << c
+          case c
+          when '[' then bkt_cnt += 1
+          when ']' then bkt_cnt -= 1
+          end
+        end
+        args << cur unless cur.empty?
+        args
       end
     end
   end

@@ -8,11 +8,22 @@ module OneGadget
     class Processor
       attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
       attr_reader :stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] The content on stack.
+      attr_reader :sp # @return [String] Stack pointer.
+
       # Instantiate a {Processor} object.
-      # @param [Array<String>] registers Registers that supported in the architecture.
-      def initialize(registers)
+      # @param [Array<String>] registers
+      #   Registers that supported in the architecture.
+      # @param [String] sp
+      #   The stack register.
+      def initialize(registers, sp)
         @registers = registers.map { |reg| [reg, to_lambda(reg)] }.to_h
-        @stack = {}
+        @sp = sp
+        @stack = Hash.new do |h, k|
+          h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
+            lmda.immi = k
+            lmda.deref!
+          end
+        end
       end
 
       # Parse one command into instruction and arguments.
@@ -26,9 +37,25 @@ module OneGadget
         [inst, inst.fetch_args(cmd)]
       end
 
+      # Process one command, without raising any exceptions.
+      # @param [String] cmd
+      #   See {#process!} for more information.
+      # @return [Boolean]
+      def process(cmd)
+        process!(cmd)
+      rescue OneGadget::Error::Error
+        false
+      end
+
       # Method need to be implemented in inheritors.
-      # @return [void]
-      def process(_cmd); raise NotImplementedError
+      #
+      # Process one command.
+      # Will raise exceptions when encounter unhandled instruction.
+      # @param [String] _cmd
+      #   One line from result of objdump.
+      # @return [Boolean]
+      #   If successfully processed.
+      def process!(_cmd); raise NotImplementedError
       end
 
       # Method need to be implemented in inheritors.
@@ -37,6 +64,10 @@ module OneGadget
       end
 
       private
+
+      def register?(reg)
+        registers.include?(reg)
+      end
 
       def to_lambda(reg)
         OneGadget::Emulators::Lambda.new(reg)

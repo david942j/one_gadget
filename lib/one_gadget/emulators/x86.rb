@@ -7,19 +7,11 @@ module OneGadget
   module Emulators
     # Super class for amd64 and i386 processor.
     class X86 < Processor
-      attr_reader :sp # @return [String] Stack pointer.
       attr_reader :pc # @return [String] Program counter.
       # Constructor for a x86 processor.
       def initialize(registers, sp, pc)
-        super(registers)
-        @sp = sp
+        super(registers, sp)
         @pc = pc
-        @stack = Hash.new do |h, k|
-          h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
-            lmda.immi = k
-            lmda.deref!
-          end
-        end
       end
 
       # Process one command.
@@ -27,6 +19,7 @@ module OneGadget
       # @param [String] cmd
       #   One line from result of objdump.
       # @return [Boolean]
+      #   If successfully processed.
       def process!(cmd)
         inst, args = parse(cmd)
         # return registers[pc] = args[0] if inst.inst == 'call'
@@ -34,16 +27,6 @@ module OneGadget
 
         sym = "inst_#{inst.inst}".to_sym
         __send__(sym, *args) != :fail
-      end
-
-      # Process one command, without raising any exceptions.
-      # @param [String] cmd
-      #   See {#process!} for more information.
-      # @return [Boolean]
-      def process(cmd)
-        process!(cmd)
-      rescue OneGadget::Error::Error
-        false
       end
 
       # Supported instruction set.
@@ -83,10 +66,6 @@ module OneGadget
       end
 
       private
-
-      def register?(reg)
-        registers.include?(reg)
-      end
 
       def inst_mov(tar, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
