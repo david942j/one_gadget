@@ -24,7 +24,7 @@ module OneGadget
       # @param [Numeric] other Value to add.
       # @return [Lambda] The result.
       def +(other)
-        raise Error::ArgumentError, 'Expect other to be Numeric.' unless other.is_a?(Numeric)
+        raise Error::InstructionArgumentError, 'Expect other to be Numeric.' unless other.is_a?(Numeric)
 
         if deref_count > 0
           ret = Lambda.new(self)
@@ -51,9 +51,9 @@ module OneGadget
 
       # Decrease dreference count with 1.
       # @return [void]
-      # @raise [Error::ArgumentError] When this object cannot be referenced anymore.
+      # @raise [Error::InstrutionArgumentError] When this object cannot be referenced anymore.
       def ref!
-        raise Error::ArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
+        raise Error::InstructionArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
 
         @deref_count -= 1
       end
@@ -84,8 +84,7 @@ module OneGadget
       #   The context.
       # @return [Integer] Result of evaluation.
       def evaluate(context)
-        raise Error::ArgumentError, "Can't eval #{self}" if deref_count > 0
-        raise Error::ArgumentError, "Can't eval #{self}" if obj && !context.key?(obj)
+        raise Error::InstructionArgumentError, "Can't eval #{self}" if deref_count > 0 || (obj && !context.key?(obj))
 
         context[obj] + immi
       end
@@ -122,7 +121,7 @@ module OneGadget
           sign = (arg =~ /,\s/) + 2 if sign.nil? && arg =~ /,\s/
           val = 0
           if sign
-            raise Error::ArgumentError, "Not support #{arg}" unless OneGadget::Helper.integer?(arg[sign..-1])
+            raise Error::InstructionArgumentError, arg unless OneGadget::Helper.integer?(arg[sign..-1])
 
             val = Integer(arg.slice!(sign..-1))
           end

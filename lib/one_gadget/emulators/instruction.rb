@@ -8,25 +8,29 @@ module OneGadget
       attr_reader :argc # @return [Integer] Count of arguments.
       # Instantiate a {Instruction} object.
       # @param [String] inst The instruction name.
-      # @param [Integer] argc
+      # @param [Range, Integer] argc
       #   Count of arguments.
       #   Negative integer for doesn't care the number of arguments.
       def initialize(inst, argc)
         @inst = inst
-        @argc = argc
+        @argc = case argc
+                when -1 then 0..Float::INFINITY
+                when Range then argc
+                when Integer then argc..argc
+                end
       end
 
       # Extract arguments from command.
       # @param [String] cmd
       # @return [Array<String>] Arguments.
-      # @raise [OneGadget::Error::ArgumentError]
+      # @raise [OneGadget::Error::InstructionArgumentError]
       def fetch_args(cmd)
         idx = cmd.index(inst)
         cmd = cmd[0...cmd.rindex('//')] if cmd.rindex('//')
         cmd = cmd[0...cmd.rindex('#')] if cmd.rindex('#')
         args = parse_args(cmd[idx + inst.size..-1])
-        if argc >= 0 && args.size != argc
-          raise OneGadget::Error::ArgumentError, "Incorrect argument number in #{cmd}, expect: #{argc}"
+        unless argc.include?(args.size)
+          raise OneGadget::Error::InstructionArgumentError, "Incorrect argument number in #{cmd}, expect: #{argc}"
         end
 
         args.map do |arg|

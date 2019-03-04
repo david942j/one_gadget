@@ -30,7 +30,7 @@ module OneGadget
           Instruction.new('add', 3),
           Instruction.new('adrp', 2),
           Instruction.new('bl', 1),
-          Instruction.new('ldr', 2),
+          Instruction.new('ldr', 2..3),
           Instruction.new('mov', 2),
           Instruction.new('stp', 3),
           Instruction.new('str', 2)
@@ -60,9 +60,17 @@ module OneGadget
         registers[pc] = target
       end
 
-      def inst_ldr(dst, src)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        registers[dst] = src
+      def inst_ldr(dst, src, index = 0)
+        src_l = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        registers[dst] = src_l
+        index = Integer(index)
+        return unless src.end_with?('!') || index.nonzero?
+
+        # Two cases:
+        # 1. pre-index mode, +src+ is [reg, imm]!
+        # 2. post-index mode, +src+ is [reg]
+        lmda = OneGadget::Emulators::Lambda.parse(src)
+        registers[lmda.obj] += lmda.immi + index
       end
 
       def inst_mov(dst, src)

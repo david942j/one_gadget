@@ -32,7 +32,7 @@ module OneGadget
       #   The parsing result.
       def parse(cmd)
         inst = instructions.find { |i| i.match?(cmd) }
-        raise Error::ArgumentError, "Not implemented instruction in #{cmd}" if inst.nil?
+        raise Error::UnsupportedInstructionError, "Not implemented instruction in #{cmd}" if inst.nil?
 
         [inst, inst.fetch_args(cmd)]
       end
@@ -43,6 +43,7 @@ module OneGadget
       # @return [Boolean]
       def process(cmd)
         process!(cmd)
+        # rescue OneGadget::Error::UnsupportedInstructionError # for debugging
       rescue OneGadget::Error::Error
         false
       end

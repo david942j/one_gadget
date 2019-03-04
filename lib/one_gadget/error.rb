@@ -5,8 +5,16 @@ module OneGadget
     class Error < StandardError
     end
 
-    # Unsupported arguments of intructions.
-    class UnsupportedInstructionArgumentsError < Error
+    # Unsupported instruction.
+    class UnsupportedInstructionError < Error
+    end
+
+    # Raises when arguments form of an instrution is invalid.
+    class InstructionArgumentError < Error
+    end
+
+    # Raises when form of arguments is valid but not supported.
+    class UnsupportedInstructionArgumentError < Error
     end
 
     # Unsupported architecture.
