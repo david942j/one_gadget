@@ -44,7 +44,7 @@ module OneGadget
       # @return [Boolean]
       def process(cmd)
         process!(cmd)
-        # rescue OneGadget::Error::UnsupportedInstructionError # for debugging
+      # rescue OneGadget::Error::UnsupportedError # for debugging
       rescue OneGadget::Error::Error
         false
       end

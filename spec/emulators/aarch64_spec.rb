@@ -1,4 +1,5 @@
 require 'one_gadget/emulators/aarch64'
+require 'one_gadget/error'
 
 describe OneGadget::Emulators::AArch64 do
   before(:each) do
@@ -45,6 +46,25 @@ describe OneGadget::Emulators::AArch64 do
       expect(@processor.registers['sp'].to_s).to eq 'sp-0x10'
       expect(@processor.stack[0].to_s).to eq 'x2'
       expect(@processor.stack[8].to_s).to eq 'x3'
+    end
+
+    it 'str' do
+      # post-index mode
+      @processor.process('mov x1, sp')
+      @processor.process('str x0, [x1], #-8')
+      expect(@processor.registers['sp'].to_s).to eq 'sp'
+      expect(@processor.registers['x1'].to_s).to eq 'sp-0x8'
+      expect(@processor.stack[0].to_s).to eq 'x0'
+
+      @processor.process('str xzr, [sp, #200]')
+      expect(@processor.stack[200]).to be_zero
+
+      @processor.process('str x2, [sp, #0x100]!')
+      expect(@processor.stack[0x100].to_s).to eq 'x2'
+      expect(@processor.registers['sp'].to_s).to eq 'sp+0x100'
+
+      expect { @processor.process!('str x3, [x4]') }
+        .to raise_error(OneGadget::Error::UnsupportedInstructionArgumentError)
     end
   end
 end

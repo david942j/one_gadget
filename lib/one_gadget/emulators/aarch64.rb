@@ -70,9 +70,7 @@ module OneGadget
         # TODO: handle some registers would be fucked after call
         checker = {
           'sigprocmask' => {},
-          '__close' => {},
-          'unsetenv' => {},
-          '__sigaction' => { 2 => :zero? }
+          '__sigaction' => { 1 => :global, 2 => :zero? }
         }
         func = checker.keys.find { |n| addr.include?(n) }
         return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }
@@ -118,8 +116,28 @@ module OneGadget
         registers[sp] += OneGadget::Emulators::Lambda.parse(dst).immi if dst.end_with?('!')
       end
 
-      # TODO
-      def inst_str(src, dst, index = 0); end
+      def inst_str(src, dst, index = 0)
+        check_register!(src)
+        raise_unsupported('str', src, dst, index) unless OneGadget::Helper.integer?(index)
+
+        dst_l = OneGadget::Emulators::Lambda.parse(dst, predefined: registers).ref!
+        # Only stores on stack.
+        if dst_l.obj == sp && dst_l.deref_count.zero?
+          cur_top = dst_l.evaluate(eval_dict)
+          stack[cur_top] = registers[src]
+        elsif !global_var?(dst_l)
+          raise_unsupported('str', src, dst)
+        end
+
+        index = Integer(index)
+        return unless dst.end_with?('!') || index.nonzero?
+
+        # Two cases:
+        # 1. pre-index mode, +dst+ is [reg, imm]!
+        # 2. post-index mode, +dst+ is [reg]
+        lmda = OneGadget::Emulators::Lambda.parse(dst)
+        registers[lmda.obj] += lmda.immi + index
+      end
 
       def libc_base
         @libc_base ||= OneGadget::Emulators::Lambda.new('$base')
@@ -132,7 +150,9 @@ module OneGadget
 
       # Override
       def global_var?(obj)
-        obj.to_s.include?(libc_base.obj)
+        str = obj.to_s
+        # TODO: check if this assumption usually correct
+        (%w[x19 x20 x21] << libc_base.obj).any? { |r| str.include?(r) }
       end
 
       class << self

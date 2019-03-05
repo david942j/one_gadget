@@ -17,6 +17,7 @@ module OneGadget
       end
 
       def objdump_bin
+        # TODO: check objdump's supported architectures
         '/home/david942j/binutils-2.32/binutils/objdump'
       end
 
@@ -24,14 +25,17 @@ module OneGadget
         'bl'
       end
 
+      def bin_sh_offset
+        @bin_sh_offset ||= str_offset('/bin/sh')
+      end
+
       def str_bin_sh?(str)
-        # TODO
-        str.include?('$base')
+        str.include?('$base') && str.include?(bin_sh_offset.to_s(16))
       end
 
       def str_sh?(str)
-        # TODO
-        str.include?('$base')
+        # XXX: hardcode -0x10 is bad
+        str.include?('$base') && str.include?((bin_sh_offset - 0x10).to_s(16))
       end
 
       def global_var?(str)
