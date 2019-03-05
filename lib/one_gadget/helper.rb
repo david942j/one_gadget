@@ -170,7 +170,7 @@ module OneGadget
       request = Net::HTTP::Get.new(uri.request_uri)
 
       response = http.request(request)
-      raise ArgumentError, "Fail to get response of #{url}" unless %w(200 302).include?(response.code)
+      raise ArgumentError, "Fail to get response of #{url}" unless %w[200 302].include?(response.code)
 
       response.code == '302' ? response['location'] : response.body
     rescue NoMethodError, SocketError, ArgumentError => e

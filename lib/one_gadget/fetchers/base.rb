@@ -172,7 +172,7 @@ module OneGadget
 
       # If str contains a branch instruction.
       def branch?(str)
-        %w(jmp je jne jl jb ja jg).any? { |f| str.include?(f) }
+        %w[jmp je jne jl jb ja jg].any? { |f| str.include?(f) }
       end
 
       def str_offset(str)

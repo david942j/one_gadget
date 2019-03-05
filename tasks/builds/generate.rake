@@ -51,7 +51,7 @@ OneGadget::Gadget.add(build_id, OFFSET,
   def template(info, gadgets)
     info_str = info[:info].lines.map { |c| '# ' + c }.join
     gadgets_str = gadgets.map do |gadget|
-      %i(offset constraints effect).reduce(GADGET_TEMPLATE) do |str, attr|
+      %i[offset constraints effect].reduce(GADGET_TEMPLATE) do |str, attr|
         str.sub(attr.to_s.upcase, gadget.__send__(attr).inspect)
       end
     end.join

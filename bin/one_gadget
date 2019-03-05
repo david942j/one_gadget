@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
-require 'one_gadget'
+
 require 'optparse'
+
+require 'one_gadget'
 
 options = { raw: false }
 usage = 'Usage: one_gadget [file] [options]'
@@ -70,10 +72,9 @@ else
   exit(1)
 end
 
-extend OneGadget::Helper
 if options[:script]
   gadgets.map(&:offset).each do |offset|
-    OneGadget::Logger.info("Trying #{colorize(format('0x%x', offset), sev: :integer)}...\n")
+    OneGadget::Logger.info("Trying #{OneGadget::Helper.colorize(format('0x%x', offset), sev: :integer)}...\n")
     execute(options[:script], offset)
   end
   exit(0)
