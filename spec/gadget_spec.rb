@@ -11,7 +11,7 @@ describe OneGadget::Gadget do
   end
 
   after(:all) do
-    OneGadget::Gadget::ClassMethods::BUILDS.delete @build_id
+    OneGadget::Gadget::ClassMethods::BUILDS.delete(@build_id)
   end
 
   it 'inspect' do
@@ -31,6 +31,7 @@ constraints:
 [OneGadget] The desired one-gadget can be found in lastest version!
             Update with: $ gem update one_gadget && gem cleanup one_gadget
     EOS
+    OneGadget::Gadget::ClassMethods::BUILDS.delete(id)
   end
 
   context 'builds_info' do

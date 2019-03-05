@@ -199,7 +199,7 @@ module OneGadget
 
       def install_objdump_guide!
         raise Error::UnsupportedArchitectureError, <<-EOS
-Objdump that supported architecture #{@arch.to_s.inspect} is not found!
+Objdump that supports architecture #{@arch.to_s.inspect} is not found!
 Please install the package 'binutils-multiarch' and try one_gadget again!
 
 For Ubuntu users:
