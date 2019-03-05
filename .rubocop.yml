@@ -35,25 +35,13 @@ Metrics/ModuleLength:
 Metrics/PerceivedComplexity:
   Enabled: false
 
-Naming/FileName:
-  Enabled: false
-
 Naming/HeredocDelimiterNaming:
   Enabled: false
 
 Naming/UncommunicativeMethodParamName:
   Enabled: false
 
-Rails:
-  Enabled: false
-
 Style/FormatStringToken:
-  Enabled: false
-
-Style/MixinUsage:
-  Enabled: false
-
-Style/PercentLiteralDelimiters:
   Enabled: false
 
 Style/TrailingBodyOnMethodDefinition:

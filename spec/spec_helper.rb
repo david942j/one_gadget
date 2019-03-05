@@ -8,10 +8,6 @@ SimpleCov.start do
   add_filter '/spec/'
 end
 
-RSpec.configure do |config|
-  config.before(:suite) { OneGadget::Helper.color_off! }
-end
-
 module Helpers
   def hook_logger(&_block)
     require 'one_gadget/logger'
@@ -26,4 +22,8 @@ module Helpers
     ret
   end
 end
-include Helpers
+
+RSpec.configure do |config|
+  config.before(:suite) { OneGadget::Helper.color_off! }
+  config.include Helpers
+end
