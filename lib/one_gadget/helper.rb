@@ -125,7 +125,7 @@ module OneGadget
     end
 
     # Fetch the latest release version's tag name.
-    # @return [String] The tag name, in form +vx.x.x+.
+    # @return [String] The tag name, in form +vX.X.X+.
     def latest_tag
       releases_url = 'https://github.com/david942j/one_gadget/releases/latest'
       @latest_tag ||= url_request(releases_url).split('/').last
@@ -145,7 +145,6 @@ module OneGadget
     # @return [Tempfile] The temp file be created.
     def download_build(file)
       temp = Tempfile.new(['gadgets', file + '.rb'])
-      url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
       temp.write(url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb'))))
       temp.tap(&:close)
     end
