@@ -43,8 +43,4 @@ describe OneGadget::Helper do
       expect(described_class.architecture(f.path)).to be :unknown
     end
   end
-
-  it 'find_objdump' do
-    skip_unless_objdump
-  end
 end
