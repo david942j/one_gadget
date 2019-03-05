@@ -265,10 +265,13 @@ module OneGadget
     end
 
     # @private
+    # @param [String] bin
+    # @param [Symbol] arch
+    # @return [Boolean]
     def objdump_arch_supported?(bin, arch)
       return false if bin.nil?
 
-      arch = sym_to_objdump_arch(arch)
+      arch = objdump_arch(arch)
       archs = `#{::Shellwords.join([bin, '--help'])}`.lines.find { |c| c.include?('supported architectures') }
       return false if archs.nil?
 
@@ -276,14 +279,18 @@ module OneGadget
     end
 
     # @private
-    def sym_to_objdump_arch(sym)
-      case sym
+    # @param [Symbol] arch
+    # @return [String]
+    def objdump_arch(arch)
+      case arch
       when :amd64 then 'i386:x86-64'
-      else sym.to_s
+      else arch.to_s
       end
     end
 
     # @private
+    # @param [Symbol] arch
+    # @return [String]
     def arch_specific_objdump(arch)
       {
         aarch64: 'aarch64-linux-gnu-objdump',

@@ -14,7 +14,7 @@ module OneGadget
         @pc = 'pc'
       end
 
-      # @see {OneGadget::Emulators::X86#process!}
+      # @see OneGadget::Emulators::X86#process!
       def process!(cmd)
         inst, args = parse(cmd.gsub(/#-?(0x)?[0-9a-f]+/) { |v| v[1..-1] })
         sym = "inst_#{inst.inst}".to_sym
@@ -156,6 +156,7 @@ module OneGadget
       end
 
       class << self
+        # AArch64 is 64-bit.
         def bits
           64
         end
