@@ -107,31 +107,34 @@ module OneGadget
         #   Lambda.parse('[x0, -104]')
         #   #=> #<Lambda @obj='x0', @immi=-104, @deref_count=1>
         def parse(argument, predefined: {})
-          deref_count = 0
           arg = argument.dup
+          return Integer(arg) if OneGadget::Helper.integer?(arg)
+
+          deref_count = 0
           if arg[0] == '[' # a little hack because there should nerver something like +[[rsp+1]+2]+ to parse.
             arg = arg[1...arg.rindex(']')]
             deref_count = 1
           end
-          return Integer(arg) if OneGadget::Helper.integer?(arg)
-
-          # We have three forms:
-          # 0. [reg]
-          # 1. [reg+imm] / [reg-imm]
-          # 2. [reg, imm] / [reg, -imm]
-          sign = arg =~ /[+-]/
-          sign = (arg =~ /,\s/) + 2 if sign.nil? && arg =~ /,\s/
-          val = 0
-          if sign
-            # Form [r1+r2] is not supported
-            raise Error::UnsupportedInstructionArgumentError, argument unless OneGadget::Helper.integer?(arg[sign..-1])
-
-            val = Integer(arg.slice!(sign..-1))
-          end
-          arg.gsub!(/,\s/, '')
-          obj = predefined[arg] || Lambda.new(arg)
-          obj += val unless val.zero?
+          base, disp = mem_obj(arg)
+          obj = predefined[base] || Lambda.new(base)
+          obj += disp unless disp.zero?
           deref_count.zero? ? obj : obj.deref
+        end
+
+        private
+
+        # @return [(String, Integer)]
+        def mem_obj(arg)
+          # We have three forms:
+          # 0. reg
+          # 1. reg+imm / reg-imm
+          # 2. reg, imm / reg, -imm
+          tokens = arg.gsub(/[\+\-]/, ' \0').scan(/[\+\-\w\d]+/)
+          return [tokens.first, 0] if tokens.size == 1
+          raise Error::UnsupportedInstructionArgumentError, arg unless tokens.size == 2
+          raise Error::UnsupportedInstructionArgumentError, arg unless OneGadget::Helper.integer?(tokens.last)
+
+          [tokens.first, Integer(tokens.last)]
         end
       end
     end
