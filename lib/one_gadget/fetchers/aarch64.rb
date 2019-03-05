@@ -25,10 +25,12 @@ module OneGadget
       end
 
       def str_bin_sh?(str)
+        # TODO
         str.include?('$base')
       end
 
       def str_sh?(str)
+        # TODO
         str.include?('$base')
       end
 

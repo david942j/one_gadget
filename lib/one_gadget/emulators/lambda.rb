@@ -50,12 +50,13 @@ module OneGadget
       end
 
       # Decrease dreference count with 1.
-      # @return [void]
+      # @return [self]
       # @raise [Error::InstrutionArgumentError] When this object cannot be referenced anymore.
       def ref!
         raise Error::InstructionArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
 
         @deref_count -= 1
+        self
       end
 
       # A new {Lambda} object with dereference count increase 1.

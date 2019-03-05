@@ -6,8 +6,6 @@ module OneGadget
   module Emulators
     # Emulator of aarch64.
     class AArch64 < Processor
-      attr_reader :pc # @return [String] Program counter.
-
       # Instantiate a {AArch64} object.
       def initialize
         super(OneGadget::ABI.aarch64, 'sp')
@@ -47,6 +45,8 @@ module OneGadget
       private
 
       def inst_add(dst, src, op2, mode = 'sxtw')
+        check_register!(dst)
+
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         op2 = OneGadget::Emulators::Lambda.parse(op2, predefined: registers)
         raise_unsupported('add', dst, src, op2) unless op2.is_a?(Integer) && mode == 'sxtw'
@@ -55,14 +55,35 @@ module OneGadget
       end
 
       def inst_adrp(dst, imm)
+        check_register!(dst)
+
         registers[dst] = libc_base + imm.to_i(16)
       end
 
-      def inst_bl(target)
-        registers[pc] = target
+      # Handle some valid calls.
+      # For example, +sigprocmask+ will always be a valid call
+      # because it just invokes syscall.
+      def inst_bl(addr)
+        # This is the last call
+        return registers[pc] = addr if %w[execve execl].any? { |n| addr.include?(n) }
+
+        # TODO: handle some registers would be fucked after call
+        checker = {
+          'sigprocmask' => {},
+          '__close' => {},
+          'unsetenv' => {},
+          '__sigaction' => { 2 => :zero? }
+        }
+        func = checker.keys.find { |n| addr.include?(n) }
+        return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }
+
+        # unhandled case or checker's condition fails
+        :fail
       end
 
       def inst_ldr(dst, src, index = 0)
+        check_register!(dst)
+
         src_l = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         registers[dst] = src_l
         raise_unsupported('ldr', dst, src, index) unless OneGadget::Helper.integer?(index)
@@ -78,16 +99,46 @@ module OneGadget
       end
 
       def inst_mov(dst, src)
+        check_register!(dst)
+
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         registers[dst] = src
       end
 
-      def inst_stp(reg1, reg2, dst); end
+      def inst_stp(reg1, reg2, dst)
+        raise_unsupported('stp', reg1, reg2, dst) unless reg64?(reg1) && reg64?(reg2)
 
+        dst_l = OneGadget::Emulators::Lambda.parse(dst, predefined: registers).ref!
+        raise_unsupported('stp', reg1, reg2, dst) unless dst_l.obj == sp && dst_l.deref_count.zero?
+
+        cur_top = dst_l.evaluate(eval_dict)
+        stack[cur_top] = registers[reg1]
+        stack[cur_top + size_t] = registers[reg2]
+
+        registers[sp] += OneGadget::Emulators::Lambda.parse(dst).immi if dst.end_with?('!')
+      end
+
+      # TODO
       def inst_str(src, dst, index = 0); end
 
       def libc_base
         @libc_base ||= OneGadget::Emulators::Lambda.new('$base')
+      end
+
+      # Checks if +reg+ is a 64-bit register.
+      def reg64?(reg)
+        register?(reg) && reg.start_with?('x')
+      end
+
+      # Override
+      def global_var?(obj)
+        obj.to_s.include?(libc_base.obj)
+      end
+
+      class << self
+        def bits
+          64
+        end
       end
     end
   end

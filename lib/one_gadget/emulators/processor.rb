@@ -9,6 +9,7 @@ module OneGadget
       attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
       attr_reader :stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] The content on stack.
       attr_reader :sp # @return [String] Stack pointer.
+      attr_reader :pc # @return [String] Program counter.
 
       # Instantiate a {Processor} object.
       # @param [Array<String>] registers
@@ -64,7 +65,28 @@ module OneGadget
       def instructions; raise NotImplementedError
       end
 
+      # To be inherited.
+      #
+      # @param [Integer] _idx
+      #   The idx-th argument.
+      #
+      # @return [Lambda, Integer]
+      #   Return value can be a {Lambda} or an +Integer+.
+      def argument(_idx); raise NotImplementedError
+      end
+
       private
+
+      def check_register!(reg)
+        raise Error::InstructionArgumentError, "#{reg.inspect} is not a valid register" unless register?(reg)
+      end
+
+      def check_argument(idx, expect)
+        case expect
+        when :global then global_var?(argument(idx))
+        when :zero? then argument(idx).is_a?(Integer) && argument(idx).zero?
+        end
+      end
 
       def register?(reg)
         registers.include?(reg)
@@ -76,6 +98,25 @@ module OneGadget
 
       def raise_unsupported(inst, *args)
         raise OneGadget::Error::UnsupportedInstructionArgumentError, "#{inst} #{args.join(', ')}"
+      end
+
+      def eval_dict
+        { sp => 0 }
+      end
+
+      def size_t
+        self.class.bits / 8
+      end
+
+      def global_var?(obj)
+        obj.to_s.include?(pc)
+      end
+
+      class << self
+        # 32 or 64.
+        # @return [Integer] 32 or 64.
+        def bits; raise NotImplementedError
+        end
       end
     end
   end

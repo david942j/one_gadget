@@ -7,7 +7,6 @@ module OneGadget
   module Emulators
     # Super class for amd64 and i386 processor.
     class X86 < Processor
-      attr_reader :pc # @return [String] Program counter.
       # Constructor for a x86 processor.
       def initialize(registers, sp, pc)
         super(registers, sp)
@@ -46,23 +45,6 @@ module OneGadget
           Instruction.new('movaps', 2),
           Instruction.new('movhps', 2)
         ]
-      end
-
-      class << self
-        # 32 or 64.
-        # @return [Integer] 32 or 64.
-        def bits; raise NotImplementedError
-        end
-      end
-
-      # To be inherited.
-      #
-      # @param [Integer] _idx
-      #   The idx-th argument.
-      #
-      # @return [Lambda, Integer]
-      #   Return value can be a {Lambda} or an +Integer+.
-      def argument(_idx); raise NotImplementedError
       end
 
       private
@@ -164,13 +146,6 @@ module OneGadget
       # yap, nop
       def inst_nop(*); end
 
-      def check_argument(idx, expect)
-        case expect
-        when :global then argument(idx).to_s.include?(pc) # easy check
-        when :zero? then argument(idx).is_a?(Integer) && argument(idx).zero?
-        end
-      end
-
       # Handle some valid calls.
       # For example, +sigprocmask+ will always be a valid call
       # because it just invokes syscall.
@@ -190,14 +165,6 @@ module OneGadget
 
         # unhandled case or checker's condition fails
         :fail
-      end
-
-      def size_t
-        self.class.bits / 8
-      end
-
-      def eval_dict
-        { sp => 0 }
       end
 
       def to_lambda(reg)
