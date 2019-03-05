@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
-require 'one_gadget'
+
 require 'optparse'
+
+require 'one_gadget'
 
 options = { raw: false }
 usage = 'Usage: one_gadget [file] [options]'
