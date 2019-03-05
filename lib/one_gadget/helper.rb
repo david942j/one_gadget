@@ -231,5 +231,66 @@ module OneGadget
     rescue ArgumentError, TypeError
       false
     end
+
+    # Cross-platform way of finding an executable in the $PATH.
+    #
+    # @param [String] cmd
+    # @return [String?]
+    # @example
+    #   which('ruby')
+    #   #=> "/usr/bin/ruby"
+    def which(cmd)
+      exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
+      ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+        exts.each do |ext|
+          exe = File.join(path, "#{cmd}#{ext}")
+          return exe if File.executable?(exe) && !File.directory?(exe)
+        end
+      end
+      nil
+    end
+
+    # Find objdump that supports architecture +arch+.
+    # @param [String] arch
+    # @return [String?]
+    # @example
+    #   Helper.find_objdump(:amd64)
+    #   #=> '/usr/bin/objdump'
+    #   Helper.find_objdump(:aarch64)
+    #   #=> '/usr/bin/aarch64-linux-gnu-objdump'
+    def find_objdump(arch)
+      [
+        which('objdump'),
+        which(arch_specific_objdump(arch))
+      ].find { |bin| objdump_arch_supported?(bin, arch) }
+    end
+
+    # @private
+    def objdump_arch_supported?(bin, arch)
+      return false if bin.nil?
+
+      arch = sym_to_objdump_arch(arch)
+      archs = `#{::Shellwords.join([bin, '--help'])}`.lines.find { |c| c.include?('supported architectures') }
+      return false if archs.nil?
+
+      archs.split.include?(arch)
+    end
+
+    # @private
+    def sym_to_objdump_arch(sym)
+      case sym
+      when :amd64 then 'i386:x86-64'
+      else sym.to_s
+      end
+    end
+
+    # @private
+    def arch_specific_objdump(arch)
+      {
+        aarch64: 'aarch64-linux-gnu-objdump',
+        amd64: 'x86_64-linux-gnu-objdump',
+        i386: 'i686-linux-gnu-objdump'
+      }[arch]
+    end
   end
 end

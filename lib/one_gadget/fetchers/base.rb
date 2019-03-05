@@ -11,6 +11,7 @@ module OneGadget
       # @param [String] file Absolute path of target libc.
       def initialize(file)
         @file = file
+        @arch = self.class.name.split('::').last.downcase.to_sym
       end
 
       # Do find gadgets in glibc.
@@ -165,7 +166,9 @@ module OneGadget
       end
 
       def objdump_bin
-        'objdump'
+        OneGadget::Helper.find_objdump(@arch).tap do |bin|
+          install_objdump_guide! if bin.nil?
+        end
       end
 
       def objdump_options
@@ -192,6 +195,16 @@ module OneGadget
 
       def offset_of(assembly)
         assembly.scan(/^([\da-f]+):/)[0][0].to_i(16)
+      end
+
+      def install_objdump_guide!
+        raise Error::UnsupportedArchitectureError, <<-EOS
+Objdump that supported architecture #{@arch.to_s.inspect} is not found!
+Please install the package 'binutils-multiarch' and try one_gadget again!
+
+For Ubuntu users:
+  $ [sudo] apt install binutils-multiarch
+        EOS
       end
     end
   end

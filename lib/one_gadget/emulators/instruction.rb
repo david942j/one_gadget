@@ -5,7 +5,7 @@ module OneGadget
     # Define instruction name and it's argument count.
     class Instruction
       attr_reader :inst # @return [String]  The instruction name.
-      attr_reader :argc # @return [Integer] Count of arguments.
+      attr_reader :argc # @return [Range] Count of arguments.
       # Instantiate a {Instruction} object.
       # @param [String] inst The instruction name.
       # @param [Range, Integer] argc
