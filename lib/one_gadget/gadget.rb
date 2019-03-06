@@ -13,8 +13,6 @@ module OneGadget
       attr_reader :constraints
       # @return [String] The final result of this gadget.
       attr_reader :effect
-      # @return [Integer] The difficulty of constraints.
-      attr_reader :score
 
       # Initialize method of {Gadget} instance.
       # @param [Integer] offset The relative address offset of this gadget.
@@ -43,6 +41,8 @@ module OneGadget
         str + "\n"
       end
 
+      # @return [Integer]
+      #   The difficulty of constraints.
       def score
         @score ||= constraints.reduce(0) { |s, c| s + calculate_score(c) }
       end
@@ -61,12 +61,12 @@ module OneGadget
         return 1 if cons.include?('GOT address')
 
         expr = cons.gsub(' == NULL', ' == 0')
-        raise Error::ArgumentError, cons unless expr.end_with?(' == 0')
+        # raise Error::ArgumentError, cons unless expr.end_with?(' == 0')
 
         identity = expr.slice(0...expr.rindex(' == 0'))
         # Thank God we are already able to parse this
         lmda = OneGadget::Emulators::Lambda.parse(identity)
-        raise Error::ArgumentError, cons unless OneGadget::ABI.all.include?(lmda.obj)
+        # raise Error::ArgumentError, cons unless OneGadget::ABI.all.include?(lmda.obj)
         # rax == 0 is easy; rax + 0x10 == 0 is hard.
         return lmda.immi.zero? ? 1 : 3 if lmda.deref_count.zero?
 
