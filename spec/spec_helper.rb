@@ -1,5 +1,7 @@
-require 'one_gadget/helper'
 require 'simplecov'
+
+require 'one_gadget/helper'
+require 'one_gadget/logger'
 
 SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new(
   [SimpleCov::Formatter::HTMLFormatter]
@@ -9,17 +11,17 @@ SimpleCov.start do
 end
 
 module Helpers
-  def hook_logger(&_block)
-    require 'one_gadget/logger'
+  def hook_logger
+    OneGadget::Logger.instance_variable_get(:@logger).reopen($stdout)
+    yield
+  end
 
-    # no method 'reopen' before ruby 2.3
-    org_logger = OneGadget::Logger.instance_variable_get(:@logger)
-    new_logger = ::Logger.new($stdout)
-    new_logger.formatter = org_logger.formatter
-    OneGadget::Logger.instance_variable_set(:@logger, new_logger)
-    ret = yield
-    OneGadget::Logger.instance_variable_set(:@logger, org_logger)
-    ret
+  def skip_unless_objdump
+    skip 'binutils not installed' if OneGadget::Helper.which('objdump').nil?
+  end
+
+  def data_path(file)
+    File.join(__dir__, 'data', file)
   end
 end
 
