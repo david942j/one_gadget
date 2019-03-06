@@ -37,5 +37,13 @@ module OneGadget
     def all
       amd64 + aarch64
     end
+
+    # Checks if the register is a stack-related pointer.
+    # @param [String] reg
+    #   Register's name.
+    # @return [Boolean]
+    def stack_register?(reg)
+      %w[esp ebp rsp rbp sp x29].include?(reg)
+    end
   end
 end

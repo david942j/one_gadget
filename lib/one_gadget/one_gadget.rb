@@ -62,9 +62,9 @@ module OneGadget
       return [] if gadgets.empty?
       return gadgets if level > 0 # currently only supports level > 0 or not
 
-      # remain gadgets with the fewest constraints
-      best = gadgets.map { |g| g.constraints.size }.min
-      gadgets.select { |g| g.constraints.size == best }
+      # remain gadgets with the lowest score
+      best = gadgets.map(&:score).min
+      gadgets.select { |g| g.score == best }
     end
   end
 end

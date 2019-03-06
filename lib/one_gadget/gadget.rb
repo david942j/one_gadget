@@ -1,4 +1,5 @@
 require 'one_gadget/abi'
+require 'one_gadget/emulators/lambda'
 require 'one_gadget/error'
 
 module OneGadget
@@ -7,11 +8,11 @@ module OneGadget
     # Information of a gadget.
     class Gadget
       # @return [Integer] The gadget's address offset.
-      attr_accessor :offset
+      attr_reader :offset
       # @return [Array<String>] The constraints need for this gadget.
-      attr_accessor :constraints
+      attr_reader :constraints
       # @return [String] The final result of this gadget.
-      attr_accessor :effect
+      attr_reader :effect
 
       # Initialize method of {Gadget} instance.
       # @param [Integer] offset The relative address offset of this gadget.
@@ -38,6 +39,41 @@ module OneGadget
           str.gsub!(/([^\w])(#{reg})([^\w])/, '\1' + OneGadget::Helper.colorize('\2', sev: :reg) + '\3')
         end
         str + "\n"
+      end
+
+      # @return [Integer]
+      #   The difficulty of constraints.
+      def score
+        @score ||= constraints.reduce(0) { |s, c| s + calculate_score(c) }
+      end
+
+      private
+
+      # REG: OneGadget::ABI.all
+      # IMM: [+-]0x[\da-f]+
+      # Identity: <REG><IMM>?
+      # Identity: [<Identity>]
+      # Expr: <REG> is the GOT address of libc
+      # Expr: <Identity> == NULL
+      # Expr: <Expr> || <Expr>
+      def calculate_score(cons)
+        return cons.split(' || ').map(&method(:calculate_score)).min if cons.include?(' || ')
+        return 1 if cons.include?('GOT address')
+
+        expr = cons.gsub(' == NULL', ' == 0')
+        # raise Error::ArgumentError, cons unless expr.end_with?(' == 0')
+
+        identity = expr.slice(0...expr.rindex(' == 0'))
+        # Thank God we are already able to parse this
+        lmda = OneGadget::Emulators::Lambda.parse(identity)
+        # raise Error::ArgumentError, cons unless OneGadget::ABI.all.include?(lmda.obj)
+        # rax == 0 is easy; rax + 0x10 == 0 is hard.
+        return lmda.immi.zero? ? 1 : 3 if lmda.deref_count.zero?
+
+        # Stack frame registers has difficulty 1
+        # when lmda.deref_count == 1
+        base = OneGadget::ABI.stack_register?(lmda.obj) ? 0 : 1
+        lmda.deref_count + base
       end
     end
 

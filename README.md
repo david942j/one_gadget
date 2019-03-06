@@ -184,10 +184,6 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
 
 ```bash
 $ one_gadget spec/data/aarch64-libc-2.27.so
-# 0x3f15c	execve("/bin/sh", sp+0x70, environ)
-# constraints:
-#   x3+0x7c0 == NULL
-#
 # 0x3f16c	execve("/bin/sh", sp+0x70, environ)
 # constraints:
 #   x3 == NULL
@@ -199,14 +195,6 @@ $ one_gadget spec/data/aarch64-libc-2.27.so
 # 0x3f1a8	execve("/bin/sh", x21, environ)
 # constraints:
 #   [x21] == NULL || x21 == NULL
-#
-# 0x63e7c	execl("/bin/sh", "sh", x2+0x7c8)
-# constraints:
-#   x2+0x7c8 == NULL
-#
-# 0x63e88	execl("/bin/sh", x1+0x7c0)
-# constraints:
-#   x1+0x7c0 == NULL
 #
 # 0x63e90	execl("/bin/sh", x1)
 # constraints:
