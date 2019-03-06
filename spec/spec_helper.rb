@@ -1,14 +1,17 @@
 require 'simplecov'
 
-require 'one_gadget/helper'
-require 'one_gadget/logger'
-
 SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new(
   [SimpleCov::Formatter::HTMLFormatter]
 )
 SimpleCov.start do
   add_filter '/spec/'
+  add_filter '/lib/one_gadget/builds/'
 end
+
+# These requirements must be put after SimpleCov.start,
+# otherwise the coverage report will not include them.
+require 'one_gadget/helper'
+require 'one_gadget/logger'
 
 module Helpers
   def hook_logger
