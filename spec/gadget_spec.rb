@@ -1,16 +1,17 @@
+require 'tempfile'
+
 require 'one_gadget/gadget'
 require 'one_gadget/helper'
 
 describe OneGadget::Gadget do
   before(:all) do
     @build_id = 'fake_id'
-    OneGadget::Helper.color_off! # disable colorize for easy testing.
     OneGadget::Gadget.add(@build_id, 0x1234, constraints: ['[rsp+0x30] == NULL', 'rax == 0'],
                                              effect: 'execve("/bin/sh", rsp+0x30, rax)')
   end
 
   after(:all) do
-    OneGadget::Gadget::ClassMethods::BUILDS.delete @build_id
+    OneGadget::Gadget::ClassMethods::BUILDS.delete(@build_id)
   end
 
   it 'inspect' do
@@ -20,6 +21,17 @@ constraints:
   [rsp+0x30] == NULL
   rax == 0
     EOS
+  end
+
+  it 'remote' do
+    id = 'remote_has_this'
+    allow(OneGadget::Helper).to receive(:remote_builds).and_return([id])
+    allow(OneGadget::Helper).to receive(:download_build).with(id) { Tempfile.new(['remote', '.rb']) }
+    expect { hook_logger { described_class.builds(id) } }.to output(<<-EOS).to_stdout
+[OneGadget] The desired one-gadget can be found in lastest version!
+            Update with: $ gem update one_gadget && gem cleanup one_gadget
+    EOS
+    OneGadget::Gadget::ClassMethods::BUILDS.delete(id)
   end
 
   context 'builds_info' do

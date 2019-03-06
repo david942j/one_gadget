@@ -2,7 +2,7 @@ require 'one_gadget/emulators/i386'
 
 describe OneGadget::Emulators::I386 do
   before(:each) do
-    @processor = OneGadget::Emulators::I386.new
+    @processor = described_class.new
   end
 
   describe 'process' do
