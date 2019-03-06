@@ -1,5 +1,5 @@
 module OneGadget
-  # define the abi of different architecture.
+  # Defines the abi of different architectures.
   module ABI
     # Define class methods here.
     module ClassMethods

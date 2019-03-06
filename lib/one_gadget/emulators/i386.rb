@@ -1,5 +1,5 @@
-require 'one_gadget/emulators/x86'
 require 'one_gadget/abi'
+require 'one_gadget/emulators/x86'
 
 module OneGadget
   module Emulators

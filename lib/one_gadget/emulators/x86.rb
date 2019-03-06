@@ -88,69 +88,69 @@ module OneGadget
         registers.include?(reg)
       end
 
-      def inst_mov(tar, src)
+      def inst_mov(dst, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        if register?(tar)
-          registers[tar] = src
+        if register?(dst)
+          registers[dst] = src
         else
           # Just ignore strange case...
-          return unless tar.include?(sp)
+          return unless dst.include?(sp)
 
-          tar = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
-          return if tar.deref_count != 1 # should not happen
+          dst = OneGadget::Emulators::Lambda.parse(dst, predefined: registers)
+          return if dst.deref_count != 1 # should not happen
 
-          tar.ref!
-          stack[tar.evaluate(eval_dict)] = src
+          dst.ref!
+          stack[dst.evaluate(eval_dict)] = src
         end
       end
 
       # This instruction moves 128bits.
-      def inst_movaps(tar, src)
+      def inst_movaps(dst, src)
         # XXX: here we only support `movaps [sp+*], xmm*`
         # TODO: This need an extra constraint: sp & 0xf == 0
-        src, tar = check_xmm_sp(src, tar) { raise_unsupported('movaps', tar, src) }
-        off = tar.evaluate(eval_dict)
+        src, dst = check_xmm_sp(src, dst) { raise_unsupported('movaps', dst, src) }
+        off = dst.evaluate(eval_dict)
         (128 / self.class.bits).times do |i|
           stack[off + i * size_t] = src[i]
         end
       end
 
-      # Mov *src to tar[:64]
-      def inst_movq(tar, src)
+      # Mov *src to dst[:64]
+      def inst_movq(dst, src)
         # XXX: here we only support `movq xmm*, [sp+*]`
-        tar, src = check_xmm_sp(tar, src) { raise_unsupported('movq', tar, src) }
+        dst, src = check_xmm_sp(dst, src) { raise_unsupported('movq', dst, src) }
         off = src.evaluate(eval_dict)
         (64 / self.class.bits).times do |i|
-          tar[i] = stack[off + i * size_t]
+          dst[i] = stack[off + i * size_t]
         end
       end
 
-      # Move *src to tar[64:128]
-      def inst_movhps(tar, src)
+      # Move *src to dst[64:128]
+      def inst_movhps(dst, src)
         # XXX: here we only support `movhps xmm*, [sp+*]`
-        tar, src = check_xmm_sp(tar, src) { raise_unsupported('movhps', tar, src) }
+        dst, src = check_xmm_sp(dst, src) { raise_unsupported('movhps', dst, src) }
         off = src.evaluate(eval_dict)
         (64 / self.class.bits).times do |i|
-          tar[i + 64 / self.class.bits] = stack[off + i * size_t]
+          dst[i + 64 / self.class.bits] = stack[off + i * size_t]
         end
       end
 
-      # check if (tar, src) in form (xmm*, [sp+*])
-      def check_xmm_sp(tar, src)
-        return yield unless tar.start_with?('xmm') && register?(tar) && src.include?(sp)
+      # check if (dst, src) in form (xmm*, [sp+*])
+      def check_xmm_sp(dst, src)
+        return yield unless dst.start_with?('xmm') && register?(dst) && src.include?(sp)
 
-        tar_lm = OneGadget::Emulators::Lambda.parse(tar, predefined: registers)
+        dst_lm = OneGadget::Emulators::Lambda.parse(dst, predefined: registers)
         src_lm = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         return yield if src_lm.deref_count != 1
 
         src_lm.ref!
-        [tar_lm, src_lm]
+        [dst_lm, src_lm]
       end
 
-      def inst_lea(tar, src)
+      def inst_lea(dst, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         src.ref!
-        registers[tar] = src
+        registers[dst] = src
       end
 
       def inst_push(val)
@@ -170,16 +170,16 @@ module OneGadget
         registers[dst] = 0
       end
 
-      def inst_add(tar, src)
+      def inst_add(dst, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        registers[tar] += src
+        registers[dst] += src
       end
 
-      def inst_sub(tar, src)
+      def inst_sub(dst, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         raise Error::ArgumentError, "Can't handle -= of type #{src.class}" unless src.is_a?(Integer)
 
-        registers[tar] -= src
+        registers[dst] -= src
       end
 
       # yap, nop

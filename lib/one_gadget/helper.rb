@@ -15,7 +15,7 @@ module OneGadget
 
     module_function
 
-    # Verify if `build_id` is a valid SHA1 hex format.
+    # Checks if +build_id+ is a valid SHA1 hex format.
     # @param [String] build_id
     #   BuildID.
     # @raise [Error::ArgumentError]
@@ -40,7 +40,7 @@ module OneGadget
     # @param [String] path Relative path.
     # @return [String] Absolute path, with symlink resolved.
     # @example
-    #   abspath('/lib/x86_64-linux-gnu/libc.so.6')
+    #   Helper.abspath('/lib/x86_64-linux-gnu/libc.so.6')
     #   #=> '/lib/x86_64-linux-gnu/libc-2.23.so'
     def abspath(path)
       Pathname.new(File.expand_path(path)).realpath.to_s
@@ -51,10 +51,10 @@ module OneGadget
     # @param [String] path Path to target file.
     # @return [Boolean] If the file is an ELF or not.
     # @example
-    #   valid_elf_file?('/etc/passwd')
-    #   => false
-    #   valid_elf_file?('/lib64/ld-linux-x86-64.so.2')
-    #   => true
+    #   Helper.valid_elf_file?('/etc/passwd')
+    #   #=> false
+    #   Helper.valid_elf_file?('/lib64/ld-linux-x86-64.so.2')
+    #   #=> true
     def valid_elf_file?(path)
       # A light-weight way to check if is a valid ELF file
       # Checks at least one phdr should present.
@@ -64,7 +64,8 @@ module OneGadget
       false
     end
 
-    # Checks if the file of given path is a valid ELF file
+    # Checks if the file of given path is a valid ELF file.
+    #
     # An error message will be shown if given path is not a valid ELF.
     #
     # @param [String] path Path to target file.
@@ -80,7 +81,7 @@ module OneGadget
     # @param [String] path Absolute file path.
     # @return [String] Target build id.
     # @example
-    #   build_id_of('/lib/x86_64-linux-gnu/libc-2.23.so')
+    #   Helper.build_id_of('/lib/x86_64-linux-gnu/libc-2.23.so')
     #   #=> '60131540dadc6796cab33388349e6e4e68692053'
     def build_id_of(path)
       File.open(path) { |f| ELFTools::ELFFile.new(f).build_id }
@@ -125,7 +126,7 @@ module OneGadget
     end
 
     # Fetch the latest release version's tag name.
-    # @return [String] The tag name, in form +vx.x.x+.
+    # @return [String] The tag name, in form +vX.X.X+.
     def latest_tag
       releases_url = 'https://github.com/david942j/one_gadget/releases/latest'
       @latest_tag ||= url_request(releases_url).split('/').last
@@ -145,7 +146,6 @@ module OneGadget
     # @return [Tempfile] The temp file be created.
     def download_build(file)
       temp = Tempfile.new(['gadgets', file + '.rb'])
-      url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb')))
       temp.write(url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb'))))
       temp.tap(&:close)
     end
@@ -160,7 +160,7 @@ module OneGadget
     # @param [String] url The url.
     # @return [String]
     #   The request response body.
-    #   If the response is '302 Found', return the location in header.
+    #   If the response is +302 Found+, returns the location in header.
     def url_request(url)
       uri = URI.parse(url)
       http = Net::HTTP.new(uri.host, uri.port)
@@ -178,10 +178,13 @@ module OneGadget
       nil
     end
 
-    # Fetch the file archiecture of +file+.
+    # Fetch the ELF archiecture of +file+.
     # @param [String] file The target ELF filename.
     # @return [Symbol]
-    #   Only supports architecture amd64 and i386 now.
+    #   Currently supports amd64, i386, arm, aarch64, and mips.
+    # @example
+    #   Helper.architecture('/bin/cat')
+    #   #=> :amd64
     def architecture(file)
       return :invalid unless File.exist?(file)
 
@@ -201,35 +204,58 @@ module OneGadget
     end
 
     # Present number in hex format.
-    # @param [Integer] val The number.
-    # @param [Boolean] psign Need to show plus sign when +val >= 0+.
-    # @return [String] string in hex format.
+    # @param [Integer] val
+    #   The number.
+    # @param [Boolean] psign
+    #   If needs to show the plus sign when +val >= 0+.
+    # @return [String]
+    #   String in hex format.
     # @example
-    #   hex(32) #=> 0x20
-    #   hex(32, psign: true) #=> +0x20
-    #   hex(-40) #=> -0x28
-    #   hex(0) #=> 0x0
-    #   hex(0, psign: true) #=> +0x0
+    #   Helper.hex(32) #=> '0x20'
+    #   Helper.hex(32, psign: true) #=> '+0x20'
+    #   Helper.hex(-40) #=> '-0x28'
+    #   Helper.hex(0) #=> '0x0'
+    #   Helper.hex(0, psign: true) #=> '+0x0'
     def hex(val, psign: false)
       return format("#{psign ? '+' : ''}0x%x", val) if val >= 0
 
       format('-0x%x', -val)
     end
 
-    # For checking a string is actually an integer.
-    # @param [String] str String to be checked.
-    # @return [Boolean] If +str+ can be converted into integer.
+    # Checks if a string can be converted into an integer.
+    # @param [String] str
+    #   String to be checked.
+    # @return [Boolean]
+    #   If +str+ can be converted into an integer.
     # @example
     #   Helper.integer? '1234'
-    #   # => true
+    #   #=> true
     #   Helper.integer? '0x1234'
-    #   # => true
+    #   #=> true
     #   Helper.integer? '0xheapoverflow'
-    #   # => false
+    #   #=> false
     def integer?(str)
       true if Integer(str)
     rescue ArgumentError, TypeError
       false
+    end
+
+    # Cross-platform way of finding an executable in +$PATH+.
+    #
+    # @param [String] cmd
+    # @return [String?]
+    # @example
+    #   Helper.which('ruby')
+    #   #=> "/usr/bin/ruby"
+    def which(cmd)
+      exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
+      ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+        exts.each do |ext|
+          exe = File.join(path, "#{cmd}#{ext}")
+          return exe if File.executable?(exe) && !File.directory?(exe)
+        end
+      end
+      nil
     end
   end
 end
