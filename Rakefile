@@ -16,7 +16,7 @@ end
 
 RSpec::Core::RakeTask.new(:spec) do |task|
   task.pattern = './spec/**/*_spec.rb'
-  task.rspec_opts = ['--color', '--require spec_helper', '--order rand']
+  task.rspec_opts = ['--color', '--require spec_helper', '--order rand', '--warning']
 end
 
 YARD::Rake::YardocTask.new(:doc) do |t|

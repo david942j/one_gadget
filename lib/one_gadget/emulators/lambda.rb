@@ -129,7 +129,7 @@ module OneGadget
           # 0. reg
           # 1. reg+imm / reg-imm
           # 2. reg, imm / reg, -imm
-          tokens = arg.gsub(/[\+\-]/, ' \0').scan(/[\+\-\w\d]+/)
+          tokens = arg.gsub(/[\+\-]/, ' \0').scan(/[\+\-\w]+/)
           return [tokens.first, 0] if tokens.size == 1
           raise Error::UnsupportedInstructionArgumentError, arg unless tokens.size == 2
           raise Error::UnsupportedInstructionArgumentError, arg unless OneGadget::Helper.integer?(tokens.last)
