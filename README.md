@@ -76,95 +76,97 @@ $ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
 #   [rsp+0x70] == NULL
 
 $ one_gadget /lib32/libc.so.6
-# 0x3a7cc	execve("/bin/sh", esp+0x28, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x28] == NULL
-#
-# 0x3a7ce	execve("/bin/sh", esp+0x2c, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x2c] == NULL
-#
-# 0x3a7d2	execve("/bin/sh", esp+0x30, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x30] == NULL
-#
-# 0x3a7d9	execve("/bin/sh", esp+0x34, environ)
+# 0x3cbea	execve("/bin/sh", esp+0x34, environ)
 # constraints:
 #   esi is the GOT address of libc
 #   [esp+0x34] == NULL
 #
-# 0x5f875	execl("/bin/sh", eax)
+# 0x3cbec	execve("/bin/sh", esp+0x38, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x38] == NULL
+#
+# 0x3cbf0	execve("/bin/sh", esp+0x3c, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x3c] == NULL
+#
+# 0x3cbf7	execve("/bin/sh", esp+0x40, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x40] == NULL
+#
+# 0x6729f	execl("/bin/sh", eax)
 # constraints:
 #   esi is the GOT address of libc
 #   eax == NULL
 #
-# 0x5f876	execl("/bin/sh", [esp])
+# 0x672a0	execl("/bin/sh", [esp])
 # constraints:
 #   esi is the GOT address of libc
 #   [esp] == NULL
+#
+# 0x13573e	execl("/bin/sh", eax)
+# constraints:
+#   ebx is the GOT address of libc
+#   eax == NULL
+#
+# 0x13573f	execl("/bin/sh", [esp])
+# constraints:
+#   ebx is the GOT address of libc
+#   [esp] == NULL
 
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6
-# 0x45526	execve("/bin/sh", rsp+0x30, environ)
+# 0x4f2c5	execve("/bin/sh", rsp+0x40, environ)
 # constraints:
-#   rax == NULL
+#   rcx == NULL
 #
-# 0x4557a	execve("/bin/sh", rsp+0x30, environ)
-# constraints:
-#   [rsp+0x30] == NULL
-#
-# 0xf1651	execve("/bin/sh", rsp+0x40, environ)
+# 0x4f322	execve("/bin/sh", rsp+0x40, environ)
 # constraints:
 #   [rsp+0x40] == NULL
 #
-# 0xf24cb	execve("/bin/sh", rsp+0x60, environ)
+# 0x10a38c	execve("/bin/sh", rsp+0x70, environ)
 # constraints:
-#   [rsp+0x60] == NULL
+#   [rsp+0x70] == NULL
 
 # show all gadgets found
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
-# 0x45526	execve("/bin/sh", rsp+0x30, environ)
+# 0x4f2c5	execve("/bin/sh", rsp+0x40, environ)
 # constraints:
-#   rax == NULL
+#   rcx == NULL
 #
-# 0x4557a	execve("/bin/sh", rsp+0x30, environ)
-# constraints:
-#   [rsp+0x30] == NULL
-#
-# 0xcde41	execve("/bin/sh", r15, r13)
-# constraints:
-#   [r15] == NULL || r15 == NULL
-#   [r13] == NULL || r13 == NULL
-#
-# 0xce0e1	execve("/bin/sh", [rbp-0x78], [rbp-0x50])
-# constraints:
-#   [[rbp-0x78]] == NULL || [rbp-0x78] == NULL
-#   [[rbp-0x50]] == NULL || [rbp-0x50] == NULL
-#
-# 0xce0e5	execve("/bin/sh", r9, [rbp-0x50])
-# constraints:
-#   [r9] == NULL || r9 == NULL
-#   [[rbp-0x50]] == NULL || [rbp-0x50] == NULL
-#
-# 0xce0e9	execve("/bin/sh", r9, rdx)
-# constraints:
-#   [r9] == NULL || r9 == NULL
-#   [rdx] == NULL || rdx == NULL
-#
-# 0xf1651	execve("/bin/sh", rsp+0x40, environ)
+# 0x4f322	execve("/bin/sh", rsp+0x40, environ)
 # constraints:
 #   [rsp+0x40] == NULL
 #
-# 0xf165d	execve("/bin/sh", rsi, [rax])
+# 0xe569f	execve("/bin/sh", r14, r12)
+# constraints:
+#   [r14] == NULL || r14 == NULL
+#   [r12] == NULL || r12 == NULL
+#
+# 0xe5858	execve("/bin/sh", [rbp-0x88], [rbp-0x70])
+# constraints:
+#   [[rbp-0x88]] == NULL || [rbp-0x88] == NULL
+#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
+#
+# 0xe585f	execve("/bin/sh", r10, [rbp-0x70])
+# constraints:
+#   [r10] == NULL || r10 == NULL
+#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
+#
+# 0xe5863	execve("/bin/sh", r10, rdx)
+# constraints:
+#   [r10] == NULL || r10 == NULL
+#   [rdx] == NULL || rdx == NULL
+#
+# 0x10a38c	execve("/bin/sh", rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL
+#
+# 0x10a398	execve("/bin/sh", rsi, [rax])
 # constraints:
 #   [rsi] == NULL || rsi == NULL
 #   [[rax]] == NULL || [rax] == NULL
-#
-# 0xf24cb	execve("/bin/sh", rsp+0x60, environ)
-# constraints:
-#   [rsp+0x60] == NULL
 
 ```
 
@@ -182,11 +184,11 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-#=> [283942, 284026, 988753, 992459]
+#=> [324293, 324386, 1090444]
 
 # or in shorter way
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1)
-#=> [283942, 284026, 843329, 844001, 844005, 844009, 988753, 988765, 992459]
+#=> [324293, 324386, 939679, 940120, 940127, 940131, 1090444, 1090456]
 
 # from build id
 one_gadget('60131540dadc6796cab33388349e6e4e68692053')
