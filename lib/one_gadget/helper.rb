@@ -209,7 +209,7 @@ module OneGadget
     # @param [Boolean] psign
     #   If needs to show the plus sign when +val >= 0+.
     # @return [String]
-    #   string in hex format.
+    #   String in hex format.
     # @example
     #   Helper.hex(32) #=> '0x20'
     #   Helper.hex(32, psign: true) #=> '+0x20'
@@ -229,11 +229,11 @@ module OneGadget
     #   If +str+ can be converted into an integer.
     # @example
     #   Helper.integer? '1234'
-    #   # => true
+    #   #=> true
     #   Helper.integer? '0x1234'
-    #   # => true
+    #   #=> true
     #   Helper.integer? '0xheapoverflow'
-    #   # => false
+    #   #=> false
     def integer?(str)
       true if Integer(str)
     rescue ArgumentError, TypeError
