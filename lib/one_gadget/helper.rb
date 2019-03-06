@@ -257,5 +257,63 @@ module OneGadget
       end
       nil
     end
+
+    # Find objdump that supports architecture +arch+.
+    # @param [String] arch
+    # @return [String?]
+    # @example
+    #   Helper.find_objdump(:amd64)
+    #   #=> '/usr/bin/objdump'
+    #   Helper.find_objdump(:aarch64)
+    #   #=> '/usr/bin/aarch64-linux-gnu-objdump'
+    def find_objdump(arch)
+      [
+        which('objdump'),
+        which(arch_specific_objdump(arch))
+      ].find { |bin| objdump_arch_supported?(bin, arch) }
+    end
+
+    # Checks if the given objdump supports certain architecture.
+    # @param [String] bin
+    # @param [Symbol] arch
+    # @return [Boolean]
+    # @example
+    #   Helper.objdump_arch_supported?('/usr/bin/objdump', :i386)
+    #   #=> true
+    def objdump_arch_supported?(bin, arch)
+      return false if bin.nil?
+
+      arch = objdump_arch(arch)
+      archs = `#{::Shellwords.join([bin, '--help'])}`.lines.find { |c| c.include?('supported architectures') }
+      return false if archs.nil?
+
+      archs.split.include?(arch)
+    end
+
+    # Converts to the architecture name shown in objdump's +--help+ command.
+    # @param [Symbol] arch
+    # @return [String]
+    # @example
+    #   Helper.objdump_arch(:i386)
+    #   #=> 'i386'
+    #   Helper.objdump_arch(:amd64)
+    #   #=> 'i386:x86-64'
+    def objdump_arch(arch)
+      case arch
+      when :amd64 then 'i386:x86-64'
+      else arch.to_s
+      end
+    end
+
+    # Returns the binary name of objdump.
+    # @param [Symbol] arch
+    # @return [String]
+    def arch_specific_objdump(arch)
+      {
+        aarch64: 'aarch64-linux-gnu-objdump',
+        amd64: 'x86_64-linux-gnu-objdump',
+        i386: 'i686-linux-gnu-objdump'
+      }[arch]
+    end
   end
 end

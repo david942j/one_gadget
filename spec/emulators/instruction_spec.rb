@@ -22,7 +22,7 @@ describe OneGadget::Emulators::Instruction do
     expect(@mov.fetch_args(<<-'EOS')).to eq ['rdx', '[rax]']
       d67f8:       48 8b 10                mov    rdx,QWORD PTR [rax]
     EOS
-    expect { @mov.fetch_args('mov a, b, c') }.to raise_error(OneGadget::Error::ArgumentError)
+    expect { @mov.fetch_args('mov a, b, c') }.to raise_error(OneGadget::Error::InstructionArgumentError)
     expect(@lea.fetch_args(<<-'EOS')).to eq ['rsi', '[rsp+0x70]']
       d67ec:       48 8d 74 24 70          lea    rsi,[rsp+0x70]
     EOS

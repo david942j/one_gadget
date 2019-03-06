@@ -26,7 +26,9 @@ constraints:
   it 'remote' do
     id = 'remote_has_this'
     allow(OneGadget::Helper).to receive(:remote_builds).and_return([id])
-    allow(OneGadget::Helper).to receive(:download_build).with(id) { Tempfile.new(['remote', '.rb']) }
+    allow(OneGadget::Helper).to receive(:url_request).and_call_original
+    allow(OneGadget::Helper).to receive(:url_request).with(/.rb$/).and_return('')
+
     expect { hook_logger { described_class.builds(id) } }.to output(<<-EOS).to_stdout
 [OneGadget] The desired one-gadget can be found in lastest version!
             Update with: $ gem update one_gadget && gem cleanup one_gadget

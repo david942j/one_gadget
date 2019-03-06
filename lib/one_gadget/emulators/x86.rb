@@ -7,19 +7,10 @@ module OneGadget
   module Emulators
     # Super class for amd64 and i386 processor.
     class X86 < Processor
-      attr_reader :sp # @return [String] Stack pointer.
-      attr_reader :pc # @return [String] Program counter.
       # Constructor for a x86 processor.
       def initialize(registers, sp, pc)
-        super(registers)
-        @sp = sp
+        super(registers, sp)
         @pc = pc
-        @stack = Hash.new do |h, k|
-          h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
-            lmda.immi = k
-            lmda.deref!
-          end
-        end
       end
 
       # Process one command.
@@ -27,6 +18,7 @@ module OneGadget
       # @param [String] cmd
       #   One line from result of objdump.
       # @return [Boolean]
+      #   If successfully processed.
       def process!(cmd)
         inst, args = parse(cmd)
         # return registers[pc] = args[0] if inst.inst == 'call'
@@ -34,16 +26,6 @@ module OneGadget
 
         sym = "inst_#{inst.inst}".to_sym
         __send__(sym, *args) != :fail
-      end
-
-      # Process one command, without raising any exceptions.
-      # @param [String] cmd
-      #   See {#process!} for more information.
-      # @return [Boolean]
-      def process(cmd)
-        process!(cmd)
-      rescue OneGadget::Error::Error
-        false
       end
 
       # Supported instruction set.
@@ -65,28 +47,7 @@ module OneGadget
         ]
       end
 
-      class << self
-        # 32 or 64.
-        # @return [Integer] 32 or 64.
-        def bits; raise NotImplementedError
-        end
-      end
-
-      # To be inherited.
-      #
-      # @param [Integer] _idx
-      #   The idx-th argument.
-      #
-      # @return [Lambda, Integer]
-      #   Return value can be a {Lambda} or an +Integer+.
-      def argument(_idx); raise NotImplementedError
-      end
-
       private
-
-      def register?(reg)
-        registers.include?(reg)
-      end
 
       def inst_mov(dst, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
@@ -148,6 +109,8 @@ module OneGadget
       end
 
       def inst_lea(dst, src)
+        check_register!(dst)
+
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         src.ref!
         registers[dst] = src
@@ -157,40 +120,37 @@ module OneGadget
         val = OneGadget::Emulators::Lambda.parse(val, predefined: registers)
         registers[sp] -= size_t
         cur_top = registers[sp].evaluate(eval_dict)
-        raise Error::ArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
+        raise Error::InstructionArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
 
         stack[cur_top] = val
       end
 
       def inst_xor(dst, src)
+        check_register!(dst)
+
         # only supports dst == src
-        raise Error::ArgumentError, 'xor operator only supports dst = src' unless dst == src
+        raise Error::UnsupportedInstructionArgumentError, 'xor operator only supports dst = src' unless dst == src
 
         dst[0] = 'r' if self.class.bits == 64 && dst.start_with?('e')
         registers[dst] = 0
       end
 
       def inst_add(dst, src)
+        check_register!(dst)
+
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
         registers[dst] += src
       end
 
       def inst_sub(dst, src)
         src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        raise Error::ArgumentError, "Can't handle -= of type #{src.class}" unless src.is_a?(Integer)
+        raise Error::UnsupportedInstructionArgumentError, "Unhandled -= of type #{src.class}" unless src.is_a?(Integer)
 
         registers[dst] -= src
       end
 
       # yap, nop
       def inst_nop(*); end
-
-      def check_argument(idx, expect)
-        case expect
-        when :global then argument(idx).to_s.include?(pc) # easy check
-        when :zero? then argument(idx).is_a?(Integer) && argument(idx).zero?
-        end
-      end
 
       # Handle some valid calls.
       # For example, +sigprocmask+ will always be a valid call
@@ -211,18 +171,6 @@ module OneGadget
 
         # unhandled case or checker's condition fails
         :fail
-      end
-
-      def size_t
-        self.class.bits / 8
-      end
-
-      def eval_dict
-        { sp => 0 }
-      end
-
-      def raise_unsupported(inst, *args)
-        raise OneGadget::Error::UnsupportedInstructionArgumentsError, "#{inst} #{args.join(', ')}"
       end
 
       def to_lambda(reg)

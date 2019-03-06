@@ -24,7 +24,7 @@ module OneGadget
       # @param [Numeric] other Value to add.
       # @return [Lambda] The result.
       def +(other)
-        raise Error::ArgumentError, 'Expect other to be Numeric.' unless other.is_a?(Numeric)
+        raise Error::InstructionArgumentError, "Expect other(#{other}) to be numeric." unless other.is_a?(Numeric)
 
         if deref_count > 0
           ret = Lambda.new(self)
@@ -50,12 +50,13 @@ module OneGadget
       end
 
       # Decrease dreference count with 1.
-      # @return [void]
-      # @raise [Error::ArgumentError] When this object cannot be referenced anymore.
+      # @return [self]
+      # @raise [Error::InstrutionArgumentError] When this object cannot be referenced anymore.
       def ref!
-        raise Error::ArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
+        raise Error::InstructionArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
 
         @deref_count -= 1
+        self
       end
 
       # A new {Lambda} object with dereference count increase 1.
@@ -84,43 +85,56 @@ module OneGadget
       #   The context.
       # @return [Integer] Result of evaluation.
       def evaluate(context)
-        raise Error::ArgumentError, "Can't eval #{self}" if deref_count > 0
-        raise Error::ArgumentError, "Can't eval #{self}" if obj && !context.key?(obj)
+        raise Error::InstructionArgumentError, "Can't eval #{self}" if deref_count > 0 || (obj && !context.key?(obj))
 
         context[obj] + immi
       end
 
       class << self
-        # Target: parse things like <tt>[rsp+0x50]</tt> into a {Lambda} object.
-        # @param [String] arg
+        # Target: parse string like <tt>[rsp+0x50]</tt> into a {Lambda} object.
+        # @param [String] argument
         # @param [Hash{String => Lambda}] predefined
         #   Predfined values.
         # @return [OneGadget::Emulators::Lambda, Integer]
-        #   If +arg+ contains number only, return it.
-        #   Otherwise, return a {Lambda} object.
+        #   If +argument+ contains number only, returns the value.
+        #   Otherwise, returns a {Lambda} object.
         # @example
         #   obj = Lambda.parse('[rsp+0x50]')
         #   #=> #<Lambda @obj='rsp', @immi=80, @deref_count=1>
         #   Lambda.parse('obj+0x30', predefined: { 'obj' => obj }).to_s
         #   #=> '[rsp+0x50]+0x30'
-        def parse(arg, predefined: {})
-          deref_count = 0
-          if arg[0] == '[' # a little hack because there should nerver something like +[[rsp+1]+2]+ to parse.
-            arg = arg[1..-2]
-            deref_count = 1
-          end
+        # @example
+        #   Lambda.parse('[x0, -104]')
+        #   #=> #<Lambda @obj='x0', @immi=-104, @deref_count=1>
+        def parse(argument, predefined: {})
+          arg = argument.dup
           return Integer(arg) if OneGadget::Helper.integer?(arg)
 
-          sign = arg =~ /[+-]/
-          val = 0
-          if sign
-            raise Error::ArgumentError, "Not support #{arg}" unless OneGadget::Helper.integer?(arg[sign..-1])
-
-            val = Integer(arg.slice!(sign..-1))
+          deref_count = 0
+          if arg[0] == '[' # a little hack because there should nerver something like +[[rsp+1]+2]+ to parse.
+            arg = arg[1...arg.rindex(']')]
+            deref_count = 1
           end
-          obj = predefined[arg] || Lambda.new(arg)
-          obj += val unless val.zero?
+          base, disp = mem_obj(arg)
+          obj = predefined[base] || Lambda.new(base)
+          obj += disp unless disp.zero?
           deref_count.zero? ? obj : obj.deref
+        end
+
+        private
+
+        # @return [(String, Integer)]
+        def mem_obj(arg)
+          # We have three forms:
+          # 0. reg
+          # 1. reg+imm / reg-imm
+          # 2. reg, imm / reg, -imm
+          tokens = arg.gsub(/[\+\-]/, ' \0').scan(/[\+\-\w]+/)
+          return [tokens.first, 0] if tokens.size == 1
+          raise Error::UnsupportedInstructionArgumentError, arg unless tokens.size == 2
+          raise Error::UnsupportedInstructionArgumentError, arg unless OneGadget::Helper.integer?(tokens.last)
+
+          [tokens.first, Integer(tokens.last)]
         end
       end
     end

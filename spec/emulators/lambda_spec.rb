@@ -36,6 +36,11 @@ describe OneGadget::Emulators::Lambda do
 
   it 'parse' do
     expect(OneGadget::Emulators::Lambda.parse('[rsp+0x50]').to_s).to eq '[rsp+0x50]'
+    # ARM form
+    expect(OneGadget::Emulators::Lambda.parse('[x0, 1160]').to_s).to eq '[x0+0x488]'
+    expect(OneGadget::Emulators::Lambda.parse('[x22, -104]').to_s).to eq '[x22-0x68]'
+    # test if OK with bang
+    expect(OneGadget::Emulators::Lambda.parse('[x2, -8]!').to_s).to eq '[x2-0x8]'
     expect(OneGadget::Emulators::Lambda.parse('[rsp+80]').to_s).to eq '[rsp+0x50]'
     expect(OneGadget::Emulators::Lambda.parse('esp').to_s).to eq 'esp'
     expect(OneGadget::Emulators::Lambda.parse('esp-10').to_s).to eq 'esp-0xa'

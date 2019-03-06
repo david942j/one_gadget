@@ -11,6 +11,7 @@ module OneGadget
       # @param [String] file Absolute path of target libc.
       def initialize(file)
         @file = file
+        @arch = self.class.name.split('::').last.downcase.to_sym
       end
 
       # Do find gadgets in glibc.
@@ -42,7 +43,7 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&block)
-        cands = `#{objdump_cmd}|egrep 'call.*<exec[^+]*>$' -B 30`.split('--').map do |cand|
+        cands = `#{objdump_cmd}|egrep '#{call_str}.*<exec[^+]*>$' -B 30`.split('--').map do |cand|
           cand.lines.map(&:strip).reject(&:empty?).join("\n")
         end
         # remove all jmps
@@ -147,6 +148,9 @@ module OneGadget
       def str_sh?(_str); raise NotImplementedError
       end
 
+      def call_str; raise NotImplementedError
+      end
+
       def emulate(cmds)
         cmds.each_with_object(emulator) { |cmd, obj| break obj unless obj.process(cmd) }
       end
@@ -155,10 +159,20 @@ module OneGadget
       end
 
       def objdump_cmd(start: nil, stop: nil)
-        cmd = %(objdump --no-show-raw-insn -w -d -M intel #{::Shellwords.escape(file)})
-        cmd.concat(" --start-address #{start}") if start
-        cmd.concat(" --stop-address #{stop}") if stop
-        cmd
+        cmd = [objdump_bin, '--no-show-raw-insn', '-w', '-d', *objdump_options, file]
+        cmd.push('--start-address', start) if start
+        cmd.push('--stop-address', stop) if stop
+        ::Shellwords.join(cmd)
+      end
+
+      def objdump_bin
+        OneGadget::Helper.find_objdump(@arch).tap do |bin|
+          install_objdump_guide! if bin.nil?
+        end
+      end
+
+      def objdump_options
+        []
       end
 
       def slice_prefix(cands)
@@ -171,17 +185,26 @@ module OneGadget
       end
 
       # If str contains a branch instruction.
-      def branch?(str)
-        %w[jmp je jne jl jb ja jg].any? { |f| str.include?(f) }
+      def branch?(_str); raise NotImplementedError
       end
 
       def str_offset(str)
         IO.binread(file).index(str + "\x00") ||
-          raise(Error::ArgumentError, "File #{file.inspect} doesn't contain string \"/bin/sh\", not glibc?")
+          raise(Error::ArgumentError, "File #{file.inspect} doesn't contain string #{str.inspect}, not glibc?")
       end
 
       def offset_of(assembly)
         assembly.scan(/^([\da-f]+):/)[0][0].to_i(16)
+      end
+
+      def install_objdump_guide!
+        raise Error::UnsupportedArchitectureError, <<-EOS
+Objdump that supports architecture #{@arch.to_s.inspect} is not found!
+Please install the package 'binutils-multiarch' and try one_gadget again!
+
+For Ubuntu users:
+  $ [sudo] apt install binutils-multiarch
+        EOS
       end
     end
   end

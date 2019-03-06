@@ -5,12 +5,24 @@ module OneGadget
     class Error < StandardError
     end
 
-    # Unsupported arguments of intructions.
-    class UnsupportedInstructionArgumentsError < Error
+    # Super class of unsupported errors.
+    class UnsupportedError < Error
+    end
+
+    # Unsupported instruction.
+    class UnsupportedInstructionError < UnsupportedError
+    end
+
+    # Raises when arguments form of an instrution is invalid.
+    class InstructionArgumentError < Error
+    end
+
+    # Raises when form of arguments is valid but not supported.
+    class UnsupportedInstructionArgumentError < UnsupportedError
     end
 
     # Unsupported architecture.
-    class UnsupportedArchitectureError < Error
+    class UnsupportedArchitectureError < UnsupportedError
     end
 
     # Argument error of ruby methods.

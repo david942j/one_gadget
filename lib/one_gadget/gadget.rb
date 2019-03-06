@@ -34,7 +34,9 @@ module OneGadget
           str += constraints.join("\n  ")
         end
         str.gsub!(/0x[\da-f]+/) { |s| OneGadget::Helper.colorize(s, sev: :integer) }
-        OneGadget::ABI.all.each { |reg| str.gsub!(reg, OneGadget::Helper.colorize(reg, sev: :reg)) }
+        OneGadget::ABI.all.each do |reg|
+          str.gsub!(/([^\w])(#{reg})([^\w])/, '\1' + OneGadget::Helper.colorize('\2', sev: :reg) + '\3')
+        end
         str + "\n"
       end
     end

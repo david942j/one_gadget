@@ -6,31 +6,35 @@
 [![Inline docs](https://inch-ci.org/github/david942j/one_gadget.svg?branch=master)](https://inch-ci.org/github/david942j/one_gadget)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](http://choosealicense.com/licenses/mit/)
 
-## One Gadget
+## OneGadget
 
 When playing ctf pwn challenges we usually need the one-gadget RCE (remote code execution),
 which leads to call `execve('/bin/sh', NULL, NULL)`.
 
 This gem provides such gadgets finder, no need to use objdump or IDA-pro every time like a fool :wink:
 
-To use this tool, just type `one_gadget /path/to/libc` in command line and enjoy the magic :laughing:
+To use this tool, type `one_gadget /path/to/libc` in command line and enjoy the magic :laughing:
 
-Note: Supports amd64 and i386!
-
-## Install
+## Installation
 
 Available on RubyGems.org!
 ```bash
 $ gem install one_gadget
 ```
 
-Note: require ruby version >= 2.1.0, you can use `ruby --version` to check.
+Note: requires ruby version >= 2.1.0, you can use `ruby --version` to check.
+
+## Supported Architectures
+
+- [x] i386
+- [x] amd64 (x86-64)
+- [x] aarch64 (ARMv8)
 
 ## Implementation
 
-OneGadget uses simple self-implement symbolic execution to find the constraints of gadgets to be successful.
+OneGadget uses symbolic execution to find the constraints of gadgets to be successful.
 
-The article introducing how I develop this tool can be found [in my blog](https://david942j.blogspot.com/2017/02/project-one-gadget-in-glibc.html).
+The article introducing how I develop this tool can be found [on my blog](https://david942j.blogspot.com/2017/02/project-one-gadget-in-glibc.html).
 
 ## Usage
 
@@ -45,14 +49,26 @@ But you can use option `--level 1` to show all gadgets found.
 
 ```bash
 SHELL_OUTPUT_OF(one_gadget)
+```
+
+```bash
 SHELL_OUTPUT_OF(one_gadget -b 60131540dadc6796cab33388349e6e4e68692053)
 SHELL_OUTPUT_OF(one_gadget /lib32/libc.so.6)
 SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6)
-# show all gadgets found
+```
+#### Show All Gadgets
+
+```bash
 SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1)
 ```
 
-#### Combine with exploit script
+#### Other Architectures
+
+```bash
+SHELL_OUTPUT_OF(one_gadget spec/data/aarch64-libc-2.27.so)
+```
+
+#### Combine with Script
 Pass your exploit script as `one_gadget`'s arguments, it can
 try all gadgets one by one, so you don't need to try every possible gadgets manually.
 
@@ -62,7 +78,7 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 
 ![--script](https://github.com/david942j/one_gadget/blob/master/examples/script.png?raw=true)
 
-### Directly use in Ruby scripts
+### In Ruby Scripts
 ```ruby
 require 'one_gadget'
 RUBY_OUTPUT_OF(OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6'))
@@ -72,7 +88,7 @@ RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1))
 RUBY_OUTPUT_OF(one_gadget('60131540dadc6796cab33388349e6e4e68692053'))
 ```
 
-### To Python lovers
+### To Python Lovers
 ```python
 import subprocess
 def one_gadget(filename):
@@ -84,7 +100,7 @@ one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
 
 ## Screenshots
 
-### Search gadgets in libc
+### Search Gadgets in Glibc
 
 #### 64 bit
 ![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file.png?raw=true)
@@ -92,7 +108,7 @@ one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
 #### 32 bit
 ![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file_32bit.png?raw=true)
 
-### Fetch gadgets from database
+### Fetch Gadgets from Database
 ![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
 
 ## Make OneGadget Better

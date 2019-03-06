@@ -1,9 +1,13 @@
 language: ruby
-sudo: required
 cache: bundler
 dist: trusty
 os:
-- linux
+  - linux
+addons:
+  apt:
+    packages:
+      - binutils-multiarch
+      - grep
 rvm:
   - 2.3
   - 2.4
@@ -24,7 +28,6 @@ before_install:
   - gem update --system
   - gem install bundler
   - gem --version
-  - sudo apt-get install -qq --force-yes binutils grep
 
 after_script:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT; fi

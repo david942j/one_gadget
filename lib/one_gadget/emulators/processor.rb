@@ -8,11 +8,23 @@ module OneGadget
     class Processor
       attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
       attr_reader :stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] The content on stack.
+      attr_reader :sp # @return [String] Stack pointer.
+      attr_reader :pc # @return [String] Program counter.
+
       # Instantiate a {Processor} object.
-      # @param [Array<String>] registers Registers that supported in the architecture.
-      def initialize(registers)
+      # @param [Array<String>] registers
+      #   Registers that supported in the architecture.
+      # @param [String] sp
+      #   The stack register.
+      def initialize(registers, sp)
         @registers = registers.map { |reg| [reg, to_lambda(reg)] }.to_h
-        @stack = {}
+        @sp = sp
+        @stack = Hash.new do |h, k|
+          h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
+            lmda.immi = k
+            lmda.deref!
+          end
+        end
       end
 
       # Parse one command into instruction and arguments.
@@ -21,14 +33,31 @@ module OneGadget
       #   The parsing result.
       def parse(cmd)
         inst = instructions.find { |i| i.match?(cmd) }
-        raise Error::ArgumentError, "Not implemented instruction in #{cmd}" if inst.nil?
+        raise Error::UnsupportedInstructionError, "Not implemented instruction in #{cmd}" if inst.nil?
 
         [inst, inst.fetch_args(cmd)]
       end
 
+      # Process one command, without raising any exceptions.
+      # @param [String] cmd
+      #   See {#process!} for more information.
+      # @return [Boolean]
+      def process(cmd)
+        process!(cmd)
+      # rescue OneGadget::Error::UnsupportedError # for debugging
+      rescue OneGadget::Error::Error
+        false
+      end
+
       # Method need to be implemented in inheritors.
-      # @return [void]
-      def process(_cmd); raise NotImplementedError
+      #
+      # Process one command.
+      # Will raise exceptions when encounter unhandled instruction.
+      # @param [String] _cmd
+      #   One line from result of objdump.
+      # @return [Boolean]
+      #   If successfully processed.
+      def process!(_cmd); raise NotImplementedError
       end
 
       # Method need to be implemented in inheritors.
@@ -36,10 +65,58 @@ module OneGadget
       def instructions; raise NotImplementedError
       end
 
+      # To be inherited.
+      #
+      # @param [Integer] _idx
+      #   The idx-th argument.
+      #
+      # @return [Lambda, Integer]
+      #   Return value can be a {Lambda} or an +Integer+.
+      def argument(_idx); raise NotImplementedError
+      end
+
       private
+
+      def check_register!(reg)
+        raise Error::InstructionArgumentError, "#{reg.inspect} is not a valid register" unless register?(reg)
+      end
+
+      def check_argument(idx, expect)
+        case expect
+        when :global then global_var?(argument(idx))
+        when :zero? then argument(idx).is_a?(Integer) && argument(idx).zero?
+        end
+      end
+
+      def register?(reg)
+        registers.include?(reg)
+      end
 
       def to_lambda(reg)
         OneGadget::Emulators::Lambda.new(reg)
+      end
+
+      def raise_unsupported(inst, *args)
+        raise OneGadget::Error::UnsupportedInstructionArgumentError, "#{inst} #{args.join(', ')}"
+      end
+
+      def eval_dict
+        { sp => 0 }
+      end
+
+      def size_t
+        self.class.bits / 8
+      end
+
+      def global_var?(obj)
+        obj.to_s.include?(pc)
+      end
+
+      class << self
+        # 32 or 64.
+        # @return [Integer] 32 or 64.
+        def bits; raise NotImplementedError
+        end
       end
     end
   end

@@ -1,29 +1,41 @@
 module OneGadget
   # Defines the abi of different architectures.
   module ABI
-    # Define class methods here.
-    module ClassMethods
-      # Registers in i386.
-      LINUX_X86_32 = %w[eax ebx ecx edx edi esi ebp esp] + 0.upto(7).map { |i| "xmm#{i}" }
-      # Registers in x86_64/
-      LINUX_X86_64 = LINUX_X86_32 +
-                     %w[rax rbx rcx rdx rdi rsi rbp rsp] +
-                     8.upto(15).map { |i| "r#{i}" } +
-                     8.upto(15).map { |i| "xmm#{i}" }
-      # Registers' name in amd64.
-      # @return [Array<String>] List of registers.
-      def amd64
-        LINUX_X86_64
-      end
+    # Registers of i386.
+    X86_32 = %w[eax ebx ecx edx edi esi ebp esp] + 0.upto(7).map { |i| "xmm#{i}" }
+    # Registers of x86_64.
+    X86_64 = X86_32 +
+             %w[rax rbx rcx rdx rdi rsi rbp rsp] +
+             8.upto(15).map { |i| "r#{i}" } +
+             8.upto(15).map { |i| "xmm#{i}" }
 
-      # Registers' name in i386.
-      # @return [Array<String>] List of registers.
-      def i386
-        LINUX_X86_32
-      end
+    # Registers of AArch64.
+    AARCH64 = %w[xzr wzr sp] + 0.upto(30).map { |i| ["x#{i}", "w#{i}"] }.flatten
 
-      alias all amd64
+    module_function
+
+    # Registers' name of amd64.
+    # @return [Array<String>] List of registers.
+    def amd64
+      X86_64.uniq
     end
-    extend ClassMethods
+
+    # Registers' name of i386.
+    # @return [Array<String>] List of registers.
+    def i386
+      X86_32
+    end
+
+    # Registers' name of aarch64.
+    # @return [Array<String>] List of registers.
+    def aarch64
+      AARCH64
+    end
+
+    # Returns all names of registers.
+    # @return [Array<String>] List of registers.
+    def all
+      amd64 + aarch64
+    end
   end
 end
