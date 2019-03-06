@@ -100,7 +100,7 @@ one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
 
 ## Screenshots
 
-### Search Gadgets from Glibc Binary
+### Search Gadgets in Glibc
 
 #### 64 bit
 ![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file.png?raw=true)
