@@ -15,8 +15,6 @@ This gem provides such gadgets finder, no need to use objdump or IDA-pro every t
 
 To use this tool, just type `one_gadget /path/to/libc` in command line and enjoy the magic :laughing:
 
-Note: Supports amd64 and i386!
-
 ## Install
 
 Available on RubyGems.org!
@@ -25,6 +23,12 @@ $ gem install one_gadget
 ```
 
 Note: require ruby version >= 2.1.0, you can use `ruby --version` to check.
+
+## Supported Architectures
+
+- [x] i386
+- [x] amd64 (x86-64)
+- [x] aarch64 (ARMv8)
 
 ## Implementation
 

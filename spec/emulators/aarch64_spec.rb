@@ -36,16 +36,16 @@ describe OneGadget::Emulators::AArch64 do
     end
 
     it 'stp' do
+      @processor.process('stp x2, x3, [sp, #16]')
+      expect(@processor.registers['sp'].to_s).to eq 'sp'
+      expect(@processor.stack[16].to_s).to eq 'x2'
+      expect(@processor.stack[24].to_s).to eq 'x3'
+
       # equivalent to 'push x1; push x0'
       @processor.process('stp x0, x1, [sp, #-16]!')
       expect(@processor.registers['sp'].to_s).to eq 'sp-0x10'
       expect(@processor.stack[-8].to_s).to eq 'x1'
       expect(@processor.stack[-16].to_s).to eq 'x0'
-
-      @processor.process('stp x2, x3, [sp, #16]')
-      expect(@processor.registers['sp'].to_s).to eq 'sp-0x10'
-      expect(@processor.stack[0].to_s).to eq 'x2'
-      expect(@processor.stack[8].to_s).to eq 'x3'
     end
 
     it 'str' do
