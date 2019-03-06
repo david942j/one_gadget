@@ -109,16 +109,13 @@ module OneGadget
         def parse(argument, predefined: {})
           arg = argument.dup
           return Integer(arg) if OneGadget::Helper.integer?(arg)
+          # nested []
+          return parse(arg[1...arg.rindex(']')], predefined: predefined).deref if arg[0] == '['
 
-          deref_count = 0
-          if arg[0] == '[' # a little hack because there should nerver something like +[[rsp+1]+2]+ to parse.
-            arg = arg[1...arg.rindex(']')]
-            deref_count = 1
-          end
           base, disp = mem_obj(arg)
           obj = predefined[base] || Lambda.new(base)
           obj += disp unless disp.zero?
-          deref_count.zero? ? obj : obj.deref
+          obj
         end
 
         private

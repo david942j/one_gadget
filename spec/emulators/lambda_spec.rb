@@ -49,5 +49,8 @@ describe OneGadget::Emulators::Lambda do
 
     predefined = { 'rsp' => OneGadget::Emulators::Lambda.new('rsp') + 0x10 }
     expect(OneGadget::Emulators::Lambda.parse('rsp+0x20', predefined: predefined).to_s).to eq 'rsp+0x30'
+
+    # Nested []
+    expect(OneGadget::Emulators::Lambda.parse('[[rsp+0x33]]').to_s).to eq '[[rsp+0x33]]'
   end
 end
