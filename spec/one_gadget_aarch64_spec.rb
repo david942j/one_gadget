@@ -25,7 +25,7 @@ describe 'one_gadget_aarch64' do
   end
 
   it 'objdump not installed' do
-    allow(OneGadget::Helper).to receive(:sym_to_objdump_arch).and_return(nil)
+    allow(OneGadget::Helper).to receive(:objdump_arch).and_return(nil)
     path = data_path('aarch64-libc-2.27.so')
     expect { hook_logger { OneGadget.gadgets(file: path, force_file: true) } }.to output(<<-EOS).to_stdout
 [OneGadget] UnsupportedArchitectureError: Objdump that supports architecture "aarch64" is not found!
