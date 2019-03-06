@@ -214,7 +214,7 @@ $ one_gadget spec/data/aarch64-libc-2.27.so
 
 ```
 
-#### Combine With Script
+#### Combine with Script
 Pass your exploit script as `one_gadget`'s arguments, it can
 try all gadgets one by one, so you don't need to try every possible gadgets manually.
 
@@ -224,7 +224,7 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 
 ![--script](https://github.com/david942j/one_gadget/blob/master/examples/script.png?raw=true)
 
-### Directly Use In Ruby Scripts
+### In Ruby Scripts
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
@@ -252,7 +252,7 @@ one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
 
 ## Screenshots
 
-### Search Gadgets From File
+### Search Gadgets from Glibc Binary
 
 #### 64 bit
 ![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file.png?raw=true)
@@ -260,7 +260,7 @@ one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
 #### 32 bit
 ![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file_32bit.png?raw=true)
 
-### Fetch Gadgets From Database
+### Fetch Gadgets from Database
 ![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
 
 ## Make OneGadget Better
