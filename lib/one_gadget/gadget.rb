@@ -81,7 +81,7 @@ module OneGadget
     module ClassMethods
       # Path to the pre-build files.
       BUILDS_PATH = File.join(__dir__, 'builds').freeze
-      # Cache.
+      # Record.
       BUILDS = Hash.new { |h, k| h[k] = [] }
       # Get gadgets from pre-defined corpus.
       # @param [String] build_id Desired build id.
@@ -89,8 +89,8 @@ module OneGadget
       #   When local not found, try search in latest version?
       # @return [Array<Gadget::Gadget>?] Gadgets.
       def builds(build_id, remote: true)
-        require_all if BUILDS.empty?
-        return BUILDS[build_id] if BUILDS.key?(build_id)
+        ret = find_build(build_id)
+        return ret unless ret.nil?
         return build_not_found unless remote
 
         # fetch remote builds
@@ -145,10 +145,11 @@ module OneGadget
 
       private
 
-      def require_all
-        Dir.glob(File.join(BUILDS_PATH, '**', '*.rb')).each do |dic|
+      def find_build(id)
+        Dir.glob(File.join(BUILDS_PATH, "*-#{id}.rb")).each do |dic|
           require dic
         end
+        BUILDS[id] if BUILDS.key?(id)
       end
 
       def build_not_found
