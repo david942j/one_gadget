@@ -29,7 +29,7 @@ module OneGadget
       # Show gadget in a pretty way.
       def inspect
         str = OneGadget::Helper.hex(offset)
-        str += effect ? "\t#{effect}\n" : "\n"
+        str += effect ? " #{effect}\n" : "\n"
         unless constraints.empty?
           str += "#{OneGadget::Helper.colorize('constraints')}:\n  "
           str += merge_constraints.join("\n  ")

@@ -9,7 +9,7 @@ describe OneGadget::Gadget do
       gadget = OneGadget::Gadget::Gadget.new(0x1234, constraints: ['[rsp+0x30] == NULL', 'rax == 0'],
                                                      effect: 'execve("/bin/sh", rsp+0x30, rax)')
       expect(gadget.inspect).to eq <<-EOS
-0x1234	execve("/bin/sh", rsp+0x30, rax)
+0x1234 execve("/bin/sh", rsp+0x30, rax)
 constraints:
   [rsp+0x30] == NULL
   rax == 0
@@ -20,7 +20,7 @@ constraints:
       gadget = OneGadget::Gadget::Gadget.new(0x1234, constraints: ['writable: x3', 'rax == 0'],
                                                      effect: 'execve("/bin/sh", rsp+0x30, rax)')
       expect(gadget.inspect).to eq <<-EOS
-0x1234	execve("/bin/sh", rsp+0x30, rax)
+0x1234 execve("/bin/sh", rsp+0x30, rax)
 constraints:
   address x3 is writable
   rax == 0
@@ -28,7 +28,7 @@ constraints:
 
       gadget.constraints << 'writable: rbx+0x20'
       expect(gadget.inspect).to eq <<-EOS
-0x1234	execve("/bin/sh", rsp+0x30, rax)
+0x1234 execve("/bin/sh", rsp+0x30, rax)
 constraints:
   addresses x3, rbx+0x20 are writable
   rax == 0
