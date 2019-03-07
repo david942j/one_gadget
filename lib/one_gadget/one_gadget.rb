@@ -62,9 +62,17 @@ module OneGadget
       return [] if gadgets.empty?
       return gadgets if level > 0 # currently only supports level > 0 or not
 
-      # remain gadgets with the lowest score
-      best = gadgets.map(&:score).min
-      gadgets.select { |g| g.score == best }
+      high, low = gadgets.partition { |g| g.score >= 0.2 }
+      return take_until(low, 3) if high.empty?
+
+      take_until(high, 3)
+    end
+
+    def take_until(ary, count)
+      return ary if ary.size <= count
+
+      threshold = ary.sort_by(&:score)[-count].score
+      ary.select { |g| g.score >= threshold }
     end
   end
 end

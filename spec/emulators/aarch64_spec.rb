@@ -64,7 +64,7 @@ describe OneGadget::Emulators::AArch64 do
       expect(@processor.registers['sp'].to_s).to eq 'sp+0x100'
 
       @processor.process('str x3, [x4]')
-      expect(@processor.constraints).to eq ['address "x4" is writable']
+      expect(@processor.constraints).to eq ['writable: x4']
     end
   end
 end

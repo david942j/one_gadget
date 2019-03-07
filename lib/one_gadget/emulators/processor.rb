@@ -83,8 +83,7 @@ module OneGadget
 
         # currently only ':writable' type
         cons = @constraints.uniq { |_type, obj| obj.deref_count.zero? ? obj.obj.to_s : obj.to_s }
-        cons = cons.map { |_type, obj| obj.to_s.inspect }.sort
-        ["address#{cons.size > 1 ? 'es' : ''} #{cons.join(', ')} #{cons.size > 1 ? 'are' : 'is'} writable"]
+        cons.map { |_type, obj| "writable: #{obj}" }.sort
       end
 
       private

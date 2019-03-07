@@ -151,11 +151,11 @@ module OneGadget
       end
 
       # Override
-      def global_var?(obj)
-        str = obj.is_a?(OneGadget::Emulators::Lambda) ? obj.obj.to_s : obj.to_s
-        # TODO: check if this assumption usually correct
-        (%w[x19 x20 x21] << libc_base.obj).any? { |r| str.include?(r) }
-      end
+      # def global_var?(obj)
+      #   str = obj.is_a?(OneGadget::Emulators::Lambda) ? obj.obj.to_s : obj.to_s
+      #   # TODO: check if this assumption usually correct
+      #   (%w[x19 x20 x21] << libc_base.obj).any? { |r| str.include?(r) }
+      # end
 
       def add_writable(lmda)
         # XXX: Better way is check LOAD segment of the libc ELF.

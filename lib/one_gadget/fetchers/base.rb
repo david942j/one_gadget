@@ -30,7 +30,7 @@ module OneGadget
             gadgets << OneGadget::Gadget::Gadget.new(offset, options)
           end
           gadgets
-        end.flatten.compact
+        end.flatten
       end
 
       # Fetch candidates that end with call exec*.

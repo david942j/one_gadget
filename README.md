@@ -184,16 +184,19 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
 
 ```bash
 $ one_gadget spec/data/aarch64-libc-2.27.so
-# 0x3f16c	execve("/bin/sh", sp+0x70, environ)
+# 0x3f160	execve("/bin/sh", sp+0x70, environ)
 # constraints:
+#   address x20+0x338 is writable
 #   x3 == NULL
 #
 # 0x3f184	execve("/bin/sh", sp+0x70, environ)
 # constraints:
+#   addresses x19+0x4, x20+0x338 are writable
 #   [sp+0x70] == NULL
 #
 # 0x3f1a8	execve("/bin/sh", x21, environ)
 # constraints:
+#   addresses x19+0x4, x20+0x338 are writable
 #   [x21] == NULL || x21 == NULL
 #
 # 0x63e90	execl("/bin/sh", x1)
