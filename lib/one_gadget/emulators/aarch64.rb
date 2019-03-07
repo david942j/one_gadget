@@ -70,7 +70,7 @@ module OneGadget
         # TODO: handle some registers would be fucked after call
         checker = {
           'sigprocmask' => {},
-          '__sigaction' => { 1 => :global, 2 => :zero? }
+          '__sigaction' => { 2 => :zero? }
         }
         func = checker.keys.find { |n| addr.include?(n) }
         return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }
@@ -125,8 +125,10 @@ module OneGadget
         if dst_l.obj == sp && dst_l.deref_count.zero?
           cur_top = dst_l.evaluate(eval_dict)
           stack[cur_top] = registers[src]
-        elsif !global_var?(dst_l)
-          raise_unsupported('str', src, dst)
+        else
+          # Unlike the stack case, don't know where to save the value.
+          # Simply add a constraint.
+          add_writable(dst_l)
         end
 
         index = Integer(index)
@@ -149,10 +151,18 @@ module OneGadget
       end
 
       # Override
-      def global_var?(obj)
-        str = obj.to_s
-        # TODO: check if this assumption usually correct
-        (%w[x19 x20 x21] << libc_base.obj).any? { |r| str.include?(r) }
+      # def global_var?(obj)
+      #   str = obj.is_a?(OneGadget::Emulators::Lambda) ? obj.obj.to_s : obj.to_s
+      #   # TODO: check if this assumption usually correct
+      #   (%w[x19 x20 x21] << libc_base.obj).any? { |r| str.include?(r) }
+      # end
+
+      def add_writable(lmda)
+        # XXX: Better way is check LOAD segment of the libc ELF.
+        # XXX: Should also checks deref_count, but sometimes [[$base+xx]] is also writable..
+        return if lmda.obj == libc_base.obj
+
+        @constraints << [:writable, lmda]
       end
 
       class << self

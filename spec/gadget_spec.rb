@@ -4,23 +4,36 @@ require 'one_gadget/gadget'
 require 'one_gadget/helper'
 
 describe OneGadget::Gadget do
-  before(:all) do
-    @build_id = 'fake_id'
-    described_class.add(@build_id, 0x1234, constraints: ['[rsp+0x30] == NULL', 'rax == 0'],
-                                           effect: 'execve("/bin/sh", rsp+0x30, rax)')
-  end
-
-  after(:all) do
-    OneGadget::Gadget::ClassMethods::BUILDS.delete(@build_id)
-  end
-
-  it 'inspect' do
-    expect(described_class.builds(@build_id).map(&:inspect).join).to eq <<-EOS
-0x1234	execve("/bin/sh", rsp+0x30, rax)
+  context 'inspect' do
+    it 'simple' do
+      gadget = OneGadget::Gadget::Gadget.new(0x1234, constraints: ['[rsp+0x30] == NULL', 'rax == 0'],
+                                                     effect: 'execve("/bin/sh", rsp+0x30, rax)')
+      expect(gadget.inspect).to eq <<-EOS
+0x1234 execve("/bin/sh", rsp+0x30, rax)
 constraints:
   [rsp+0x30] == NULL
   rax == 0
-    EOS
+      EOS
+    end
+
+    it 'merge constraints' do
+      gadget = OneGadget::Gadget::Gadget.new(0x1234, constraints: ['writable: x3', 'rax == 0'],
+                                                     effect: 'execve("/bin/sh", rsp+0x30, rax)')
+      expect(gadget.inspect).to eq <<-EOS
+0x1234 execve("/bin/sh", rsp+0x30, rax)
+constraints:
+  address x3 is writable
+  rax == 0
+      EOS
+
+      gadget.constraints << 'writable: rbx+0x20'
+      expect(gadget.inspect).to eq <<-EOS
+0x1234 execve("/bin/sh", rsp+0x30, rax)
+constraints:
+  addresses x3, rbx+0x20 are writable
+  rax == 0
+      EOS
+    end
   end
 
   context 'score' do
@@ -28,38 +41,41 @@ constraints:
       OneGadget::Gadget::Gadget.new(0, constraints: cons)
     end
 
+    let(:eps) { 0.000001 }
+
     it 'empty' do
-      expect(new([]).score).to be_zero
+      expect(new([]).score).to be_within(eps).of 1.0
     end
 
     it 'level 1' do
-      expect(new(['[rsp+0x30] == NULL']).score).to be 1
-      expect(new(['[esp+0x34] == NULL']).score).to be 1
-      expect(new(['[rbp+0x30] == NULL']).score).to be 1
-      expect(new(['rax == NULL']).score).to be 1
-      expect(new(['x1 == NULL']).score).to be 1
-      expect(new(['[rsi] == NULL || rsi == NULL']).score).to be 1
-      expect(new(['ebx is the GOT address of libc']).score).to be 1
-      expect(new(['[rsi] == NULL || ebx is the GOT address of libc']).score).to be 1
+      expect(new(['[rsp+0x30] == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['[esp+0x34] == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['[rbp+0x30] == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['rax == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['x1 == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['[rsi] == NULL || rsi == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['ebx is the GOT address of libc']).score).to be_within(eps).of 0.9
+      expect(new(['[rsi] == NULL || ebx is the GOT address of libc']).score).to be_within(eps).of 0.9
     end
 
     it 'level 2' do
-      expect(new(['[[sp+0x38]] == NULL']).score).to be 2
-      expect(new(['[rax] == NULL']).score).to be 2
-      expect(new(['[rsi] == NULL']).score).to be 2
-      expect(new(['[x4+0xad0] == NULL']).score).to be 2
+      expect(new(['[[sp+0x38]] == NULL']).score).to be_within(eps).of 0.81
+      expect(new(['[rax] == NULL']).score).to be_within(eps).of 0.81
+      expect(new(['[rsi] == NULL']).score).to be_within(eps).of 0.81
+      expect(new(['[x4+0xad0] == NULL']).score).to be_within(eps).of 0.81
+      expect(new(['writable: x20+0x338']).score).to be_within(eps).of 0.81
     end
 
     it 'level 3' do
-      expect(new(['x4+0xad0 == NULL']).score).to be 3
-      expect(new(['[[x4+0xad0]] == NULL']).score).to be 3
+      expect(new(['[[x4+0xad0]] == NULL']).score).to be_within(eps).of 0.9**3
+      expect(new(['x4+0xad0 == NULL']).score).to be_within(eps).of 0.1
     end
 
     it 'more than one' do
       expect(new([
                    'rax == NULL',
                    'rbx+0x333 == NULL'
-                 ]).score).to be 4 # sum
+                 ]).score).to be_within(eps).of 0.9 * 0.1
     end
   end
 

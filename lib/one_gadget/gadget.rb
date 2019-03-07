@@ -29,10 +29,10 @@ module OneGadget
       # Show gadget in a pretty way.
       def inspect
         str = OneGadget::Helper.hex(offset)
-        str += effect ? "\t#{effect}\n" : "\n"
+        str += effect ? " #{effect}\n" : "\n"
         unless constraints.empty?
           str += "#{OneGadget::Helper.colorize('constraints')}:\n  "
-          str += constraints.join("\n  ")
+          str += merge_constraints.join("\n  ")
         end
         str.gsub!(/0x[\da-f]+/) { |s| OneGadget::Helper.colorize(s, sev: :integer) }
         OneGadget::ABI.all.each do |reg|
@@ -41,10 +41,10 @@ module OneGadget
         str + "\n"
       end
 
-      # @return [Integer]
-      #   The difficulty of constraints.
+      # @return [Float]
+      #   The success probability of the constraints.
       def score
-        @score ||= constraints.reduce(0) { |s, c| s + calculate_score(c) }
+        @score ||= constraints.reduce(1.0) { |s, c| s * calculate_score(c) }
       end
 
       private
@@ -54,11 +54,13 @@ module OneGadget
       # Identity: <REG><IMM>?
       # Identity: [<Identity>]
       # Expr: <REG> is the GOT address of libc
+      # Expr: writable: <Identity>
       # Expr: <Identity> == NULL
       # Expr: <Expr> || <Expr>
       def calculate_score(cons)
-        return cons.split(' || ').map(&method(:calculate_score)).min if cons.include?(' || ')
-        return 1 if cons.include?('GOT address')
+        return cons.split(' || ').map(&method(:calculate_score)).max if cons.include?(' || ')
+        return 0.9 if cons.include?('GOT address')
+        return 0.81 if cons.include?('writable')
 
         expr = cons.gsub(' == NULL', ' == 0')
         # raise Error::ArgumentError, cons unless expr.end_with?(' == 0')
@@ -67,13 +69,22 @@ module OneGadget
         # Thank God we are already able to parse this
         lmda = OneGadget::Emulators::Lambda.parse(identity)
         # raise Error::ArgumentError, cons unless OneGadget::ABI.all.include?(lmda.obj)
-        # rax == 0 is easy; rax + 0x10 == 0 is hard.
-        return lmda.immi.zero? ? 1 : 3 if lmda.deref_count.zero?
+        # rax == 0 is easy; rax + 0x10 == 0 is damn hard.
+        return lmda.immi.zero? ? 0.9 : 0.1 if lmda.deref_count.zero?
 
-        # Stack frame registers has difficulty 1
-        # when lmda.deref_count == 1
+        # [sp+xx] == NULL is easy.
         base = OneGadget::ABI.stack_register?(lmda.obj) ? 0 : 1
-        lmda.deref_count + base
+        0.9**(lmda.deref_count + base)
+      end
+
+      def merge_constraints
+        key = 'writable: '
+        w_cons, normal = constraints.partition { |c| c.start_with?(key) }
+        return normal if w_cons.empty?
+
+        w_cons.map! { |c| c[key.size..-1] }
+        ["address#{w_cons.size > 1 ? 'es' : ''} #{w_cons.join(', ')} #{w_cons.size > 1 ? 'are' : 'is'} writable"] +
+          normal
       end
     end
 
@@ -146,6 +157,8 @@ module OneGadget
       private
 
       def find_build(id)
+        return BUILDS[id] if BUILDS.key?(id)
+
         Dir.glob(File.join(BUILDS_PATH, "*-#{id}.rb")).each do |dic|
           require dic
         end

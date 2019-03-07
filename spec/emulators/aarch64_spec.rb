@@ -63,8 +63,8 @@ describe OneGadget::Emulators::AArch64 do
       expect(@processor.stack[0x100].to_s).to eq 'x2'
       expect(@processor.registers['sp'].to_s).to eq 'sp+0x100'
 
-      expect { @processor.process!('str x3, [x4]') }
-        .to raise_error(OneGadget::Error::UnsupportedInstructionArgumentError)
+      @processor.process('str x3, [x4]')
+      expect(@processor.constraints).to eq ['writable: x4']
     end
   end
 end

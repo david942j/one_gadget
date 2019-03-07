@@ -163,8 +163,8 @@ module OneGadget
         checker = {
           'sigprocmask' => {},
           '__close' => {},
-          'unsetenv' => { 0 => :global },
-          '__sigaction' => { 1 => :global, 2 => :zero? }
+          'unsetenv' => { 0 => :global_var? },
+          '__sigaction' => { 1 => :global_var?, 2 => :zero? }
         }
         func = checker.keys.find { |n| addr.include?(n) }
         return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }

@@ -30,7 +30,7 @@ module OneGadget
             gadgets << OneGadget::Gadget::Gadget.new(offset, options)
           end
           gadgets
-        end.flatten.compact
+        end.flatten
       end
 
       # Fetch candidates that end with call exec*.
@@ -84,7 +84,7 @@ module OneGadget
         # arg[2] == NULL || [arg[2]] == NULL || arg[2] == envp
         arg1 = processor.argument(1).to_s
         arg2 = processor.argument(2).to_s
-        cons = []
+        cons = processor.constraints
         cons << check_execve_arg(processor, arg1)
         return nil unless cons.all?
 
@@ -135,8 +135,9 @@ module OneGadget
         return nil if global_var?(arg) # we don't want base-related constraints
 
         args << arg
+        cons = processor.constraints + ["#{arg} == NULL"]
         # now arg is the constraint.
-        { constraints: ["#{arg} == NULL"], effect: %(execl("/bin/sh", #{args.join(', ')})) }
+        { constraints: cons, effect: %(execl("/bin/sh", #{args.join(', ')})) }
       end
 
       def global_var?(_str); raise NotImplementedError

@@ -38,13 +38,6 @@ The article introducing how I develop this tool can be found [on my blog](https:
 
 ## Usage
 
-Since OneGadget version 1.5.0,
-much more one-gadgets have been found.
-And gadgets become too many to show them all,
-they would be selected automatically according to the difficulty of constraints.
-Therefore, gadgets shown will be less than previous versions (before v1.5.0).
-But you can use option `--level 1` to show all gadgets found.
-
 ### Command Line Interface
 
 ```bash
@@ -65,115 +58,86 @@ $ one_gadget
 ```
 
 ```bash
-$ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
-# 0x45216	execve("/bin/sh", rsp+0x30, environ)
-# constraints:
-#   rax == NULL
-#
-# 0x4526a	execve("/bin/sh", rsp+0x30, environ)
-# constraints:
-#   [rsp+0x30] == NULL
-#
-# 0xef6c4	execve("/bin/sh", rsp+0x50, environ)
-# constraints:
-#   [rsp+0x50] == NULL
-#
-# 0xf0567	execve("/bin/sh", rsp+0x70, environ)
-# constraints:
-#   [rsp+0x70] == NULL
-
-$ one_gadget /lib32/libc.so.6
-# 0x3cbea	execve("/bin/sh", esp+0x34, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x34] == NULL
-#
-# 0x3cbec	execve("/bin/sh", esp+0x38, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x38] == NULL
-#
-# 0x3cbf0	execve("/bin/sh", esp+0x3c, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x3c] == NULL
-#
-# 0x3cbf7	execve("/bin/sh", esp+0x40, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x40] == NULL
-#
-# 0x6729f	execl("/bin/sh", eax)
-# constraints:
-#   esi is the GOT address of libc
-#   eax == NULL
-#
-# 0x672a0	execl("/bin/sh", [esp])
-# constraints:
-#   esi is the GOT address of libc
-#   [esp] == NULL
-#
-# 0x13573e	execl("/bin/sh", eax)
-# constraints:
-#   ebx is the GOT address of libc
-#   eax == NULL
-#
-# 0x13573f	execl("/bin/sh", [esp])
-# constraints:
-#   ebx is the GOT address of libc
-#   [esp] == NULL
-
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6
-# 0x4f2c5	execve("/bin/sh", rsp+0x40, environ)
+# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
 # constraints:
 #   rcx == NULL
 #
-# 0x4f322	execve("/bin/sh", rsp+0x40, environ)
+# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
 # constraints:
 #   [rsp+0x40] == NULL
 #
-# 0x10a38c	execve("/bin/sh", rsp+0x70, environ)
+# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
 # constraints:
 #   [rsp+0x70] == NULL
 
 ```
-#### Show All Gadgets
+![x86_64](https://github.com/david942j/one_gadget/blob/master/examples/x86_64.png?raw=true)
 
+#### Given BuildID
 ```bash
-$ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
-# 0x4f2c5	execve("/bin/sh", rsp+0x40, environ)
+$ one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d
+# 0x45526 execve("/bin/sh", rsp+0x30, environ)
 # constraints:
-#   rcx == NULL
+#   rax == NULL
 #
-# 0x4f322	execve("/bin/sh", rsp+0x40, environ)
+# 0x4557a execve("/bin/sh", rsp+0x30, environ)
+# constraints:
+#   [rsp+0x30] == NULL
+#
+# 0xf1651 execve("/bin/sh", rsp+0x40, environ)
 # constraints:
 #   [rsp+0x40] == NULL
 #
-# 0xe569f	execve("/bin/sh", r14, r12)
+# 0xf24cb execve("/bin/sh", rsp+0x60, environ)
+# constraints:
+#   [rsp+0x60] == NULL
+
+```
+![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
+
+#### Show All Gadgets
+
+Sometimes +one_gadget+ finds too many gadgets to show them in one screen,
+by default gadgets would be filtered automatically *according to the difficulty of constraints*.
+
+Use option `--level 1` to show all gadgets found instead of only those with higher probabilities.
+
+```bash
+$ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
+# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
+# constraints:
+#   rcx == NULL
+#
+# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
+# constraints:
+#   [rsp+0x40] == NULL
+#
+# 0xe569f execve("/bin/sh", r14, r12)
 # constraints:
 #   [r14] == NULL || r14 == NULL
 #   [r12] == NULL || r12 == NULL
 #
-# 0xe5858	execve("/bin/sh", [rbp-0x88], [rbp-0x70])
+# 0xe5858 execve("/bin/sh", [rbp-0x88], [rbp-0x70])
 # constraints:
 #   [[rbp-0x88]] == NULL || [rbp-0x88] == NULL
 #   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
 #
-# 0xe585f	execve("/bin/sh", r10, [rbp-0x70])
+# 0xe585f execve("/bin/sh", r10, [rbp-0x70])
 # constraints:
 #   [r10] == NULL || r10 == NULL
 #   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
 #
-# 0xe5863	execve("/bin/sh", r10, rdx)
+# 0xe5863 execve("/bin/sh", r10, rdx)
 # constraints:
 #   [r10] == NULL || r10 == NULL
 #   [rdx] == NULL || rdx == NULL
 #
-# 0x10a38c	execve("/bin/sh", rsp+0x70, environ)
+# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
 # constraints:
 #   [rsp+0x70] == NULL
 #
-# 0x10a398	execve("/bin/sh", rsi, [rax])
+# 0x10a398 execve("/bin/sh", rsi, [rax])
 # constraints:
 #   [rsi] == NULL || rsi == NULL
 #   [[rax]] == NULL || [rax] == NULL
@@ -182,25 +146,76 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
 
 #### Other Architectures
 
+##### i386
+```bash
+$ one_gadget /lib32/libc.so.6
+# 0x3cbea execve("/bin/sh", esp+0x34, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x34] == NULL
+#
+# 0x3cbec execve("/bin/sh", esp+0x38, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x38] == NULL
+#
+# 0x3cbf0 execve("/bin/sh", esp+0x3c, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x3c] == NULL
+#
+# 0x3cbf7 execve("/bin/sh", esp+0x40, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x40] == NULL
+#
+# 0x6729f execl("/bin/sh", eax)
+# constraints:
+#   esi is the GOT address of libc
+#   eax == NULL
+#
+# 0x672a0 execl("/bin/sh", [esp])
+# constraints:
+#   esi is the GOT address of libc
+#   [esp] == NULL
+#
+# 0x13573e execl("/bin/sh", eax)
+# constraints:
+#   ebx is the GOT address of libc
+#   eax == NULL
+#
+# 0x13573f execl("/bin/sh", [esp])
+# constraints:
+#   ebx is the GOT address of libc
+#   [esp] == NULL
+
+```
+![i386](https://github.com/david942j/one_gadget/blob/master/examples/i386.png?raw=true)
+
+##### AArch64
 ```bash
 $ one_gadget spec/data/aarch64-libc-2.27.so
-# 0x3f16c	execve("/bin/sh", sp+0x70, environ)
+# 0x3f160 execve("/bin/sh", sp+0x70, environ)
 # constraints:
+#   address x20+0x338 is writable
 #   x3 == NULL
 #
-# 0x3f184	execve("/bin/sh", sp+0x70, environ)
+# 0x3f184 execve("/bin/sh", sp+0x70, environ)
 # constraints:
+#   addresses x19+0x4, x20+0x338 are writable
 #   [sp+0x70] == NULL
 #
-# 0x3f1a8	execve("/bin/sh", x21, environ)
+# 0x3f1a8 execve("/bin/sh", x21, environ)
 # constraints:
+#   addresses x19+0x4, x20+0x338 are writable
 #   [x21] == NULL || x21 == NULL
 #
-# 0x63e90	execl("/bin/sh", x1)
+# 0x63e90 execl("/bin/sh", x1)
 # constraints:
 #   x1 == NULL
 
 ```
+![aarch64](https://github.com/david942j/one_gadget/blob/master/examples/aarch64.png?raw=true)
 
 #### Combine with Script
 Pass your exploit script as `one_gadget`'s arguments, it can
@@ -223,8 +238,8 @@ one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1)
 #=> [324293, 324386, 939679, 940120, 940127, 940131, 1090444, 1090456]
 
 # from build id
-one_gadget('60131540dadc6796cab33388349e6e4e68692053')
-#=> [283158, 283242, 980676, 984423]
+one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0')
+#=> [324293, 324386, 1090444]
 
 ```
 
@@ -235,21 +250,9 @@ def one_gadget(filename):
   return map(int, subprocess.check_output(['one_gadget', '--raw', filename]).split(' '))
 
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
-# [283942, 284026, 988753, 992459]
+#=> [324293, 324386, 1090444]
+
 ```
-
-## Screenshots
-
-### Search Gadgets in Glibc
-
-#### 64 bit
-![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file.png?raw=true)
-
-#### 32 bit
-![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file_32bit.png?raw=true)
-
-### Fetch Gadgets from Database
-![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
 
 ## Make OneGadget Better
 Any suggestion or feature request is welcome! Feel free to send a pull request.

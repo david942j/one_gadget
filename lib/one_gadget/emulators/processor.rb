@@ -19,6 +19,7 @@ module OneGadget
       def initialize(registers, sp)
         @registers = registers.map { |reg| [reg, to_lambda(reg)] }.to_h
         @sp = sp
+        @constraints = []
         @stack = Hash.new do |h, k|
           h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
             lmda.immi = k
@@ -75,6 +76,16 @@ module OneGadget
       def argument(_idx); raise NotImplementedError
       end
 
+      # @return [Array<String>]
+      #   Extra constraints found during execution.
+      def constraints
+        return [] if @constraints.empty?
+
+        # currently only ':writable' type
+        cons = @constraints.uniq { |_type, obj| obj.deref_count.zero? ? obj.obj.to_s : obj.to_s }
+        cons.map { |_type, obj| "writable: #{obj}" }.sort
+      end
+
       private
 
       def check_register!(reg)
@@ -83,7 +94,7 @@ module OneGadget
 
       def check_argument(idx, expect)
         case expect
-        when :global then global_var?(argument(idx))
+        when :global_var? then global_var?(argument(idx))
         when :zero? then argument(idx).is_a?(Integer) && argument(idx).zero?
         end
       end

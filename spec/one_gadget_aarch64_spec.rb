@@ -9,17 +9,17 @@ describe 'one_gadget_aarch64' do
     it 'libc-2.23' do
       path = data_path('aarch64-libc-2.23.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
-        .to eq [0x3d6d0, 0x3d6d8, 0x3d718, 0x60c1c, 0x60c20]
+        .to eq [0x3d6d0, 0x3d6dc, 0x3d718, 0x60c1c, 0x60c20]
     end
 
     it 'libc-2.24' do
       path = data_path('aarch64-libc-2.24.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3c930, 0x3c970]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3c934, 0x3c970]
     end
 
     it 'libc-2.27' do
       path = data_path('aarch64-libc-2.27.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f16c, 0x3f184, 0x3f1a8, 0x63e90]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f160, 0x3f184, 0x3f1a8, 0x63e90]
     end
   end
 
