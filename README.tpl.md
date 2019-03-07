@@ -52,10 +52,16 @@ SHELL_OUTPUT_OF(one_gadget)
 ```
 
 ```bash
-SHELL_OUTPUT_OF(one_gadget -b 60131540dadc6796cab33388349e6e4e68692053)
-SHELL_OUTPUT_OF(one_gadget /lib32/libc.so.6)
 SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6)
 ```
+![from file](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/x86_64.png?raw=true)
+
+#### Given BuildID
+```bash
+SHELL_OUTPUT_OF(one_gadget -b b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0)
+```
+![build id](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/from_build_id.png?raw=true)
+
 #### Show All Gadgets
 
 ```bash
@@ -64,6 +70,13 @@ SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1)
 
 #### Other Architectures
 
+##### i386
+```bash
+SHELL_OUTPUT_OF(one_gadget /lib32/libc.so.6)
+```
+![from file](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/from_file_32bit.png?raw=true)
+
+##### AArch64
 ```bash
 SHELL_OUTPUT_OF(one_gadget spec/data/aarch64-libc-2.27.so)
 ```
@@ -85,7 +98,7 @@ RUBY_OUTPUT_OF(OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6'))
 # or in shorter way
 RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1))
 # from build id
-RUBY_OUTPUT_OF(one_gadget('60131540dadc6796cab33388349e6e4e68692053'))
+RUBY_OUTPUT_OF(one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0'))
 ```
 
 ### To Python Lovers
@@ -97,19 +110,6 @@ def one_gadget(filename):
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
 # [283942, 284026, 988753, 992459]
 ```
-
-## Screenshots
-
-### Search Gadgets in Glibc
-
-#### 64 bit
-![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file.png?raw=true)
-
-#### 32 bit
-![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file_32bit.png?raw=true)
-
-### Fetch Gadgets from Database
-![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
 
 ## Make OneGadget Better
 Any suggestion or feature request is welcome! Feel free to send a pull request.

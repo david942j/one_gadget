@@ -42,7 +42,7 @@ module OneGadget
       end
 
       # @return [Float]
-      #   The success probability constraints.
+      #   The success probability of the constraints.
       def score
         @score ||= constraints.reduce(1.0) { |s, c| s * calculate_score(c) }
       end
@@ -157,6 +157,8 @@ module OneGadget
       private
 
       def find_build(id)
+        return BUILDS[id] if BUILDS.key?(id)
+
         Dir.glob(File.join(BUILDS_PATH, "*-#{id}.rb")).each do |dic|
           require dic
         end

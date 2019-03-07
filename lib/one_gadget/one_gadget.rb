@@ -34,7 +34,7 @@ module OneGadget
               from_file(OneGadget::Helper.abspath(file), force: force_file)
             end
       ret = refine_gadgets(ret, level)
-      ret.map!(&:offset) unless details
+      ret = ret.map(&:offset) unless details
       ret
     rescue OneGadget::Error::Error => e
       OneGadget::Logger.error("#{e.class.name.split('::').last}: #{e.message}")

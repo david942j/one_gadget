@@ -65,64 +65,6 @@ $ one_gadget
 ```
 
 ```bash
-$ one_gadget -b 60131540dadc6796cab33388349e6e4e68692053
-# 0x45216	execve("/bin/sh", rsp+0x30, environ)
-# constraints:
-#   rax == NULL
-#
-# 0x4526a	execve("/bin/sh", rsp+0x30, environ)
-# constraints:
-#   [rsp+0x30] == NULL
-#
-# 0xef6c4	execve("/bin/sh", rsp+0x50, environ)
-# constraints:
-#   [rsp+0x50] == NULL
-#
-# 0xf0567	execve("/bin/sh", rsp+0x70, environ)
-# constraints:
-#   [rsp+0x70] == NULL
-
-$ one_gadget /lib32/libc.so.6
-# 0x3cbea	execve("/bin/sh", esp+0x34, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x34] == NULL
-#
-# 0x3cbec	execve("/bin/sh", esp+0x38, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x38] == NULL
-#
-# 0x3cbf0	execve("/bin/sh", esp+0x3c, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x3c] == NULL
-#
-# 0x3cbf7	execve("/bin/sh", esp+0x40, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x40] == NULL
-#
-# 0x6729f	execl("/bin/sh", eax)
-# constraints:
-#   esi is the GOT address of libc
-#   eax == NULL
-#
-# 0x672a0	execl("/bin/sh", [esp])
-# constraints:
-#   esi is the GOT address of libc
-#   [esp] == NULL
-#
-# 0x13573e	execl("/bin/sh", eax)
-# constraints:
-#   ebx is the GOT address of libc
-#   eax == NULL
-#
-# 0x13573f	execl("/bin/sh", [esp])
-# constraints:
-#   ebx is the GOT address of libc
-#   [esp] == NULL
-
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6
 # 0x4f2c5	execve("/bin/sh", rsp+0x40, environ)
 # constraints:
@@ -137,6 +79,26 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6
 #   [rsp+0x70] == NULL
 
 ```
+![from file](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/from_file.png?raw=true)
+
+#### Given BuildID
+```bash
+$ one_gadget -b b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0
+# 0x4f2c5	execve("/bin/sh", rsp+0x40, environ)
+# constraints:
+#   rcx == NULL
+#
+# 0x4f322	execve("/bin/sh", rsp+0x40, environ)
+# constraints:
+#   [rsp+0x40] == NULL
+#
+# 0x10a38c	execve("/bin/sh", rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL
+
+```
+![build id](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/from_build_id.png?raw=true)
+
 #### Show All Gadgets
 
 ```bash
@@ -182,6 +144,53 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
 
 #### Other Architectures
 
+##### i386
+```bash
+$ one_gadget /lib32/libc.so.6
+# 0x3cbea	execve("/bin/sh", esp+0x34, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x34] == NULL
+#
+# 0x3cbec	execve("/bin/sh", esp+0x38, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x38] == NULL
+#
+# 0x3cbf0	execve("/bin/sh", esp+0x3c, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x3c] == NULL
+#
+# 0x3cbf7	execve("/bin/sh", esp+0x40, environ)
+# constraints:
+#   esi is the GOT address of libc
+#   [esp+0x40] == NULL
+#
+# 0x6729f	execl("/bin/sh", eax)
+# constraints:
+#   esi is the GOT address of libc
+#   eax == NULL
+#
+# 0x672a0	execl("/bin/sh", [esp])
+# constraints:
+#   esi is the GOT address of libc
+#   [esp] == NULL
+#
+# 0x13573e	execl("/bin/sh", eax)
+# constraints:
+#   ebx is the GOT address of libc
+#   eax == NULL
+#
+# 0x13573f	execl("/bin/sh", [esp])
+# constraints:
+#   ebx is the GOT address of libc
+#   [esp] == NULL
+
+```
+![from file](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/from_file_32bit.png?raw=true)
+
+##### AArch64
 ```bash
 $ one_gadget spec/data/aarch64-libc-2.27.so
 # 0x3f160	execve("/bin/sh", sp+0x70, environ)
@@ -226,8 +235,8 @@ one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1)
 #=> [324293, 324386, 939679, 940120, 940127, 940131, 1090444, 1090456]
 
 # from build id
-one_gadget('60131540dadc6796cab33388349e6e4e68692053')
-#=> [283158, 283242, 980676, 984423]
+one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0')
+#=> [324293, 324386, 1090444]
 
 ```
 
@@ -240,19 +249,6 @@ def one_gadget(filename):
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
 # [283942, 284026, 988753, 992459]
 ```
-
-## Screenshots
-
-### Search Gadgets in Glibc
-
-#### 64 bit
-![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file.png?raw=true)
-
-#### 32 bit
-![from file](https://github.com/david942j/one_gadget/blob/master/examples/from_file_32bit.png?raw=true)
-
-### Fetch Gadgets from Database
-![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
 
 ## Make OneGadget Better
 Any suggestion or feature request is welcome! Feel free to send a pull request.
