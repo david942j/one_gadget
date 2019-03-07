@@ -54,7 +54,7 @@ SHELL_OUTPUT_OF(one_gadget)
 ```bash
 SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6)
 ```
-![from file](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/x86_64.png?raw=true)
+![x86_64](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/x86_64.png?raw=true)
 
 #### Given BuildID
 ```bash
@@ -74,12 +74,13 @@ SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1)
 ```bash
 SHELL_OUTPUT_OF(one_gadget /lib32/libc.so.6)
 ```
-![from file](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/from_file_32bit.png?raw=true)
+![i386](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/i386.png?raw=true)
 
 ##### AArch64
 ```bash
 SHELL_OUTPUT_OF(one_gadget spec/data/aarch64-libc-2.27.so)
 ```
+![aarch64](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/aarch64.png?raw=true)
 
 #### Combine with Script
 Pass your exploit script as `one_gadget`'s arguments, it can
