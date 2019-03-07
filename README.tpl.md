@@ -57,7 +57,7 @@ SHELL_OUTPUT_OF(one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d)
 
 #### Show All Gadgets
 
-Sometimes +one_gadget+ finds too many gadgets to show them in one screen,
+Sometimes `one_gadget` finds too many gadgets to show them in one screen,
 by default gadgets would be filtered automatically *according to the difficulty of constraints*.
 
 Use option `--level 1` to show all gadgets found instead of only those with higher probabilities.
