@@ -41,39 +41,41 @@ constraints:
       OneGadget::Gadget::Gadget.new(0, constraints: cons)
     end
 
+    let(:eps) { 0.000001 }
+
     it 'empty' do
-      expect(new([]).score).to be 1.0
+      expect(new([]).score).to be_within(eps).of 1.0
     end
 
     it 'level 1' do
-      expect(new(['[rsp+0x30] == NULL']).score).to be 0.9
-      expect(new(['[esp+0x34] == NULL']).score).to be 0.9
-      expect(new(['[rbp+0x30] == NULL']).score).to be 0.9
-      expect(new(['rax == NULL']).score).to be 0.9
-      expect(new(['x1 == NULL']).score).to be 0.9
-      expect(new(['[rsi] == NULL || rsi == NULL']).score).to be 0.9
-      expect(new(['ebx is the GOT address of libc']).score).to be 0.9
-      expect(new(['[rsi] == NULL || ebx is the GOT address of libc']).score).to be 0.9
+      expect(new(['[rsp+0x30] == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['[esp+0x34] == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['[rbp+0x30] == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['rax == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['x1 == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['[rsi] == NULL || rsi == NULL']).score).to be_within(eps).of 0.9
+      expect(new(['ebx is the GOT address of libc']).score).to be_within(eps).of 0.9
+      expect(new(['[rsi] == NULL || ebx is the GOT address of libc']).score).to be_within(eps).of 0.9
     end
 
     it 'level 2' do
-      expect(new(['[[sp+0x38]] == NULL']).score).to be 0.81
-      expect(new(['[rax] == NULL']).score).to be 0.81
-      expect(new(['[rsi] == NULL']).score).to be 0.81
-      expect(new(['[x4+0xad0] == NULL']).score).to be 0.81
-      expect(new(['writable: x20+0x338']).score).to be 0.81
+      expect(new(['[[sp+0x38]] == NULL']).score).to be_within(eps).of 0.81
+      expect(new(['[rax] == NULL']).score).to be_within(eps).of 0.81
+      expect(new(['[rsi] == NULL']).score).to be_within(eps).of 0.81
+      expect(new(['[x4+0xad0] == NULL']).score).to be_within(eps).of 0.81
+      expect(new(['writable: x20+0x338']).score).to be_within(eps).of 0.81
     end
 
     it 'level 3' do
-      expect(new(['[[x4+0xad0]] == NULL']).score).to be 0.9**3
-      expect(new(['x4+0xad0 == NULL']).score).to be 0.1
+      expect(new(['[[x4+0xad0]] == NULL']).score).to be_within(eps).of 0.9**3
+      expect(new(['x4+0xad0 == NULL']).score).to be_within(eps).of 0.1
     end
 
     it 'more than one' do
       expect(new([
                    'rax == NULL',
                    'rbx+0x333 == NULL'
-                 ]).score).to be 0.9 * 0.1
+                 ]).score).to be_within(eps).of 0.9 * 0.1
     end
   end
 
