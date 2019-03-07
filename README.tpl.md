@@ -47,13 +47,13 @@ SHELL_OUTPUT_OF(one_gadget)
 ```bash
 SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6)
 ```
-![x86_64](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/x86_64.png?raw=true)
+![x86_64](https://github.com/david942j/one_gadget/blob/master/examples/x86_64.png?raw=true)
 
 #### Given BuildID
 ```bash
 SHELL_OUTPUT_OF(one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d)
 ```
-![build id](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/from_build_id.png?raw=true)
+![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
 
 #### Show All Gadgets
 
@@ -72,13 +72,13 @@ SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1)
 ```bash
 SHELL_OUTPUT_OF(one_gadget /lib32/libc.so.6)
 ```
-![i386](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/i386.png?raw=true)
+![i386](https://github.com/david942j/one_gadget/blob/master/examples/i386.png?raw=true)
 
 ##### AArch64
 ```bash
 SHELL_OUTPUT_OF(one_gadget spec/data/aarch64-libc-2.27.so)
 ```
-![aarch64](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/aarch64.png?raw=true)
+![aarch64](https://github.com/david942j/one_gadget/blob/master/examples/aarch64.png?raw=true)
 
 #### Combine with Script
 Pass your exploit script as `one_gadget`'s arguments, it can
@@ -106,8 +106,7 @@ import subprocess
 def one_gadget(filename):
   return map(int, subprocess.check_output(['one_gadget', '--raw', filename]).split(' '))
 
-one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
-# [283942, 284026, 988753, 992459]
+RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6'))
 ```
 
 ## Make OneGadget Better
