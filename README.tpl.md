@@ -38,13 +38,6 @@ The article introducing how I develop this tool can be found [on my blog](https:
 
 ## Usage
 
-Since OneGadget version 1.5.0,
-much more one-gadgets have been found.
-And gadgets become too many to show them all,
-they would be selected automatically according to the difficulty of constraints.
-Therefore, gadgets shown will be less than previous versions (before v1.5.0).
-But you can use option `--level 1` to show all gadgets found.
-
 ### Command Line Interface
 
 ```bash
@@ -58,11 +51,16 @@ SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6)
 
 #### Given BuildID
 ```bash
-SHELL_OUTPUT_OF(one_gadget -b b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0)
+SHELL_OUTPUT_OF(one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d)
 ```
 ![build id](https://github.com/david942j/one_gadget/blob/enhance/constraint/examples/from_build_id.png?raw=true)
 
 #### Show All Gadgets
+
+Sometimes +one_gadget+ finds too many gadgets to show them in one screen,
+by default gadgets would be filtered automatically *according to the difficulty of constraints*.
+
+Use option `--level 1` to show all gadgets found instead of only those with higher probabilities.
 
 ```bash
 SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1)
