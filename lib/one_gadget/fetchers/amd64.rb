@@ -36,6 +36,8 @@ module OneGadget
           next nil if jmp_at.nil?
 
           cand = cand[0..jmp_at]
+          next if cand.any? { |c| c.include?(call_str) }
+
           jmp_addr = cand.last.scan(/jmp\s+([\da-f]+)\s/)[0][0].to_i(16)
           dump = `#{objdump_cmd(start: jmp_addr, stop: jmp_addr + 100)}|egrep '[0-9a-f]+:'`
           remain = dump.lines.map(&:strip).reject(&:empty?)
