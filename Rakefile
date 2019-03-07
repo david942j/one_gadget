@@ -14,10 +14,7 @@ RuboCop::RakeTask.new(:rubocop) do |task|
   task.options += ['--force-exclusion', 'lib/one_gadget/builds/*.rb']
 end
 
-RSpec::Core::RakeTask.new(:spec) do |task|
-  task.pattern = './spec/**/*_spec.rb'
-  task.rspec_opts = ['--color', '--require spec_helper', '--order rand', '--warning']
-end
+RSpec::Core::RakeTask.new(:spec)
 
 YARD::Rake::YardocTask.new(:doc) do |t|
   t.files = Dir['lib/**/*.rb'] - Dir['lib/one_gadget/builds/*.rb']
