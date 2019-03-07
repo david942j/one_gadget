@@ -54,11 +54,13 @@ module OneGadget
       # Identity: <REG><IMM>?
       # Identity: [<Identity>]
       # Expr: <REG> is the GOT address of libc
+      # Expr: address(es)? <Identity>(, <Identity>)* are|is writable
       # Expr: <Identity> == NULL
       # Expr: <Expr> || <Expr>
       def calculate_score(cons)
         return cons.split(' || ').map(&method(:calculate_score)).min if cons.include?(' || ')
         return 1 if cons.include?('GOT address')
+        return 1 if cons.include?('writable')
 
         expr = cons.gsub(' == NULL', ' == 0')
         # raise Error::ArgumentError, cons unless expr.end_with?(' == 0')
