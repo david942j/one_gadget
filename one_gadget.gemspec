@@ -24,6 +24,13 @@ Gem::Specification.new do |s|
   s.homepage      = 'https://github.com/david942j/one_gadget'
   s.executables   = ['one_gadget']
 
+  s.metadata = {
+    'bug_tracker_uri' => 'https://github.com/david942j/one_gadget/issues',
+    'documentation_uri' => 'https://www.rubydoc.info/github/david942j/one_gadget/master',
+    'homepage_uri' => 'https://github.com/david942j/one_gadget',
+    'source_code_uri' => 'https://github.com/david942j/one_gadget'
+  }
+
   s.required_ruby_version = '>= 2.1.0'
 
   s.add_runtime_dependency 'elftools', '>= 1.0.2', '< 1.2.0'
