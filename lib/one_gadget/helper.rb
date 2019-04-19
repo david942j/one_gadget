@@ -284,10 +284,7 @@ module OneGadget
       return false if bin.nil?
 
       arch = objdump_arch(arch)
-      archs = `#{::Shellwords.join([bin, '--help'])}`.lines.find { |c| c.include?('supported architectures') }
-      return false if archs.nil?
-
-      archs.split.include?(arch)
+      `#{::Shellwords.join([bin, '--help'])}`.lines.any? { |c| c.split.include?(arch) }
     end
 
     # Converts to the architecture name shown in objdump's +--help+ command.
