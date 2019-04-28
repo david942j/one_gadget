@@ -312,5 +312,14 @@ module OneGadget
         i386: 'i686-linux-gnu-objdump'
       }[arch]
     end
+    
+    # Returns the names of libc functions from the file's global offset table.
+    # @param [String] file
+    # @return [Array<String>]
+    def get_got_functions(file)
+      arch = architecture(file)
+      objdump_bin = find_objdump(arch)
+      `#{::Shellwords.join([objdump_bin, '-T', file])} | grep -iPo 'GLIBC_.+?\\s+\\K.*'`.split()
+    end
   end
 end
