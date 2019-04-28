@@ -321,5 +321,22 @@ module OneGadget
       objdump_bin = find_objdump(arch)
       `#{::Shellwords.join([objdump_bin, '-T', file])} | grep -iPo 'GLIBC_.+?\\s+\\K.*'`.split()
     end
+    
+    # Returns a dictionary that maps functions to their offsets.
+    # @param [String] file
+    # @param [Array<String>] functions
+    # @return [Hash{String => Integer}]
+    def get_offsets(file, functions)
+      arch = architecture(file)
+      objdump_bin = find_objdump(arch)
+      objdump_cmd = ::Shellwords.join([objdump_bin, '-T', file])
+      functions.map! { |f| '\\b' + f + '\\b' }
+      ret = {}
+      for line in `#{::Shellwords.join([objdump_bin, '-T', file])} | grep -iP '(#{functions.join('|')})'`.lines.map(&:chomp) do
+        tokens = line.split()
+        ret[tokens[-1]] = tokens[0].to_i(16)
+      end
+      return ret
+    end
   end
 end
