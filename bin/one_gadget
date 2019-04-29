@@ -93,7 +93,7 @@ if !options[:build_id] && ARGV[0] && options[:near]
               end
   function_offsets = OneGadget::Helper.get_offsets(ARGV[0], functions)
   function_offsets.each do |function, offset|
-    puts OneGadget::Helper.colorize("Gadgets near #{function}:", sev: :error)
+    puts OneGadget::Helper.colorize("Gadgets near #{function}(#{format('0x%x', offset)}):", sev: :error)
     gadgets.sort_by! { |gadget| (gadget.offset - offset).abs }
     if options[:raw]
       puts gadgets.map(&:offset).join(' ')
