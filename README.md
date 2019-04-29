@@ -47,6 +47,7 @@ $ one_gadget
 # Usage: one_gadget [file] [options]
 #     -b, --build-id BuildID           BuildID[sha1] of libc.
 #     -f, --[no-]force-file            Force search gadgets in file instead of build id first.
+#     -n, --near FUNCTIONS/FILE        Order gadgets by their distance to the given functions or to the GOT functions of the given file.
 #     -l, --level OUTPUT_LEVEL         The output level.
 #                                      OneGadget automatically selects gadgets with higher successful probability.
 #                                      Increase this level to ask OneGadget show more gadgets it found.
@@ -61,17 +62,17 @@ $ one_gadget
 
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6
-# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
+# 0x44adf execve("/bin/sh", rsp+0x30, environ)
 # constraints:
-#   rcx == NULL
+#   rax == NULL
 #
-# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
+# 0x44b33 execve("/bin/sh", rsp+0x30, environ)
 # constraints:
-#   [rsp+0x40] == NULL
+#   [rsp+0x30] == NULL
 #
-# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
+# 0xe5756 execve("/bin/sh", rsp+0x60, environ)
 # constraints:
-#   [rsp+0x70] == NULL
+#   [rsp+0x60] == NULL
 
 ```
 ![x86_64](https://github.com/david942j/one_gadget/blob/master/examples/x86_64.png?raw=true)
@@ -107,42 +108,37 @@ Use option `--level 1` to show all gadgets found instead of only those with high
 
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
-# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
+# 0x44adf execve("/bin/sh", rsp+0x30, environ)
 # constraints:
-#   rcx == NULL
+#   rax == NULL
 #
-# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
+# 0x44b33 execve("/bin/sh", rsp+0x30, environ)
 # constraints:
-#   [rsp+0x40] == NULL
+#   [rsp+0x30] == NULL
 #
-# 0xe569f execve("/bin/sh", r14, r12)
-# constraints:
-#   [r14] == NULL || r14 == NULL
-#   [r12] == NULL || r12 == NULL
-#
-# 0xe5858 execve("/bin/sh", [rbp-0x88], [rbp-0x70])
-# constraints:
-#   [[rbp-0x88]] == NULL || [rbp-0x88] == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-#
-# 0xe585f execve("/bin/sh", r10, [rbp-0x70])
-# constraints:
-#   [r10] == NULL || r10 == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-#
-# 0xe5863 execve("/bin/sh", r10, rdx)
-# constraints:
-#   [r10] == NULL || r10 == NULL
-#   [rdx] == NULL || rdx == NULL
-#
-# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
-# constraints:
-#   [rsp+0x70] == NULL
-#
-# 0x10a398 execve("/bin/sh", rsi, [rax])
+# 0x44b3f execve("/bin/sh", rsi, [rax])
 # constraints:
 #   [rsi] == NULL || rsi == NULL
 #   [[rax]] == NULL || [rax] == NULL
+#
+# 0xc740a execve("/bin/sh", r13, r12)
+# constraints:
+#   [r13] == NULL || r13 == NULL
+#   [r12] == NULL || r12 == NULL
+#
+# 0xc740d execve("/bin/sh", r13, rdx)
+# constraints:
+#   [r13] == NULL || r13 == NULL
+#   [rdx] == NULL || rdx == NULL
+#
+# 0xc7410 execve("/bin/sh", rsi, rdx)
+# constraints:
+#   [rsi] == NULL || rsi == NULL
+#   [rdx] == NULL || rdx == NULL
+#
+# 0xe5756 execve("/bin/sh", rsp+0x60, environ)
+# constraints:
+#   [rsp+0x60] == NULL
 
 ```
 
@@ -151,44 +147,34 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
 ##### i386
 ```bash
 $ one_gadget /lib32/libc.so.6
-# 0x3cbea execve("/bin/sh", esp+0x34, environ)
+# 0x3e866 execve("/bin/sh", esp+0x34, environ)
 # constraints:
 #   esi is the GOT address of libc
 #   [esp+0x34] == NULL
 #
-# 0x3cbec execve("/bin/sh", esp+0x38, environ)
+# 0x3e868 execve("/bin/sh", esp+0x38, environ)
 # constraints:
 #   esi is the GOT address of libc
 #   [esp+0x38] == NULL
 #
-# 0x3cbf0 execve("/bin/sh", esp+0x3c, environ)
+# 0x3e86c execve("/bin/sh", esp+0x3c, environ)
 # constraints:
 #   esi is the GOT address of libc
 #   [esp+0x3c] == NULL
 #
-# 0x3cbf7 execve("/bin/sh", esp+0x40, environ)
+# 0x3e873 execve("/bin/sh", esp+0x40, environ)
 # constraints:
 #   esi is the GOT address of libc
 #   [esp+0x40] == NULL
 #
-# 0x6729f execl("/bin/sh", eax)
+# 0x68efb execl("/bin/sh", eax)
 # constraints:
 #   esi is the GOT address of libc
 #   eax == NULL
 #
-# 0x672a0 execl("/bin/sh", [esp])
+# 0x68efc execl("/bin/sh", [esp])
 # constraints:
 #   esi is the GOT address of libc
-#   [esp] == NULL
-#
-# 0x13573e execl("/bin/sh", eax)
-# constraints:
-#   ebx is the GOT address of libc
-#   eax == NULL
-#
-# 0x13573f execl("/bin/sh", [esp])
-# constraints:
-#   ebx is the GOT address of libc
 #   [esp] == NULL
 
 ```
@@ -233,11 +219,11 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-#=> [324293, 324386, 1090444]
+#=> [281311, 281395, 939862]
 
 # or in shorter way
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1)
-#=> [324293, 324386, 939679, 940120, 940127, 940131, 1090444, 1090456]
+#=> [281311, 281395, 281407, 816138, 816141, 816144, 939862]
 
 # from build id
 one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0')
@@ -252,7 +238,7 @@ def one_gadget(filename):
   return map(int, subprocess.check_output(['one_gadget', '--raw', filename]).split(' '))
 
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
-#=> [324293, 324386, 1090444]
+#=> [281311, 281395, 939862]
 
 ```
 
