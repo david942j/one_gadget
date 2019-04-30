@@ -21,4 +21,41 @@ Usage: one_gadget [file] [options]
         --version                    Current gem version.
     EOS
   end
+
+  it 'near functions' do
+    file = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
+    expect(`env ruby -I#{@lib} #{@bin} -n wscanf,pwrite -l 1 -r #{file}`).to eq <<-EOS
+Gadgets near pwrite(0xd9b70):
+878577 878565 756280 258986 258902
+
+Gadgets near wscanf(0x6afe0):
+258986 258902 756280 878565 878577
+
+    EOS
+  end
+
+  it 'near file' do
+    bin_file = data_path('testNearFile.elf')
+    lib_file = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
+    expect(`env ruby -I#{@lib} #{@bin} -n #{bin_file} -l 1 -r #{lib_file}`).to eq <<-EOS
+Gadgets near exit(0x359d0):
+258902 258986 756280 878565 878577
+
+Gadgets near puts(0x68fe0):
+258986 258902 756280 878565 878577
+
+Gadgets near printf(0x4f1e0):
+258986 258902 756280 878565 878577
+
+Gadgets near strlen(0x80420):
+756280 258986 258902 878565 878577
+
+Gadgets near __cxa_finalize(0x35c70):
+258902 258986 756280 878565 878577
+
+Gadgets near __libc_start_main(0x201a0):
+258902 258986 756280 878565 878577
+
+    EOS
+  end
 end
