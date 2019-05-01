@@ -23,6 +23,7 @@ Usage: one_gadget [file] [options]
   end
 
   it 'near functions' do
+    skip 'Windows' unless RUBY_PLATFORM =~ /linux/
     file = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
     expect(`env ruby -I#{@lib} #{@bin} -n wscanf,pwrite -l 1 -r #{file}`).to eq <<-EOS
 Gadgets near pwrite(0xd9b70):
@@ -35,6 +36,7 @@ Gadgets near wscanf(0x6afe0):
   end
 
   it 'near file' do
+    skip 'Windows' unless RUBY_PLATFORM =~ /linux/
     bin_file = data_path('testNearFile.elf')
     lib_file = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
     expect(`env ruby -I#{@lib} #{@bin} -n #{bin_file} -l 1 -r #{lib_file}`).to eq <<-EOS
