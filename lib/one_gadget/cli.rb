@@ -62,8 +62,11 @@ module OneGadget
     # @return [Boolean]
     def handle_gadgets(gadgets, libc_file)
       return handle_script(gadgets, @options[:script]) if @options[:script]
-      return handle_near(libc_file, gadgets, @options[:near]) if libc_file && @options[:near]
 
+      if @options[:near]
+        return error("Libc file must be given when using --near option\n") unless libc_file
+        return handle_near(libc_file, gadgets, @options[:near]) if libc_file && @options[:near]
+      end
       display_gadgets(gadgets, @options[:raw])
       true
     end
@@ -204,6 +207,8 @@ module OneGadget
                     near.split(',').map(&:strip)
                   end
       function_offsets = OneGadget::Helper.function_offsets(libc_file, functions)
+      return error("No functions for processing\n") if function_offsets.empty?
+
       function_offsets.each do |function, offset|
         colored_offset = OneGadget::Helper.colored_hex(offset)
         OneGadget::Logger.warn("Gadgets near #{OneGadget::Helper.colorize(function)}(#{colored_offset}):\n")

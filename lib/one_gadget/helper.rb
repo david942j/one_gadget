@@ -343,7 +343,7 @@ module OneGadget
       ret = {}
       `#{objdump_cmd} | grep -iP '(#{functions.join('|')})'`.lines.map(&:chomp).each do |line|
         tokens = line.split
-        ret[tokens[-1]] = tokens[0].to_i(16)
+        ret[tokens.last] = tokens.first.to_i(16)
       end
       ret
     end

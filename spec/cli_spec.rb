@@ -147,5 +147,19 @@ constraints:
 
       EOS
     end
+
+    it 'empty' do
+      argv = %w[--near no_such_function] + [libc_file]
+      expect { hook_logger { described_class.work(argv) } }.to output(<<-EOS).to_stdout
+[OneGadget] No functions for processing
+      EOS
+    end
+
+    it 'file only' do
+      argv = b_param + %w[--near system]
+      expect { hook_logger { described_class.work(argv) } }.to output(<<-EOS).to_stdout
+[OneGadget] Libc file must be given when using --near option
+      EOS
+    end
   end
 end

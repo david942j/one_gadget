@@ -99,6 +99,90 @@ $ one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d
 ```
 ![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
 
+#### Gadgets Near Functions
+
+##### Why
+
+Consider this scenario when exploiting:
+1. Able to write on GOT (Global Offset Table) functions
+2. Libc base address is unknown
+
+In this scenario you can choose to write two low-byte on a GOT entry with one-gadget's two low-byte.
+If the function offset on GOT is close enough with the one-gadget,
+you will have at least 1/16 chance of success.
+
+##### Usage
+
+Reorder gadgets according to the distance of given functions.
+
+```bash
+$ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near exit,mkdir
+# [OneGadget] Gadgets near exit(0x43120):
+# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
+# constraints:
+#   rcx == NULL
+#
+# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
+# constraints:
+#   [rsp+0x40] == NULL
+#
+# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL
+#
+# [OneGadget] Gadgets near mkdir(0x10fbb0):
+# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL
+#
+# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
+# constraints:
+#   [rsp+0x40] == NULL
+#
+# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
+# constraints:
+#   rcx == NULL
+#
+
+```
+![near](https://github.com/david942j/one_gadget/blob/master/examples/near.png?raw=true)
+
+Regular expression is acceptable.
+```bash
+$ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near 'write.*' --raw
+# [OneGadget] Gadgets near writev(0x1166a0):
+# 1090444 324386 324293
+#
+# [OneGadget] Gadgets near write(0x110140):
+# 1090444 324386 324293
+#
+
+```
+
+Pass an ELF file as the argument, OneGadget takes all GOT functions for processing.
+```bash
+$ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near spec/data/test_near_file.elf --raw
+# [OneGadget] Gadgets near exit(0x43120):
+# 324293 324386 1090444
+#
+# [OneGadget] Gadgets near puts(0x809c0):
+# 324386 324293 1090444
+#
+# [OneGadget] Gadgets near printf(0x64e80):
+# 324386 324293 1090444
+#
+# [OneGadget] Gadgets near strlen(0x9dc70):
+# 324386 324293 1090444
+#
+# [OneGadget] Gadgets near __cxa_finalize(0x43520):
+# 324293 324386 1090444
+#
+# [OneGadget] Gadgets near __libc_start_main(0x21ab0):
+# 324293 324386 1090444
+#
+
+```
+
 #### Show All Gadgets
 
 Sometimes `one_gadget` finds too many gadgets to show them in one screen,

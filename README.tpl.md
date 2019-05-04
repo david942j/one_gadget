@@ -57,6 +57,37 @@ SHELL_OUTPUT_OF(one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d)
 ```
 ![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
 
+#### Gadgets Near Functions
+
+##### Why
+
+Consider this scenario when exploiting:
+1. Able to write on GOT (Global Offset Table) functions
+2. Libc base address is unknown
+
+In this scenario you can choose to write two low-byte on a GOT entry with one-gadget's two low-byte.
+If the function offset on GOT is close enough with the one-gadget,
+you will have at least 1/16 chance of success.
+
+##### Usage
+
+Reorder gadgets according to the distance of given functions.
+
+```bash
+SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near exit,mkdir)
+```
+![near](https://github.com/david942j/one_gadget/blob/master/examples/near.png?raw=true)
+
+Regular expression is acceptable.
+```bash
+SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near 'write.*' --raw)
+```
+
+Pass an ELF file as the argument, OneGadget will take all GOT functions for processing.
+```bash
+SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near spec/data/test_near_file.elf --raw)
+```
+
 #### Show All Gadgets
 
 Sometimes `one_gadget` finds too many gadgets to show them in one screen,
