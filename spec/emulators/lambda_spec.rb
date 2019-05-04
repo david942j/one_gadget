@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget/emulators/lambda'
 describe OneGadget::Emulators::Lambda do
   before(:each) do
@@ -52,5 +54,12 @@ describe OneGadget::Emulators::Lambda do
 
     # Nested []
     expect(OneGadget::Emulators::Lambda.parse('[[rsp+0x33]]').to_s).to eq '[[rsp+0x33]]'
+  end
+
+  it 'evaluate' do
+    l = described_class.parse('rax+0x30')
+    expect(l.evaluate('rax' => 2)).to be 50
+
+    expect { l.evaluate({}) }.to raise_error(OneGadget::Error::InstructionArgumentError, "Can't eval rax+0x30")
   end
 end

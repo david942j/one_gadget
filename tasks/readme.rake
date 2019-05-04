@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 desc 'To auto generate README.md from README.tpl'
 task :readme do
   next if ENV['CI']

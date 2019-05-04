@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 describe 'Binary' do
   before(:all) do
     @bin = File.join(__dir__, '..', 'bin', 'one_gadget')

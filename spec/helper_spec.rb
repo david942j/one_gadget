@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget/helper'
 
 describe OneGadget::Helper do

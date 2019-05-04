@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget/emulators/aarch64'
 require 'one_gadget/error'
 

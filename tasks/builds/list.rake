@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 namespace :builds do
   desc 'To auto generate the builds_list file'
   task :list do

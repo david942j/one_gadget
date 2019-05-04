@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 namespace :builds do
   desc 'To auto generate rb files into lib/builds/*.rb'
   task :generate, :pattern do |_t, args|
@@ -41,13 +43,13 @@ INFO
 build_id = File.basename(__FILE__, '.rb').split('-').last
 GADGETS
   EOS
-             .freeze
+
   GADGET_TEMPLATE = <<-EOS
 OneGadget::Gadget.add(build_id, OFFSET,
                       constraints: CONSTRAINTS,
                       effect: EFFECT)
   EOS
-                    .freeze
+
   def template(info, gadgets)
     info_str = info[:info].lines.map { |c| '# ' + c }.join
     gadgets_str = gadgets.map do |gadget|

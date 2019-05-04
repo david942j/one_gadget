@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'net/http'
 require 'openssl'
 require 'pathname'
@@ -125,6 +127,9 @@ module OneGadget
       "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"
     end
 
+    # Returns the hexified and colorized integer.
+    # @param [Integer] val
+    # @return [String]
     def colored_hex(val)
       colorize(hex(val), sev: :integer)
     end
@@ -204,7 +209,7 @@ module OneGadget
     rescue ELFTools::ELFError # not a valid ELF
       :invalid
     ensure
-      f.close if f
+      f&.close
     end
 
     # Present number in hex format.

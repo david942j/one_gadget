@@ -1,4 +1,4 @@
-lib = File.expand_path('../lib', __FILE__)
+lib = File.expand_path('lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 require 'date'
@@ -31,7 +31,7 @@ Gem::Specification.new do |s|
     'source_code_uri' => 'https://github.com/david942j/one_gadget'
   }
 
-  s.required_ruby_version = '>= 2.1.0'
+  s.required_ruby_version = '>= 2.3.0'
 
   s.add_runtime_dependency 'elftools', '>= 1.0.2', '< 1.2.0'
 

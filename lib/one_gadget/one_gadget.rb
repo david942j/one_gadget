@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget/error'
 require 'one_gadget/fetcher'
 require 'one_gadget/helper'
@@ -60,7 +62,7 @@ module OneGadget
     # Remove hard-to-reach-constrains gadgets according to level
     def refine_gadgets(gadgets, level)
       return [] if gadgets.empty?
-      return gadgets if level > 0 # currently only supports level > 0 or not
+      return gadgets if level.positive? # currently only supports level > 0 or not
 
       high, low = gadgets.partition { |g| g.score >= 0.2 }
       return take_until(low, 3) if high.empty?

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget/error'
 require 'one_gadget/helper'
 
@@ -26,7 +28,7 @@ module OneGadget
       def +(other)
         raise Error::InstructionArgumentError, "Expect other(#{other}) to be numeric." unless other.is_a?(Numeric)
 
-        if deref_count > 0
+        if deref_count.positive?
           ret = Lambda.new(self)
         else
           ret = Lambda.new(obj)
@@ -79,13 +81,19 @@ module OneGadget
         str
       end
 
-      # Eval the value of lambda.
-      # Only support those like +rsp+0x30+.
+      # Evaluates the value of lambda.
+      # Only supports +rsp+0x30+ form.
       # @param [Hash{String => Integer}] context
       #   The context.
       # @return [Integer] Result of evaluation.
+      # @example
+      #   l = Lambda.parse('rax+0x30')
+      #   l.eval(rax: 2)
+      #   #=> 50
       def evaluate(context)
-        raise Error::InstructionArgumentError, "Can't eval #{self}" if deref_count > 0 || (obj && !context.key?(obj))
+        if deref_count.positive? || (obj && !context.key?(obj))
+          raise Error::InstructionArgumentError, "Can't eval #{self}"
+        end
 
         context[obj] + immi
       end

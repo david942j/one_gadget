@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'elftools'
 
 require 'one_gadget/emulators/i386'

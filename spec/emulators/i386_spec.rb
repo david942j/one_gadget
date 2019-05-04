@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget/emulators/i386'
 
 describe OneGadget::Emulators::I386 do
