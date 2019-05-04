@@ -125,6 +125,10 @@ module OneGadget
       "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"
     end
 
+    def colored_hex(val)
+      colorize(hex(val), sev: :integer)
+    end
+
     # Fetch the latest release version's tag name.
     # @return [String] The tag name, in form +vX.X.X+.
     def latest_tag
@@ -311,6 +315,32 @@ module OneGadget
         amd64: 'x86_64-linux-gnu-objdump',
         i386: 'i686-linux-gnu-objdump'
       }[arch]
+    end
+
+    # Returns the names of functions from the file's global offset table.
+    # @param [String] file
+    # @return [Array<String>]
+    def got_functions(file)
+      arch = architecture(file)
+      objdump_bin = find_objdump(arch)
+      `#{::Shellwords.join([objdump_bin, '-T', file])} | grep -iPo 'GLIBC_.+?\\s+\\K.*'`.split
+    end
+
+    # Returns a dictionary that maps functions to their offsets.
+    # @param [String] file
+    # @param [Array<String>] functions
+    # @return [Hash{String => Integer}]
+    def function_offsets(file, functions)
+      arch = architecture(file)
+      objdump_bin = find_objdump(arch)
+      objdump_cmd = ::Shellwords.join([objdump_bin, '-T', file])
+      functions.map! { |f| '\\b' + f + '\\b' }
+      ret = {}
+      `#{objdump_cmd} | grep -iP '(#{functions.join('|')})'`.lines.map(&:chomp).each do |line|
+        tokens = line.split
+        ret[tokens[-1]] = tokens[0].to_i(16)
+      end
+      ret
     end
   end
 end

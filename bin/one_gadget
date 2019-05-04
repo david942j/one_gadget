@@ -17,6 +17,11 @@ parser = OptionParser.new do |opts|
     options[:force_file] = b
   end
 
+  opts.on('-n', '--near FUNCTIONS/FILE', 'Order gadgets by their distance to the given functions'\
+                                         ' or to the GOT functions of the given file.') do |n|
+    options[:near] = n
+  end
+
   opts.on('-l', '--level OUTPUT_LEVEL', Integer, 'The output level.',
           'OneGadget automatically selects gadgets with higher successful probability.',
           'Increase this level to ask OneGadget show more gadgets it found.',
@@ -74,8 +79,29 @@ end
 
 if options[:script]
   gadgets.map(&:offset).each do |offset|
-    OneGadget::Logger.info("Trying #{OneGadget::Helper.colorize(format('0x%x', offset), sev: :integer)}...\n")
+    OneGadget::Logger.info("Trying #{OneGadget::Helper.colored_hex(offset)}...\n")
     execute(options[:script], offset)
+  end
+  exit(0)
+end
+
+if !options[:build_id] && ARGV[0] && options[:near]
+  functions = if File.file?(options[:near]) && OneGadget::Helper.valid_elf_file?(options[:near])
+                OneGadget::Helper.got_functions(options[:near])
+              else
+                options[:near].split(',').map(&:strip)
+              end
+  function_offsets = OneGadget::Helper.function_offsets(ARGV[0], functions)
+  function_offsets.each do |function, offset|
+    colored_offset = OneGadget::Helper.colored_hex(offset)
+    OneGadget::Logger.warn("Gadgets near #{OneGadget::Helper.colorize(function)}(#{colored_offset}):\n")
+    gadgets.sort_by! { |gadget| (gadget.offset - offset).abs }
+    if options[:raw]
+      puts gadgets.map(&:offset).join(' ')
+    else
+      puts gadgets.map(&:inspect).join("\n")
+    end
+    puts "\n"
   end
   exit(0)
 end
