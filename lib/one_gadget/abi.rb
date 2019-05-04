@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module OneGadget
   # Defines the abi of different architectures.
   module ABI

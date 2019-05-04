@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget/emulators/amd64'
 
 describe OneGadget::Emulators::Amd64 do

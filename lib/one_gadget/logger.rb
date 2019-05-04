@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'logger'
 
 require 'one_gadget/helper'

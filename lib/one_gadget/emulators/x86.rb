@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget/emulators/instruction'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/emulators/processor'

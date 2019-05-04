@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget'
 
 describe 'one_gadget_i386' do

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'one_gadget/error'
 require 'one_gadget/fetchers/aarch64'
 require 'one_gadget/fetchers/amd64'

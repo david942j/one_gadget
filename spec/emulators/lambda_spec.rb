@@ -1,7 +1,9 @@
+# frozen_string_literal: true
+
 require 'one_gadget/emulators/lambda'
 describe OneGadget::Emulators::Lambda do
   before(:each) do
-    @rsp = OneGadget::Emulators::Lambda.new('rsp')
+    @rsp = described_class.new('rsp')
   end
 
   describe '+' do
@@ -11,7 +13,7 @@ describe OneGadget::Emulators::Lambda do
     end
 
     it 'mixed' do
-      rax = OneGadget::Emulators::Lambda.new('rax')
+      rax = described_class.new('rax')
       rax += 0x50
       expect(rax.to_s).to eq 'rax+0x50'
       rax += 0x50
@@ -35,22 +37,29 @@ describe OneGadget::Emulators::Lambda do
   end
 
   it 'parse' do
-    expect(OneGadget::Emulators::Lambda.parse('[rsp+0x50]').to_s).to eq '[rsp+0x50]'
+    expect(described_class.parse('[rsp+0x50]').to_s).to eq '[rsp+0x50]'
     # ARM form
-    expect(OneGadget::Emulators::Lambda.parse('[x0, 1160]').to_s).to eq '[x0+0x488]'
-    expect(OneGadget::Emulators::Lambda.parse('[x22, -104]').to_s).to eq '[x22-0x68]'
+    expect(described_class.parse('[x0, 1160]').to_s).to eq '[x0+0x488]'
+    expect(described_class.parse('[x22, -104]').to_s).to eq '[x22-0x68]'
     # test if OK with bang
-    expect(OneGadget::Emulators::Lambda.parse('[x2, -8]!').to_s).to eq '[x2-0x8]'
-    expect(OneGadget::Emulators::Lambda.parse('[rsp+80]').to_s).to eq '[rsp+0x50]'
-    expect(OneGadget::Emulators::Lambda.parse('esp').to_s).to eq 'esp'
-    expect(OneGadget::Emulators::Lambda.parse('esp-10').to_s).to eq 'esp-0xa'
-    expect(OneGadget::Emulators::Lambda.parse('123')).to be 123
-    expect(OneGadget::Emulators::Lambda.parse('0xabc123')).to be 0xabc123
+    expect(described_class.parse('[x2, -8]!').to_s).to eq '[x2-0x8]'
+    expect(described_class.parse('[rsp+80]').to_s).to eq '[rsp+0x50]'
+    expect(described_class.parse('esp').to_s).to eq 'esp'
+    expect(described_class.parse('esp-10').to_s).to eq 'esp-0xa'
+    expect(described_class.parse('123')).to be 123
+    expect(described_class.parse('0xabc123')).to be 0xabc123
 
-    predefined = { 'rsp' => OneGadget::Emulators::Lambda.new('rsp') + 0x10 }
-    expect(OneGadget::Emulators::Lambda.parse('rsp+0x20', predefined: predefined).to_s).to eq 'rsp+0x30'
+    predefined = { 'rsp' => described_class.new('rsp') + 0x10 }
+    expect(described_class.parse('rsp+0x20', predefined: predefined).to_s).to eq 'rsp+0x30'
 
     # Nested []
-    expect(OneGadget::Emulators::Lambda.parse('[[rsp+0x33]]').to_s).to eq '[[rsp+0x33]]'
+    expect(described_class.parse('[[rsp+0x33]]').to_s).to eq '[[rsp+0x33]]'
+  end
+
+  it 'evaluate' do
+    l = described_class.parse('rax+0x30')
+    expect(l.evaluate('rax' => 2)).to be 50
+
+    expect { l.evaluate({}) }.to raise_error(OneGadget::Error::InstructionArgumentError, "Can't eval rax+0x30")
   end
 end
