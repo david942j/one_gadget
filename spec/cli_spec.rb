@@ -59,6 +59,8 @@ constraints:
   end
 
   it 'file with raw' do
+    skip_unless_objdump
+
     expect { described_class.work(%w[--force --raw --level 1] + [libc_file]) }.to output(<<-EOS).to_stdout
 324293 324386 939679 940120 940127 940131 1090444 1090456
     EOS
