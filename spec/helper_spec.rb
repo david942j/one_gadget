@@ -43,4 +43,21 @@ describe OneGadget::Helper do
       expect(described_class.architecture(f.path)).to be :unknown
     end
   end
+
+  it 'got_function' do
+    skip_unless_objdump
+
+    file = data_path('test_near_file.elf')
+    expect(described_class.got_functions(file)).to eq %w[puts strlen printf __libc_start_main exit __cxa_finalize]
+  end
+
+  it 'function_offsets' do
+    skip_unless_objdump
+
+    result = {
+      'system' => 0x45390,
+      'printf' => 0x55800
+    }
+    expect(described_class.function_offsets(@libcpath, %w[system printf])).to eq result
+  end
 end

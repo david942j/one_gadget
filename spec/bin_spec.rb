@@ -22,24 +22,56 @@ Usage: one_gadget [file] [options]
     EOS
   end
 
-  it 'near functions' do
-    skip 'Windows' unless RUBY_PLATFORM =~ /linux/
-    file = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
-    expect(`env ruby -I#{@lib} #{@bin} -n wscanf,pwrite -l 1 -r #{file}`).to eq <<-EOS
+  context 'near' do
+    before do
+      skip_unless_objdump
+    end
+
+    it 'functions' do
+      file = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
+      expect(`env ruby -I#{@lib} #{@bin} -n system -l 1 #{file}`).to eq <<-EOS
+Gadgets near system(0x3f4d0):
+0x3f3aa execve("/bin/sh", rsp+0x30, environ)
+constraints:
+  [rsp+0x30] == NULL
+
+0x3f356 execve("/bin/sh", rsp+0x30, environ)
+constraints:
+  rax == NULL
+
+0xb8a38 execve("/bin/sh", r13, r12)
+constraints:
+  [r13] == NULL || r13 == NULL
+  [r12] == NULL || r12 == NULL
+
+0xd67e5 execve("/bin/sh", rsp+0x70, environ)
+constraints:
+  [rsp+0x70] == NULL
+
+0xd67f1 execve("/bin/sh", rsi, [rax])
+constraints:
+  [rsi] == NULL || rsi == NULL
+  [[rax]] == NULL || [rax] == NULL
+
+      EOS
+    end
+
+    it 'functions' do
+      file = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
+      expect(`env ruby -I#{@lib} #{@bin} -n wscanf,pwrite -l 1 -r #{file}`).to eq <<-EOS
 Gadgets near pwrite(0xd9b70):
 878577 878565 756280 258986 258902
 
 Gadgets near wscanf(0x6afe0):
 258986 258902 756280 878565 878577
 
-    EOS
-  end
+      EOS
+    end
 
-  it 'near file' do
-    skip 'Windows' unless RUBY_PLATFORM =~ /linux/
-    bin_file = data_path('testNearFile.elf')
-    lib_file = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
-    expect(`env ruby -I#{@lib} #{@bin} -n #{bin_file} -l 1 -r #{lib_file}`).to eq <<-EOS
+    it 'file' do
+      bin_file = data_path('test_near_file.elf')
+      lib_file = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
+      expect(`env ruby -I#{@lib} #{@bin} -n #{bin_file} -l 1 -r #{lib_file}`).to eq <<-EOS
 Gadgets near exit(0x359d0):
 258902 258986 756280 878565 878577
 
@@ -58,6 +90,7 @@ Gadgets near __cxa_finalize(0x35c70):
 Gadgets near __libc_start_main(0x201a0):
 258902 258986 756280 878565 878577
 
-    EOS
+      EOS
+    end
   end
 end

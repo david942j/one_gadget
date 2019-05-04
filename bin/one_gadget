@@ -87,11 +87,11 @@ end
 
 if !options[:build_id] && ARGV[0] && options[:near]
   functions = if File.file?(options[:near]) && OneGadget::Helper.valid_elf_file?(options[:near])
-                OneGadget::Helper.get_got_functions(options[:near])
+                OneGadget::Helper.got_functions(options[:near])
               else
                 options[:near].split(',').map(&:strip)
               end
-  function_offsets = OneGadget::Helper.get_offsets(ARGV[0], functions)
+  function_offsets = OneGadget::Helper.function_offsets(ARGV[0], functions)
   function_offsets.each do |function, offset|
     puts OneGadget::Helper.colorize("Gadgets near #{function}(#{format('0x%x', offset)}):", sev: :error)
     gadgets.sort_by! { |gadget| (gadget.offset - offset).abs }

@@ -313,10 +313,10 @@ module OneGadget
       }[arch]
     end
 
-    # Returns the names of libc functions from the file's global offset table.
+    # Returns the names of functions from the file's global offset table.
     # @param [String] file
     # @return [Array<String>]
-    def get_got_functions(file)
+    def got_functions(file)
       arch = architecture(file)
       objdump_bin = find_objdump(arch)
       `#{::Shellwords.join([objdump_bin, '-T', file])} | grep -iPo 'GLIBC_.+?\\s+\\K.*'`.split
@@ -326,7 +326,7 @@ module OneGadget
     # @param [String] file
     # @param [Array<String>] functions
     # @return [Hash{String => Integer}]
-    def get_offsets(file, functions)
+    def function_offsets(file, functions)
       arch = architecture(file)
       objdump_bin = find_objdump(arch)
       objdump_cmd = ::Shellwords.join([objdump_bin, '-T', file])
