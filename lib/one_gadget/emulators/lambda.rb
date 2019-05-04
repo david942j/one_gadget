@@ -88,7 +88,7 @@ module OneGadget
       # @return [Integer] Result of evaluation.
       # @example
       #   l = Lambda.parse('rax+0x30')
-      #   l.eval(rax: 2)
+      #   l.evaluate('rax' => 2)
       #   #=> 50
       def evaluate(context)
         if deref_count.positive? || (obj && !context.key?(obj))
