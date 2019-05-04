@@ -24,6 +24,11 @@ describe OneGadget::Helper do
     expect(described_class.colorize('123', sev: :integer)).to eq "\e[38;5;189m123\e[0m"
   end
 
+  it 'colorize' do
+    allow(described_class).to receive(:color_enabled?).and_return(true)
+    expect(described_class.colored_hex(-0x137)).to eq "\e[38;5;189m-0x137\e[0m"
+  end
+
   it 'url_request' do
     val = :val
     expect { hook_logger { val = described_class.url_request('oao') } }.to output(<<-EOS.strip).to_stdout

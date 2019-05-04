@@ -125,6 +125,10 @@ module OneGadget
       "#{color}#{str.sub(cc[:esc_m], color)}#{cc[:esc_m]}"
     end
 
+    def colored_hex(val)
+      colorize(hex(val), sev: :integer)
+    end
+
     # Fetch the latest release version's tag name.
     # @return [String] The tag name, in form +vX.X.X+.
     def latest_tag

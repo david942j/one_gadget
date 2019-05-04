@@ -79,7 +79,7 @@ end
 
 if options[:script]
   gadgets.map(&:offset).each do |offset|
-    OneGadget::Logger.info("Trying #{OneGadget::Helper.colorize(format('0x%x', offset), sev: :integer)}...\n")
+    OneGadget::Logger.info("Trying #{OneGadget::Helper.colored_hex(offset)}...\n")
     execute(options[:script], offset)
   end
   exit(0)
@@ -93,7 +93,8 @@ if !options[:build_id] && ARGV[0] && options[:near]
               end
   function_offsets = OneGadget::Helper.function_offsets(ARGV[0], functions)
   function_offsets.each do |function, offset|
-    puts OneGadget::Helper.colorize("Gadgets near #{function}(#{format('0x%x', offset)}):", sev: :error)
+    colored_offset = OneGadget::Helper.colored_hex(offset)
+    OneGadget::Logger.warn("Gadgets near #{OneGadget::Helper.colorize(function)}(#{colored_offset}):\n")
     gadgets.sort_by! { |gadget| (gadget.offset - offset).abs }
     if options[:raw]
       puts gadgets.map(&:offset).join(' ')
