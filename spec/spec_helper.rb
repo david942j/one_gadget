@@ -21,6 +21,10 @@ module Helpers
     yield
   end
 
+  def skip_on_windows
+    skip 'Cannot run on Windows' if /cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM
+  end
+
   def skip_unless_objdump
     skip 'binutils not installed' if OneGadget::Helper.which('objdump').nil?
   end
