@@ -7,26 +7,38 @@ require 'one_gadget/one_gadget'
 require 'one_gadget/version'
 
 module OneGadget
-  # Methods for command lint interface.
+  # Methods for command line interface.
   module CLI
     # Help message.
     USAGE = 'Usage: one_gadget <FILE|-b BuildID> [options]'
+    # Default options.
+    DEFAULT_OPTIONS = { raw: false, level: 0 }.freeze
 
     module_function
 
     # Main method of CLI.
     # @param [Array<String>] argv
     #   Command line arguments.
-    # @return [void]
+    # @return [Boolean]
+    #   Whether the command execute successfully.
     # @example
     #   CLI.work(%w[--help])
-    #   #=> # usage message
+    #   # usage message
+    #   #=> true
     #   CLI.work(%w[--version])
-    #   #=> # version message
+    #   # version message
+    #   #=> true
+    # @example
+    #   CLI.work([])
+    #   # usage message
+    #   #=> false
+    # @example
+    #   CLI.work(%w[-b b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0 -r])
+    #   # 324293 324386 1090444
+    #   #=> true
     def work(argv)
-      @options = { raw: false, level: 0 }
+      @options = DEFAULT_OPTIONS.dup
       parser.parse!(argv)
-      # handles --version
       return show("OneGadget Version #{OneGadget::VERSION}") if @options[:version]
       return info_build_id(@options[:info]) if @options[:info]
 
@@ -41,6 +53,14 @@ module OneGadget
                 else # libc_file
                   OneGadget.gadgets(file: libc_file, details: true, force_file: @options[:force_file], level: level)
                 end
+      handle_gadgets(gadgets, libc_file)
+    end
+
+    # Gadgets fetched, decides how to display them.
+    # @param [Array<OneGadget::Gadget::Gadget>] gadgets
+    # @param [String] libc_file
+    # @return [Boolean]
+    def handle_gadgets(gadgets, libc_file)
       return handle_script(gadgets, @options[:script]) if @options[:script]
       return handle_near(libc_file, gadgets, @options[:near]) if libc_file && @options[:near]
 
@@ -148,8 +168,10 @@ module OneGadget
       true
     end
 
+    # Write gadgets to stdout.
     # @param [Array<OneGadget::Gadget::Gadget>] gadgets
     # @param [Boolean] raw
+    #   In raw mode, only the offset of gadgets are printed.
     # @return [void]
     def display_gadgets(gadgets, raw)
       if raw
