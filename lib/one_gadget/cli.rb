@@ -12,7 +12,7 @@ module OneGadget
     # Help message.
     USAGE = 'Usage: one_gadget <FILE|-b BuildID> [options]'
     # Default options.
-    DEFAULT_OPTIONS = { raw: false, level: 0 }.freeze
+    DEFAULT_OPTIONS = { raw: false, force_file: false, level: 0 }.freeze
 
     module_function
 
@@ -56,24 +56,21 @@ module OneGadget
       handle_gadgets(gadgets, libc_file)
     end
 
-    # Gadgets fetched, decides how to display them.
+    # Decides how to display fetched gadgets according to options.
     # @param [Array<OneGadget::Gadget::Gadget>] gadgets
     # @param [String] libc_file
     # @return [Boolean]
     def handle_gadgets(gadgets, libc_file)
       return handle_script(gadgets, @options[:script]) if @options[:script]
+      return handle_near(libc_file, gadgets, @options[:near]) if @options[:near]
 
-      if @options[:near]
-        return error("Libc file must be given when using --near option\n") unless libc_file
-        return handle_near(libc_file, gadgets, @options[:near]) if libc_file && @options[:near]
-      end
       display_gadgets(gadgets, @options[:raw])
-      true
     end
 
-    # Display libc information given BuildID.
+    # Displays libc information given BuildID.
     # @param [String] id
     # @return [Boolean]
+    #   +false+ is returned if no information found.
     # @example
     #   CLI.info_build_id('b417c')
     #   # [OneGadget] Information of b417c:
@@ -109,8 +106,8 @@ module OneGadget
           @options[:build_id] = b
         end
 
-        opts.on('-f', '--[no-]force-file', 'Force search gadgets in file instead of build id first.') do |b|
-          @options[:force_file] = b
+        opts.on('-f', '--[no-]force-file', 'Force search gadgets in file instead of build id first.') do |f|
+          @options[:force_file] = f
         end
 
         opts.on('-l', '--level OUTPUT_LEVEL', Integer, 'The output level.',
@@ -130,8 +127,8 @@ module OneGadget
         end
 
         opts.on('-s', '--script exploit-script', 'Run exploit script with all possible gadgets.',
-                'The script will be run as \'exploit-script $offset\'.') do |script|
-          @options[:script] = script
+                'The script will be run as \'exploit-script $offset\'.') do |s|
+          @options[:script] = s
         end
 
         opts.on('--info BuildID', 'Show version information given BuildID.') do |b|
@@ -152,14 +149,14 @@ module OneGadget
       true
     end
 
-    # Forks and executes the command.
+    # Spawns and waits until the process end.
     # @param [String] cmd
     # @return [void]
     def execute(cmd)
       Process.wait(spawn(cmd))
     end
 
-    # Handle the --script feature.
+    # Handles the --script feature.
     # @param [Array<OneGadget::Gadget::Gadget>] gadgets
     # @param [String] script
     # @return [true]
@@ -171,20 +168,20 @@ module OneGadget
       true
     end
 
-    # Write gadgets to stdout.
+    # Writes gadgets to stdout.
     # @param [Array<OneGadget::Gadget::Gadget>] gadgets
     # @param [Boolean] raw
     #   In raw mode, only the offset of gadgets are printed.
-    # @return [void]
+    # @return [true]
     def display_gadgets(gadgets, raw)
       if raw
-        puts gadgets.map(&:offset).join(' ')
+        show(gadgets.map(&:offset).join(' '))
       else
-        puts gadgets.map(&:inspect).join("\n")
+        show(gadgets.map(&:inspect).join("\n"))
       end
     end
 
-    # Log error.
+    # Logs error.
     # @param [String] msg
     # @return [false]
     def error(msg)
@@ -200,7 +197,8 @@ module OneGadget
     #   - Use one comma without spaces to specify a list of functions: +printf,scanf,free+.
     #   - Path to an ELF file and take its GOT functions to process: +/bin/ls+
     def handle_near(libc_file, gadgets, near)
-      # TODO: show proper message for invalid +near+
+      return error("Libc file must be given when using --near option\n") unless libc_file
+
       functions = if File.file?(near) && OneGadget::Helper.valid_elf_file?(near)
                     OneGadget::Helper.got_functions(near)
                   else
@@ -213,7 +211,7 @@ module OneGadget
         colored_offset = OneGadget::Helper.colored_hex(offset)
         OneGadget::Logger.warn("Gadgets near #{OneGadget::Helper.colorize(function)}(#{colored_offset}):\n")
         display_gadgets(gadgets.sort_by { |gadget| (gadget.offset - offset).abs }, @options[:raw])
-        puts "\n"
+        show("\n")
       end
       true
     end

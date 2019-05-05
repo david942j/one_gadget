@@ -62,7 +62,7 @@ SHELL_OUTPUT_OF(one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d)
 ##### Why
 
 Consider this scenario when exploiting:
-1. Able to write on GOT (Global Offset Table) functions
+1. Able to write on GOT (Global Offset Table)
 2. Libc base address is unknown
 
 In this scenario you can choose to write two low-byte on a GOT entry with one-gadget's two low-byte.

@@ -104,7 +104,7 @@ $ one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d
 ##### Why
 
 Consider this scenario when exploiting:
-1. Able to write on GOT (Global Offset Table) functions
+1. Able to write on GOT (Global Offset Table)
 2. Libc base address is unknown
 
 In this scenario you can choose to write two low-byte on a GOT entry with one-gadget's two low-byte.
@@ -159,7 +159,7 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near 'write.*' --raw
 
 ```
 
-Pass an ELF file as the argument, OneGadget takes all GOT functions for processing.
+Pass an ELF file as the argument, OneGadget will take all GOT functions for processing.
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near spec/data/test_near_file.elf --raw
 # [OneGadget] Gadgets near exit(0x43120):
