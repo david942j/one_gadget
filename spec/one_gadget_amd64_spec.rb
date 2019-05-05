@@ -34,13 +34,13 @@ describe 'one_gadget_amd64' do
     end
 
     it 'not ELF' do
-      expect { hook_logger { OneGadget.gadgets(file: __FILE__) } }.to output(<<-EOS.strip).to_stdout
+      expect { hook_logger { OneGadget.gadgets(file: __FILE__) } }.to output(<<-EOS).to_stdout
 [OneGadget] ArgumentError: Not an ELF file, expected glibc as input
       EOS
     end
 
     it 'not glibc' do
-      expect { hook_logger { OneGadget.gadgets(file: '/bin/ls') } }.to output(<<-EOS.strip).to_stdout
+      expect { hook_logger { OneGadget.gadgets(file: '/bin/ls') } }.to output(<<-EOS).to_stdout
 [OneGadget] ArgumentError: File "/bin/ls" doesn't contain string "/bin/sh", not glibc?
       EOS
     end
@@ -61,7 +61,7 @@ describe 'one_gadget_amd64' do
     end
 
     it 'invalid' do
-      expect { hook_logger { OneGadget.gadgets(build_id: '^_^') } }.to output(<<-EOS.strip).to_stdout
+      expect { hook_logger { OneGadget.gadgets(build_id: '^_^') } }.to output(<<-EOS).to_stdout
 [OneGadget] ArgumentError: invalid BuildID format: "^_^"
       EOS
     end
