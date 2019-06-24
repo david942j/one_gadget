@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# Ubuntu 16.04
+# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6_2.23-0ubuntu10_i386/lib/i386-linux-gnu/libc-2.23.so
 # 
 # Intel 80386
 # 
