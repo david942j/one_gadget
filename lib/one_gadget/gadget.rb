@@ -63,6 +63,7 @@ module OneGadget
         return cons.split(' || ').map(&method(:calculate_score)).max if cons.include?(' || ')
         return 0.9 if cons.include?('GOT address')
         return 0.81 if cons.include?('writable')
+        return 0.9 if cons.include?(' & 0xf')
 
         expr = cons.gsub(' == NULL', ' == 0')
         # raise Error::ArgumentError, cons unless expr.end_with?(' == 0')

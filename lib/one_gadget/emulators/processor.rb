@@ -83,9 +83,15 @@ module OneGadget
       def constraints
         return [] if @constraints.empty?
 
-        # currently only ':writable' type
-        cons = @constraints.uniq { |_type, obj| obj.deref_count.zero? ? obj.obj.to_s : obj.to_s }
-        cons.map { |_type, obj| "writable: #{obj}" }.sort
+        # we have these types:
+        # * :writable
+        # * :raw
+        cons = @constraints.uniq do |type, obj|
+          next obj unless type == :writable
+
+          obj.deref_count.zero? ? obj.obj.to_s : obj.to_s
+        end
+        cons.map { |type, obj| type == :writable ? "writable: #{obj}" : obj }.sort
       end
 
       private

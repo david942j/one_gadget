@@ -70,9 +70,9 @@ module OneGadget
       # This instruction moves 128bits.
       def inst_movaps(dst, src)
         # XXX: here we only support `movaps [sp+*], xmm*`
-        # TODO: This need an extra constraint: sp & 0xf == 0
         src, dst = check_xmm_sp(src, dst) { raise_unsupported('movaps', dst, src) }
         off = dst.evaluate(eval_dict)
+        @constraints << [:raw, "#{sp} & 0xf == #{0x10 - off & 0xf}"]
         (128 / self.class.bits).times do |i|
           stack[off + i * size_t] = src[i]
         end

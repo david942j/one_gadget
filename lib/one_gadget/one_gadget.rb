@@ -59,7 +59,7 @@ module OneGadget
       OneGadget::Fetcher.from_build_id(build_id, remote: false)
     end
 
-    # Remove hard-to-reach-constrains gadgets according to level
+    # Remove hard-to-reach-constraints gadgets according to level
     def refine_gadgets(gadgets, level)
       return [] if gadgets.empty?
       return gadgets if level.positive? # currently only supports level > 0 or not
