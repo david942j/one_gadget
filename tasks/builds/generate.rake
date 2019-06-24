@@ -2,6 +2,7 @@
 
 namespace :builds do
   desc 'To auto generate rb files into lib/builds/*.rb'
+  # bundle exec rake "builds:generate[../libcdb/libc/**/*]"
   task :generate, :pattern do |_t, args|
     require 'elftools'
     require 'one_gadget'

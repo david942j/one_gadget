@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# spec/data/libc-2.27-b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0.so
+# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6_2.27-3ubuntu1_amd64/lib/x86_64-linux-gnu/libc-2.27.so
 # 
 # Advanced Micro Devices X86-64
 # 
@@ -15,7 +15,7 @@ require 'one_gadget/gadget'
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 324293,
-                      constraints: ["rcx == NULL"],
+                      constraints: ["rsp & 0xf == 0", "rcx == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x40, environ)")
 OneGadget::Gadget.add(build_id, 324386,
                       constraints: ["[rsp+0x40] == NULL"],

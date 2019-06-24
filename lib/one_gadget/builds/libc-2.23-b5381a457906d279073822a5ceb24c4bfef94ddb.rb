@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# Ubuntu 16.04
+# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6_2.23-0ubuntu10_amd64/lib/x86_64-linux-gnu/libc-2.23.so
 # 
 # Advanced Micro Devices X86-64
 # 
@@ -25,6 +25,12 @@ OneGadget::Gadget.add(build_id, 283158,
 OneGadget::Gadget.add(build_id, 283242,
                       constraints: ["[rsp+0x30] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
+OneGadget::Gadget.add(build_id, 839923,
+                      constraints: ["[rcx] == NULL || rcx == NULL", "[r12] == NULL || r12 == NULL"],
+                      effect: "execve(\"/bin/sh\", rcx, r12)")
+OneGadget::Gadget.add(build_id, 840136,
+                      constraints: ["[rax] == NULL || rax == NULL", "[r12] == NULL || r12 == NULL"],
+                      effect: "execve(\"/bin/sh\", rax, r12)")
 OneGadget::Gadget.add(build_id, 983716,
                       constraints: ["[rsp+0x50] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x50, environ)")
@@ -34,4 +40,7 @@ OneGadget::Gadget.add(build_id, 983728,
 OneGadget::Gadget.add(build_id, 987463,
                       constraints: ["[rsp+0x70] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x70, environ)")
+OneGadget::Gadget.add(build_id, 1009392,
+                      constraints: ["[rcx] == NULL || rcx == NULL", "[[rbp-0xf8]] == NULL || [rbp-0xf8] == NULL"],
+                      effect: "execve(\"/bin/sh\", rcx, [rbp-0xf8])")
 
