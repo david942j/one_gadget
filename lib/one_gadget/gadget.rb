@@ -58,16 +58,21 @@ module OneGadget
       # Expr: <REG> is the GOT address of libc
       # Expr: writable: <Identity>
       # Expr: <Identity> == NULL
+      # Expr: <REG> & 0xf == <IMM>
       # Expr: <Expr> || <Expr>
       def calculate_score(cons)
         return cons.split(' || ').map(&method(:calculate_score)).max if cons.include?(' || ')
-        return 0.9 if cons.include?('GOT address') || cons.include?(' & 0xf')
-        return 0.81 if cons.include?('writable')
 
-        expr = cons.gsub(' == NULL', ' == 0')
-        # raise Error::ArgumentError, cons unless expr.end_with?(' == 0')
+        case cons
+        when / & 0xf/ then 0.95
+        when /GOT address/ then 0.9
+        when /^writable/ then 0.81
+        when / == NULL$/ then calculate_null_score(cons)
+        end
+      end
 
-        identity = expr.slice(0...expr.rindex(' == 0'))
+      def calculate_null_score(cons)
+        identity = cons.slice(0...cons.rindex(' == NULL'))
         # Thank God we are already able to parse this
         lmda = OneGadget::Emulators::Lambda.parse(identity)
         # raise Error::ArgumentError, cons unless OneGadget::ABI.all.include?(lmda.obj)

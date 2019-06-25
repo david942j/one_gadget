@@ -47,26 +47,6 @@ constraints:
 constraints:
   [rsp+0x40] == NULL
 
-0xe569f execve("/bin/sh", r14, r12)
-constraints:
-  [r14] == NULL || r14 == NULL
-  [r12] == NULL || r12 == NULL
-
-0xe5858 execve("/bin/sh", [rbp-0x88], [rbp-0x70])
-constraints:
-  [[rbp-0x88]] == NULL || [rbp-0x88] == NULL
-  [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-
-0xe585f execve("/bin/sh", r10, [rbp-0x70])
-constraints:
-  [r10] == NULL || r10 == NULL
-  [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-
-0xe5863 execve("/bin/sh", r10, rdx)
-constraints:
-  [r10] == NULL || r10 == NULL
-  [rdx] == NULL || rdx == NULL
-
 0x10a38c execve("/bin/sh", rsp+0x70, environ)
 constraints:
   [rsp+0x70] == NULL
@@ -93,10 +73,6 @@ constraints:
     expect { hook_logger { described_class.work(b_param + %w[-s true]) } }.to output(<<-EOS).to_stdout
 [OneGadget] Trying 0x4f2c5...
 [OneGadget] Trying 0x4f322...
-[OneGadget] Trying 0xe569f...
-[OneGadget] Trying 0xe5858...
-[OneGadget] Trying 0xe585f...
-[OneGadget] Trying 0xe5863...
 [OneGadget] Trying 0x10a38c...
     EOS
   end

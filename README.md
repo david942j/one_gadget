@@ -71,26 +71,6 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6
 # constraints:
 #   [rsp+0x40] == NULL
 #
-# 0xe569f execve("/bin/sh", r14, r12)
-# constraints:
-#   [r14] == NULL || r14 == NULL
-#   [r12] == NULL || r12 == NULL
-#
-# 0xe5858 execve("/bin/sh", [rbp-0x88], [rbp-0x70])
-# constraints:
-#   [[rbp-0x88]] == NULL || [rbp-0x88] == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-#
-# 0xe585f execve("/bin/sh", r10, [rbp-0x70])
-# constraints:
-#   [r10] == NULL || r10 == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-#
-# 0xe5863 execve("/bin/sh", r10, rdx)
-# constraints:
-#   [r10] == NULL || r10 == NULL
-#   [rdx] == NULL || rdx == NULL
-#
 # 0x10a38c execve("/bin/sh", rsp+0x70, environ)
 # constraints:
 #   [rsp+0x70] == NULL
@@ -148,26 +128,6 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near exit,mkdir
 # constraints:
 #   [rsp+0x40] == NULL
 #
-# 0xe569f execve("/bin/sh", r14, r12)
-# constraints:
-#   [r14] == NULL || r14 == NULL
-#   [r12] == NULL || r12 == NULL
-#
-# 0xe5858 execve("/bin/sh", [rbp-0x88], [rbp-0x70])
-# constraints:
-#   [[rbp-0x88]] == NULL || [rbp-0x88] == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-#
-# 0xe585f execve("/bin/sh", r10, [rbp-0x70])
-# constraints:
-#   [r10] == NULL || r10 == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-#
-# 0xe5863 execve("/bin/sh", r10, rdx)
-# constraints:
-#   [r10] == NULL || r10 == NULL
-#   [rdx] == NULL || rdx == NULL
-#
 # 0x10a38c execve("/bin/sh", rsp+0x70, environ)
 # constraints:
 #   [rsp+0x70] == NULL
@@ -176,26 +136,6 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near exit,mkdir
 # 0x10a38c execve("/bin/sh", rsp+0x70, environ)
 # constraints:
 #   [rsp+0x70] == NULL
-#
-# 0xe5863 execve("/bin/sh", r10, rdx)
-# constraints:
-#   [r10] == NULL || r10 == NULL
-#   [rdx] == NULL || rdx == NULL
-#
-# 0xe585f execve("/bin/sh", r10, [rbp-0x70])
-# constraints:
-#   [r10] == NULL || r10 == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-#
-# 0xe5858 execve("/bin/sh", [rbp-0x88], [rbp-0x70])
-# constraints:
-#   [[rbp-0x88]] == NULL || [rbp-0x88] == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
-#
-# 0xe569f execve("/bin/sh", r14, r12)
-# constraints:
-#   [r14] == NULL || r14 == NULL
-#   [r12] == NULL || r12 == NULL
 #
 # 0x4f322 execve("/bin/sh", rsp+0x40, environ)
 # constraints:
@@ -214,10 +154,10 @@ Regular expression is acceptable.
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near 'write.*' --raw
 # [OneGadget] Gadgets near writev(0x1166a0):
-# 1090444 940131 940127 940120 939679 324386 324293
+# 1090444 324386 324293
 #
 # [OneGadget] Gadgets near write(0x110140):
-# 1090444 940131 940127 940120 939679 324386 324293
+# 1090444 324386 324293
 #
 
 ```
@@ -226,22 +166,22 @@ Pass an ELF file as the argument, OneGadget will take all GOT functions for proc
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near spec/data/test_near_file.elf --raw
 # [OneGadget] Gadgets near exit(0x43120):
-# 324293 324386 939679 940120 940127 940131 1090444
+# 324293 324386 1090444
 #
 # [OneGadget] Gadgets near puts(0x809c0):
-# 324386 324293 939679 940120 940127 940131 1090444
+# 324386 324293 1090444
 #
 # [OneGadget] Gadgets near printf(0x64e80):
-# 324386 324293 939679 940120 940127 940131 1090444
+# 324386 324293 1090444
 #
 # [OneGadget] Gadgets near strlen(0x9dc70):
-# 939679 940120 940127 940131 324386 324293 1090444
+# 324386 324293 1090444
 #
 # [OneGadget] Gadgets near __cxa_finalize(0x43520):
-# 324293 324386 939679 940120 940127 940131 1090444
+# 324293 324386 1090444
 #
 # [OneGadget] Gadgets near __libc_start_main(0x21ab0):
-# 324293 324386 939679 940120 940127 940131 1090444
+# 324293 324386 1090444
 #
 
 ```
@@ -382,7 +322,7 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-#=> [324293, 324386, 939679, 940120, 940127, 940131, 1090444]
+#=> [324293, 324386, 1090444]
 
 # or in shorter way
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1)
@@ -390,7 +330,7 @@ one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1)
 
 # from build id
 one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0')
-#=> [324293, 324386, 939679, 940120, 940127, 940131, 1090444]
+#=> [324293, 324386, 1090444]
 
 ```
 
@@ -401,7 +341,7 @@ def one_gadget(filename):
   return map(int, subprocess.check_output(['one_gadget', '--raw', filename]).split(' '))
 
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
-#=> [324293, 324386, 939679, 940120, 940127, 940131, 1090444]
+#=> [324293, 324386, 1090444]
 
 ```
 
