@@ -78,7 +78,7 @@ module OneGadget
         end
       end
 
-      # Mov *src to dst[:64]
+      # Move *src to dst[:64]
       def inst_movq(dst, src)
         # XXX: here we only support `movq xmm*, [sp+*]`
         dst, src = check_xmm_sp(dst, src) { raise_unsupported('movq', dst, src) }

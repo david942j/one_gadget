@@ -35,7 +35,7 @@ module OneGadget
         res = super
         return if res.nil?
 
-        # unshift got constraint into cons
+        # unshift GOT constraint into cons
         res[:constraints].unshift("#{@base_reg} is the GOT address of libc")
         res
       end

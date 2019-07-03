@@ -187,7 +187,7 @@ module OneGadget
       nil
     end
 
-    # Fetch the ELF archiecture of +file+.
+    # Fetch the ELF architecture of +file+.
     # @param [String] file The target ELF filename.
     # @return [Symbol]
     #   Currently supports amd64, i386, arm, aarch64, and mips.

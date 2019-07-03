@@ -26,7 +26,7 @@ describe OneGadget::Emulators::I386 do
       expect(@processor.stack[0].to_s).to eq 'esi-0x55f61'
       expect(@processor.stack[4].to_s).to eq 'esp+0x34'
       expect(@processor.stack[8].to_s).to eq '[[esi-0xb8]]'
-      # The defualt value of stack is a lambda
+      # The default value of stack is a lambda
       expect(@processor.stack[3].to_s).to eq '[esp+0x3]'
     end
 

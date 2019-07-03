@@ -38,20 +38,20 @@ module OneGadget
         ret
       end
 
-      # Implement substract with +Numeric+.
+      # Implement subtract with +Numeric+.
       # @param [Numeric] other Value to substract.
       # @return [Lambda] The result.
       def -(other)
         self.+(-other)
       end
 
-      # Increase dreference count with 1.
+      # Increase dereference count with 1.
       # @return [void]
       def deref!
         @deref_count += 1
       end
 
-      # Decrease dreference count with 1.
+      # Decrease dereference count with 1.
       # @return [self]
       # @raise [Error::InstrutionArgumentError] When this object cannot be referenced anymore.
       def ref!
@@ -102,7 +102,7 @@ module OneGadget
         # Target: parse string like <tt>[rsp+0x50]</tt> into a {Lambda} object.
         # @param [String] argument
         # @param [Hash{String => Lambda}] predefined
-        #   Predfined values.
+        #   Predefined values.
         # @return [OneGadget::Emulators::Lambda, Integer]
         #   If +argument+ contains number only, returns the value.
         #   Otherwise, returns a {Lambda} object.

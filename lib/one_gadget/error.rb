@@ -15,7 +15,7 @@ module OneGadget
     class UnsupportedInstructionError < UnsupportedError
     end
 
-    # Raises when arguments form of an instrution is invalid.
+    # Raises when arguments form of an instruction is invalid.
     class InstructionArgumentError < Error
     end
 
