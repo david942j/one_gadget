@@ -19,7 +19,7 @@ GEM
     parser (2.6.3.0)
       ast (~> 2.4.0)
     rainbow (3.0.0)
-    rake (12.3.3)
+    rake (13.0.0)
     rspec (3.8.0)
       rspec-core (~> 3.8.0)
       rspec-expectations (~> 3.8.0)
@@ -54,7 +54,7 @@ PLATFORMS
 
 DEPENDENCIES
   one_gadget!
-  rake (~> 12.3)
+  rake (~> 13.0)
   rspec (~> 3.7)
   rubocop (~> 0.59)
   simplecov (~> 0.17.0)

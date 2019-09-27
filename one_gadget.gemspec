@@ -35,7 +35,7 @@ Gem::Specification.new do |s|
 
   s.add_runtime_dependency 'elftools', '>= 1.0.2', '< 1.2.0'
 
-  s.add_development_dependency 'rake', '~> 12.3'
+  s.add_development_dependency 'rake', '~> 13.0'
   s.add_development_dependency 'rspec', '~> 3.7'
   s.add_development_dependency 'rubocop', '~> 0.59'
   s.add_development_dependency 'simplecov', '~> 0.17.0'
