@@ -56,6 +56,8 @@ $ one_gadget
 #     -s, --script exploit-script      Run exploit script with all possible gadgets.
 #                                      The script will be run as 'exploit-script $offset'.
 #         --info BuildID               Show version information given BuildID.
+#         --base BASE_ADDRESS          The base address of libc.
+#                                      Default: 0
 #         --version                    Current gem version.
 
 ```
