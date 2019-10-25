@@ -36,6 +36,23 @@ describe OneGadget::CLI do
     EOS
   end
 
+  it 'base' do
+    expect { hook_logger { described_class.work(b_param + %w[--base 0x7fff7f000000]) } }.to output(<<-EOS).to_stdout
+0x7fff7f04f2c5 execve("/bin/sh", rsp+0x40, environ)
+constraints:
+  rsp & 0xf == 0
+  rcx == NULL
+
+0x7fff7f04f322 execve("/bin/sh", rsp+0x40, environ)
+constraints:
+  [rsp+0x40] == NULL
+
+0x7fff7f10a38c execve("/bin/sh", rsp+0x70, environ)
+constraints:
+  [rsp+0x70] == NULL
+    EOS
+  end
+
   it 'build id' do
     expect { described_class.work(b_param) }.to output(<<-EOS).to_stdout
 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)

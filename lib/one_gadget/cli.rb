@@ -12,7 +12,7 @@ module OneGadget
     # Help message.
     USAGE = 'Usage: one_gadget <FILE|-b BuildID> [options]'
     # Default options.
-    DEFAULT_OPTIONS = { raw: false, force_file: false, level: 0 }.freeze
+    DEFAULT_OPTIONS = { raw: false, force_file: false, level: 0, base: 0 }.freeze
 
     module_function
 
@@ -53,6 +53,7 @@ module OneGadget
                 else # libc_file
                   OneGadget.gadgets(file: libc_file, details: true, force_file: @options[:force_file], level: level)
                 end
+      gadgets.each { |g| g.base = @options[:base] }
       handle_gadgets(gadgets, libc_file)
     end
 
@@ -136,6 +137,10 @@ module OneGadget
           @options[:info] = b
         end
 
+        opts.on('--base BASE_ADDRESS', Integer, 'The base address of libc.', 'Default: 0') do |b|
+          @options[:base] = b
+        end
+
         opts.on('--version', 'Current gem version.') do |v|
           @options[:version] = v
         end
@@ -176,7 +181,7 @@ module OneGadget
     # @return [true]
     def display_gadgets(gadgets, raw)
       if raw
-        show(gadgets.map(&:offset).join(' '))
+        show(gadgets.map(&:value).join(' '))
       else
         show(gadgets.map(&:inspect).join("\n"))
       end

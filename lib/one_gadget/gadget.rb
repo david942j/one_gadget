@@ -9,6 +9,8 @@ module OneGadget
   module Gadget
     # Information of a gadget.
     class Gadget
+      # @return [Integer] Base address of libc. Default: 0.
+      attr_accessor :base
       # @return [Integer] The gadget's address offset.
       attr_reader :offset
       # @return [Array<String>] The constraints need for this gadget.
@@ -23,6 +25,7 @@ module OneGadget
       # @example
       #   OneGadget::Gadget::Gadget.new(0x12345, constraints: ['rax == 0'])
       def initialize(offset, **options)
+        @base = 0
         @offset = offset
         @constraints = options[:constraints] || []
         @effect = options[:effect]
@@ -30,7 +33,7 @@ module OneGadget
 
       # Show gadget in a pretty way.
       def inspect
-        str = OneGadget::Helper.hex(offset)
+        str = OneGadget::Helper.hex(value)
         str += effect ? " #{effect}\n" : "\n"
         unless constraints.empty?
           str += "#{OneGadget::Helper.colorize('constraints')}:\n  "
@@ -41,6 +44,12 @@ module OneGadget
           str.gsub!(/([^\w])(#{reg})([^\w])/, '\1' + OneGadget::Helper.colorize('\2', sev: :reg) + '\3')
         end
         str + "\n"
+      end
+
+      # @return [Integer]
+      #   Returns +base+ plus +offset+.
+      def value
+        base + offset
       end
 
       # @return [Float]
