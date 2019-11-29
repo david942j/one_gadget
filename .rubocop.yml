@@ -8,7 +8,7 @@ AllCops:
 Layout/EndOfLine:
   EnforcedStyle: lf
 
-Layout/IndentHeredoc:
+Layout/HeredocIndentation:
   Enabled: false
 
 Metrics/AbcSize:
@@ -39,7 +39,7 @@ Metrics/PerceivedComplexity:
 Naming/HeredocDelimiterNaming:
   Enabled: false
 
-Naming/UncommunicativeMethodParamName:
+Naming/MethodParameterName:
   Enabled: false
 
 Style/FormatStringToken:
