@@ -11,6 +11,10 @@ Layout/EndOfLine:
 Layout/HeredocIndentation:
   Enabled: false
 
+Layout/LineLength:
+  Enabled: true
+  Max: 120
+
 Metrics/AbcSize:
   Enabled: false
 
@@ -22,10 +26,6 @@ Metrics/ClassLength:
 
 Metrics/CyclomaticComplexity:
   Enabled: false
-
-Metrics/LineLength:
-  Enabled: true
-  Max: 120
 
 Metrics/MethodLength:
   Enabled: false

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 lib = File.expand_path('lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
@@ -20,7 +22,7 @@ Gem::Specification.new do |s|
   s.license       = 'MIT'
   s.authors       = ['david942j']
   s.email         = ['david942j@gmail.com']
-  s.files         = Dir['lib/**/*.rb'] + Dir['bin/*'] + %w(README.md)
+  s.files         = Dir['lib/**/*.rb'] + Dir['bin/*'] + %w[README.md]
   s.homepage      = 'https://github.com/david942j/one_gadget'
   s.executables   = ['one_gadget']
 
