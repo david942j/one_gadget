@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'bundler/gem_tasks'
 require 'rspec/core/rake_task'
 require 'rubocop/rake_task'
@@ -7,7 +9,7 @@ import 'tasks/builds/generate.rake'
 import 'tasks/builds/list.rake'
 import 'tasks/readme.rake'
 
-task default: %i(readme rubocop spec builds:list)
+task default: %i[readme rubocop spec builds:list]
 
 RuboCop::RakeTask.new(:rubocop) do |task|
   task.patterns = ['lib/**/*.rb', 'spec/**/*.rb', 'bin/*', 'tasks/**/*.rake']

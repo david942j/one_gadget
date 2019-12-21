@@ -175,7 +175,7 @@ module OneGadget
       def find_build(id)
         return BUILDS[id] if BUILDS.key?(id)
 
-        Dir.glob(File.join(BUILDS_PATH, "*-#{id}.rb")).each do |dic|
+        Dir.glob(File.join(BUILDS_PATH, "*-#{id}.rb")).sort.each do |dic|
           require dic
         end
         BUILDS[id] if BUILDS.key?(id)
