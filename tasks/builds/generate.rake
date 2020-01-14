@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 namespace :builds do
-  desc 'To auto generate rb files into lib/builds/*.rb'
+  desc 'Generates lib/builds/*.rb from libc files'
   # bundle exec rake "builds:generate[../libcdb/libc/**/*]"
   task :generate, :pattern do |_t, args|
     require 'elftools'
