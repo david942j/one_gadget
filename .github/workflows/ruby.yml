@@ -18,7 +18,7 @@ jobs:
       with:
         ruby-version: 2.6.x
     - name: Install apt packages
-      run: sudo apt install -yy grep binutils-multiarch
+      run: sudo apt update && sudo apt install -yy grep binutils-multiarch
     - name: Build and test with Rake
       run: |
         gem install bundler
