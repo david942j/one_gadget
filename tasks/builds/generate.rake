@@ -77,7 +77,7 @@ OneGadget::Gadget.add(build_id, OFFSET,
     len = str[st..-1].index("\x00")
     return nil if len.nil?
 
-    fname = filename.sub('../libcdb', 'https://gitlab.com/libcdb/libcdb/blob/master')
+    fname = filename.sub('../libcdb', 'https://gitlab.com/david942j/libcdb/blob/master')
     {
       build_id: build_id,
       info: fname + "\n\n" + arch + "\n\n" + str[st, len]
