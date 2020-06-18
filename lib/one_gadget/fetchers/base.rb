@@ -45,8 +45,17 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&block)
-        cands = `#{objdump_cmd}|egrep '#{call_str}.*<exec[^+]*>$' -B 30`.split('--').map do |cand|
-          cand.lines.map(&:strip).reject(&:empty?).join("\n")
+        call_regexp = "#{call_str}.*<exec[^+]*>$"
+        cands = []
+        `#{objdump_cmd}|egrep '#{call_regexp}' -B 30`.split('--').each do |cand|
+          lines = cand.lines.map(&:strip).reject(&:empty?)
+          # split with call_regexp
+          loop do
+            idx = lines.index { |l| l =~ /#{call_regexp}/ }
+            break if idx.nil?
+
+            cands << lines.shift(idx + 1).join("\n")
+          end
         end
         # remove all jmps
         cands = slice_prefix(cands, &method(:branch?))
