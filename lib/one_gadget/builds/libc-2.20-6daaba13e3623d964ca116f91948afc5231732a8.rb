@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/glibc-2.20-5.fc21.i686/lib/libc-2.20.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/glibc-2.20-5.fc21.i686/lib/libc-2.20.so
 # 
 # Intel 80386
 # 

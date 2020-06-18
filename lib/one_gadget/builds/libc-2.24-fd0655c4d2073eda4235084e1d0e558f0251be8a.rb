@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/aarch64-linux-gnu-glibc-2.24-1-any.pkg.tar/usr/aarch64-linux-gnu/lib/libc-2.24.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/aarch64-linux-gnu-glibc-2.24-1-any.pkg.tar/usr/aarch64-linux-gnu/lib/libc-2.24.so
 # 
 # AArch64
 # 

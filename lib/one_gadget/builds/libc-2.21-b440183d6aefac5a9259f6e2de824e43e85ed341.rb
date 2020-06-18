@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/glibc-2.21-4-x86_64.pkg.tar/usr/lib/libc-2.21.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/glibc-2.21-4-x86_64.pkg.tar/usr/lib/libc-2.21.so
 # 
 # Advanced Micro Devices X86-64
 # 

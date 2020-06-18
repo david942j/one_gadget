@@ -14,13 +14,19 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 944878,
+                      constraints: ["[r15] == NULL || r15 == NULL", "[r12] == NULL || r12 == NULL"],
+                      effect: "execve(\"/bin/sh\", r15, r12)")
+OneGadget::Gadget.add(build_id, 944881,
+                      constraints: ["[r15] == NULL || r15 == NULL", "[rdx] == NULL || rdx == NULL"],
+                      effect: "execve(\"/bin/sh\", r15, rdx)")
+OneGadget::Gadget.add(build_id, 944884,
+                      constraints: ["[rsi] == NULL || rsi == NULL", "[rdx] == NULL || rdx == NULL"],
+                      effect: "execve(\"/bin/sh\", rsi, rdx)")
 OneGadget::Gadget.add(build_id, 945379,
                       constraints: ["[r10] == NULL || r10 == NULL", "[r12] == NULL || r12 == NULL"],
                       effect: "execve(\"/bin/sh\", r10, r12)")
 OneGadget::Gadget.add(build_id, 945382,
                       constraints: ["[r10] == NULL || r10 == NULL", "[rdx] == NULL || rdx == NULL"],
                       effect: "execve(\"/bin/sh\", r10, rdx)")
-OneGadget::Gadget.add(build_id, 945385,
-                      constraints: ["[rsi] == NULL || rsi == NULL", "[rdx] == NULL || rdx == NULL"],
-                      effect: "execve(\"/bin/sh\", rsi, rdx)")
 

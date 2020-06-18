@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc0.1-i386-2.23-2/lib32/libc-2.23.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/libc0.1-i386-2.23-2/lib32/libc-2.23.so
 # 
 # Intel 80386
 # 

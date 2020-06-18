@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6_2.19-0ubuntu6.9_amd64/lib/x86_64-linux-gnu/libc-2.19.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/libc6_2.19-0ubuntu6.9_amd64/lib/x86_64-linux-gnu/libc-2.19.so
 # 
 # Advanced Micro Devices X86-64
 # 

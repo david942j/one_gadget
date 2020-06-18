@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6-i386_2.19-0ubuntu6.9_amd64/lib32/libc-2.19.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/libc6-i386_2.19-0ubuntu6.9_amd64/lib32/libc-2.19.so
 # 
 # Intel 80386
 # 

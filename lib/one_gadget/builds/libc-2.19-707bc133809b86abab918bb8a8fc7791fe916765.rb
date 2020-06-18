@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/lib32-glibc-2.19-3-x86_64.pkg.tar/usr/lib32/libc-2.19.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/lib32-glibc-2.19-3-x86_64.pkg.tar/usr/lib32/libc-2.19.so
 # 
 # Intel 80386
 # 
