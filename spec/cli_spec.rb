@@ -20,7 +20,7 @@ describe OneGadget::CLI do
   it 'info' do
     expect { hook_logger { described_class.work(%w[--info b417c]) } }.to output(<<-EOS).to_stdout
 [OneGadget] Information of b417c:
-            https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6_2.27-3ubuntu1_amd64/lib/x86_64-linux-gnu/libc-2.27.so
+            https://gitlab.com/david942j/libcdb/blob/master/libc/libc6_2.27-3ubuntu1_amd64/lib/x86_64-linux-gnu/libc-2.27.so
 
             Advanced Micro Devices X86-64
 

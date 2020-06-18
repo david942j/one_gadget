@@ -97,7 +97,7 @@ constraints:
   context 'builds_info' do
     it 'normal' do
       expect(described_class.builds_info('58c735bc7b19b0aeb395cce70cf63bd62ac75e4a').join("\n")).to eq <<-EOS.strip
-https://gitlab.com/libcdb/libcdb/blob/master/libc/glibc-2.25-1-x86_64.pkg.tar/usr/lib/libc-2.25.so
+https://gitlab.com/david942j/libcdb/blob/master/libc/glibc-2.25-1-x86_64.pkg.tar/usr/lib/libc-2.25.so
 
 Advanced Micro Devices X86-64
 

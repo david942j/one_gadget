@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6_2.21-0ubuntu4.3_arm64/lib/aarch64-linux-gnu/libc-2.21.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/libc6_2.21-0ubuntu4.3_arm64/lib/aarch64-linux-gnu/libc-2.21.so
 # 
 # AArch64
 # 

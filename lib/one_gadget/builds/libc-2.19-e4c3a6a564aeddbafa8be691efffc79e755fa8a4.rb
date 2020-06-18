@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc0.1-i686-2.19-15/lib/i386-kfreebsd-gnu/i686/cmov/libc-2.19.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/libc0.1-i686-2.19-15/lib/i386-kfreebsd-gnu/i686/cmov/libc-2.19.so
 # 
 # Intel 80386
 # 

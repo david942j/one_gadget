@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6_2.29-0ubuntu2_amd64/lib/x86_64-linux-gnu/libc-2.29.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/libc6_2.29-0ubuntu2_amd64/lib/x86_64-linux-gnu/libc-2.29.so
 # 
 # Advanced Micro Devices X86-64
 # 
@@ -14,15 +14,21 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 926158,
+                      constraints: ["[r15] == NULL || r15 == NULL", "[r13] == NULL || r13 == NULL"],
+                      effect: "execve(\"/bin/sh\", r15, r13)")
+OneGadget::Gadget.add(build_id, 926161,
+                      constraints: ["[r15] == NULL || r15 == NULL", "[rdx] == NULL || rdx == NULL"],
+                      effect: "execve(\"/bin/sh\", r15, rdx)")
+OneGadget::Gadget.add(build_id, 926164,
+                      constraints: ["[rsi] == NULL || rsi == NULL", "[rdx] == NULL || rdx == NULL"],
+                      effect: "execve(\"/bin/sh\", rsi, rdx)")
 OneGadget::Gadget.add(build_id, 926591,
                       constraints: ["[rcx] == NULL || rcx == NULL", "[[rbp-0x70]] == NULL || [rbp-0x70] == NULL"],
                       effect: "execve(\"/bin/sh\", rcx, [rbp-0x70])")
 OneGadget::Gadget.add(build_id, 926595,
                       constraints: ["[rcx] == NULL || rcx == NULL", "[rdx] == NULL || rdx == NULL"],
                       effect: "execve(\"/bin/sh\", rcx, rdx)")
-OneGadget::Gadget.add(build_id, 926598,
-                      constraints: ["[rsi] == NULL || rsi == NULL", "[rdx] == NULL || rdx == NULL"],
-                      effect: "execve(\"/bin/sh\", rsi, rdx)")
 OneGadget::Gadget.add(build_id, 1076984,
                       constraints: ["[rsp+0x70] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x70, environ)")

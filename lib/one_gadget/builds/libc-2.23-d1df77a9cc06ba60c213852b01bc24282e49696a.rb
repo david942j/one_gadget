@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/libcdb/libcdb/blob/master/libc/libc6-amd64-2.23-0experimental0/lib64/libc-2.23.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/libc6-amd64-2.23-0experimental0/lib64/libc-2.23.so
 # 
 # Advanced Micro Devices X86-64
 # 
