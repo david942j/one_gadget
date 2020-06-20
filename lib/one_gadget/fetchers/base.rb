@@ -29,7 +29,7 @@ module OneGadget
             next if options.nil? # impossible be a gadget
 
             offset = offset_of(lines[i])
-            gadgets << OneGadget::Gadget::Gadget.new(offset, options)
+            gadgets << OneGadget::Gadget::Gadget.new(offset, **options)
           end
           gadgets
         end.flatten
