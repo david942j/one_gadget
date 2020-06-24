@@ -32,7 +32,7 @@ module OneGadget
       #   ...
       #   call execve
       def jmp_case_candidates
-        `#{objdump_cmd}|egrep 'rdi.*# #{bin_sh_hex}' -A 3`.split('--').map do |cand|
+        `#{@objdump.command}|egrep 'rdi.*# #{bin_sh_hex}' -A 3`.split('--').map do |cand|
           cand = cand.lines.map(&:strip).reject(&:empty?)
           jmp_at = cand.index { |c| c.include?('jmp') }
           next nil if jmp_at.nil?
@@ -41,7 +41,7 @@ module OneGadget
           next if cand.any? { |c| c.include?(call_str) }
 
           jmp_addr = cand.last.scan(/jmp\s+([\da-f]+)\s/)[0][0].to_i(16)
-          dump = `#{objdump_cmd(start: jmp_addr, stop: jmp_addr + 100)}|egrep '[0-9a-f]+:'`
+          dump = `#{@objdump.command(start: jmp_addr, stop: jmp_addr + 100)}|egrep '[0-9a-f]+:'`
           remain = dump.lines.map(&:strip).reject(&:empty?)
           remain = remain[0..remain.index { |r| r.match(/call.*<execve[^+]*>/) }]
           [cand + remain].join("\n")
