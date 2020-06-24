@@ -57,6 +57,7 @@ module OneGadget
           registers[dst] = src
         else
           # Just ignore strange case...
+          # TODO(david942j): #120
           return unless dst.include?(sp)
 
           dst = OneGadget::Emulators::Lambda.parse(dst, predefined: registers)

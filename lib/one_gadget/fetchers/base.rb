@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require 'shellwords'
+require 'one_gadget/error'
+require 'one_gadget/fetchers/objdump'
 
 module OneGadget
   module Fetcher
@@ -13,7 +14,9 @@ module OneGadget
       # @param [String] file Absolute path of target libc.
       def initialize(file)
         @file = file
-        @arch = self.class.name.split('::').last.downcase.to_sym
+        arch = self.class.name.split('::').last.downcase.to_sym
+        @objdump = Objdump.new(file, arch)
+        @objdump.extra_options = objdump_options
       end
 
       # Do find gadgets in glibc.
@@ -47,7 +50,7 @@ module OneGadget
       def candidates(&block)
         call_regexp = "#{call_str}.*<exec[^+]*>$"
         cands = []
-        `#{objdump_cmd}|egrep '#{call_regexp}' -B 30`.split('--').each do |cand|
+        `#{@objdump.command}|egrep '#{call_regexp}' -B 30`.split('--').each do |cand|
           lines = cand.lines.map(&:strip).reject(&:empty?)
           # split with call_regexp
           loop do
@@ -170,19 +173,6 @@ module OneGadget
       def emulator; raise NotImplementedError
       end
 
-      def objdump_cmd(start: nil, stop: nil)
-        cmd = [objdump_bin, '--no-show-raw-insn', '-w', '-d', *objdump_options, file]
-        cmd.push('--start-address', start) if start
-        cmd.push('--stop-address', stop) if stop
-        ::Shellwords.join(cmd)
-      end
-
-      def objdump_bin
-        OneGadget::Helper.find_objdump(@arch).tap do |bin|
-          install_objdump_guide! if bin.nil?
-        end
-      end
-
       def objdump_options
         []
       end
@@ -207,16 +197,6 @@ module OneGadget
 
       def offset_of(assembly)
         assembly.scan(/^([\da-f]+):/)[0][0].to_i(16)
-      end
-
-      def install_objdump_guide!
-        raise Error::UnsupportedArchitectureError, <<-EOS
-Objdump that supports architecture #{@arch.to_s.inspect} is not found!
-Please install the package 'binutils-multiarch' and try one_gadget again!
-
-For Ubuntu users:
-  $ [sudo] apt install binutils-multiarch
-        EOS
       end
     end
   end
