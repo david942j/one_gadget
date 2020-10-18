@@ -7,7 +7,7 @@ require 'one_gadget/helper'
 module OneGadget
   # A logger for internal usage.
   module Logger
-    @logger = ::Logger.new(STDOUT)
+    @logger = ::Logger.new($stdout)
     @logger.formatter = proc do |severity, _datetime, _progname, msg|
       prep = ' ' * 12
       message = msg.lines.map.with_index do |str, i|
@@ -15,11 +15,11 @@ module OneGadget
 
         str.strip.empty? ? str : prep + str
       end
-      color = case severity
-              when 'WARN' then :warn
-              when 'INFO' then :reg
-              when 'ERROR' then :error
-              end
+      color = {
+        'WARN' => :warn,
+        'INFO' => :reg,
+        'ERROR' => :error
+      }[severity]
       msg = +"[#{OneGadget::Helper.colorize('OneGadget', sev: color)}] #{message.join}"
       msg << "\n" unless msg.end_with?("\n")
       msg
@@ -40,7 +40,7 @@ module OneGadget
     def ask_update(msg: '')
       name = 'one_gadget'
       cmd = OneGadget::Helper.colorize("gem update #{name} && gem cleanup #{name}")
-      OneGadget::Logger.info(msg + "\n" + "Update with: $ #{cmd}" + "\n")
+      OneGadget::Logger.info("#{msg}\nUpdate with: $ #{cmd}\n")
     end
 
     %i[info warn error].each do |sym|

@@ -154,8 +154,8 @@ module OneGadget
     # @param [String] file The filename desired.
     # @return [Tempfile] The temp file be created.
     def download_build(file)
-      temp = Tempfile.new(['gadgets', file + '.rb'])
-      temp.write(url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', file + '.rb'))))
+      temp = Tempfile.new(['gadgets', "#{file}.rb"])
+      temp.write(url_request(url_of_file(File.join('lib', 'one_gadget', 'builds', "#{file}.rb"))))
       temp.tap(&:close)
     end
 
@@ -339,7 +339,7 @@ module OneGadget
       arch = architecture(file)
       objdump_bin = find_objdump(arch)
       objdump_cmd = ::Shellwords.join([objdump_bin, '-T', file])
-      functions.map! { |f| '\\b' + f + '\\b' }
+      functions.map! { |f| "\\b#{f}\\b" }
       ret = {}
       `#{objdump_cmd} | grep -iP '(#{functions.join('|')})'`.lines.map(&:chomp).each do |line|
         tokens = line.split

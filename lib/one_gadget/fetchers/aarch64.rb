@@ -15,7 +15,7 @@ module OneGadget
 
       # If str contains a branch instruction.
       def branch?(str)
-        %w[b b.hi b.gt b.eq b.le b.ls b.lt b.ne b.cs].any? { |f| str.include?(' ' + f + ' ') }
+        %w[b b.hi b.gt b.eq b.le b.ls b.lt b.ne b.cs].any? { |f| str.include?(" #{f} ") }
       end
 
       def call_str

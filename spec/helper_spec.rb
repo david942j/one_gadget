@@ -45,7 +45,7 @@ describe OneGadget::Helper do
     expect(described_class.architecture(data_path('aarch64-libc-2.24.so'))).to be :aarch64
     # for testing 'unknown'
     Tempfile.create(['tmp', '.elf']) do |f|
-      f.write("\x7fELF\x02\x01\x01" + "\x00" * 9 + "\x01" * 48)
+      f.write("\x7fELF\x02\x01\x01#{"\x00" * 9}#{"\x01" * 48}")
       f.close
       expect(described_class.architecture(f.path)).to be :unknown
     end

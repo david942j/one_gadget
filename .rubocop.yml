@@ -1,9 +1,12 @@
 AllCops:
-  TargetRubyVersion: 2.3
   DisplayCopNames: true
   DisplayStyleGuide: true
+  NewCops: enable
   Exclude:
     - lib/one_gadget/builds/*.rb
+
+Gemspec/RequiredRubyVersion:
+  Enabled: false
 
 Layout/EndOfLine:
   EnforcedStyle: lf
@@ -40,6 +43,9 @@ Naming/HeredocDelimiterNaming:
   Enabled: false
 
 Naming/MethodParameterName:
+  Enabled: false
+
+Style/AccessorGrouping:
   Enabled: false
 
 Style/FormatStringToken:
