@@ -1,6 +1,6 @@
 language: ruby
 cache: bundler
-dist: trusty
+dist: bionic
 os:
   - linux
 addons:
@@ -9,7 +9,6 @@ addons:
       - binutils-multiarch
       - grep
 rvm:
-  - 2.4
   - 2.5
   - 2.6
   - 2.7
