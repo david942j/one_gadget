@@ -14,6 +14,7 @@ module OneGadget
       attr_accessor :obj # @return [String, Lambda] The object currently related to.
       attr_accessor :immi # @return [Integer] The immidiate value currently added.
       attr_accessor :deref_count # @return [Integer] The times of dereference.
+
       # Instantiate a {Lambda} object.
       # @param [Lambda, String] obj
       def initialize(obj)
@@ -134,7 +135,7 @@ module OneGadget
           # 0. reg
           # 1. reg+imm / reg-imm
           # 2. reg, imm / reg, -imm
-          tokens = arg.gsub(/[\+\-]/, ' \0').scan(/[\+\-\w]+/)
+          tokens = arg.gsub(/[+\-]/, ' \0').scan(/[+\-\w]+/)
           return [tokens.first, 0] if tokens.size == 1
           raise Error::UnsupportedInstructionArgumentError, arg unless tokens.size == 2
           raise Error::UnsupportedInstructionArgumentError, arg unless OneGadget::Helper.integer?(tokens.last)

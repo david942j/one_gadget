@@ -10,6 +10,7 @@ module OneGadget
       # The absolute path of glibc.
       # @return [String] The filename.
       attr_reader :file
+
       # Instantiate a fetcher object.
       # @param [String] file Absolute path of target libc.
       def initialize(file)
@@ -177,10 +178,10 @@ module OneGadget
         []
       end
 
-      def slice_prefix(cands)
+      def slice_prefix(cands, &block)
         cands.map do |cand|
           lines = cand.lines
-          to_rm = lines[0...-1].rindex { |c| yield(c) }
+          to_rm = lines[0...-1].rindex(&block)
           lines = lines[to_rm + 1..-1] unless to_rm.nil?
           lines.join
         end
@@ -191,7 +192,7 @@ module OneGadget
       end
 
       def str_offset(str)
-        IO.binread(file).index(str + "\x00") ||
+        IO.binread(file).index("#{str}\x00") ||
           raise(Error::ArgumentError, "File #{file.inspect} doesn't contain string #{str.inspect}, not glibc?")
       end
 

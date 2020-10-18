@@ -1,5 +1,18 @@
 # frozen_string_literal: true
 
+TEMPLATE = <<-EOS
+require 'one_gadget/gadget'
+INFO
+build_id = File.basename(__FILE__, '.rb').split('-').last
+GADGETS
+EOS
+
+GADGET_TEMPLATE = <<-EOS
+OneGadget::Gadget.add(build_id, OFFSET,
+                      constraints: CONSTRAINTS,
+                      effect: EFFECT)
+EOS
+
 namespace :builds do
   desc 'Generates lib/builds/*.rb from libc files'
   # bundle exec rake "builds:generate[../libcdb/libc/**/*]"
@@ -10,7 +23,7 @@ namespace :builds do
     total = entries.size
     if total > 1
       print "Process #{total} files? (Y/n) "
-      s = STDIN.gets
+      s = $stdin.gets
       next if s.upcase[0] == 'N'
     end
     path = File.join(__dir__, '..', '..', 'lib', 'one_gadget', 'builds')
@@ -38,21 +51,8 @@ namespace :builds do
     puts "Total #{total} files, skipped #{@skipped} files, failed #{@failed} files"
   end
 
-  TEMPLATE = <<-EOS
-require 'one_gadget/gadget'
-INFO
-build_id = File.basename(__FILE__, '.rb').split('-').last
-GADGETS
-  EOS
-
-  GADGET_TEMPLATE = <<-EOS
-OneGadget::Gadget.add(build_id, OFFSET,
-                      constraints: CONSTRAINTS,
-                      effect: EFFECT)
-  EOS
-
   def template(info, gadgets)
-    info_str = info[:info].lines.map { |c| '# ' + c }.join
+    info_str = info[:info].lines.map { |c| "# #{c}" }.join
     gadgets_str = gadgets.map do |gadget|
       %i[offset constraints effect].reduce(GADGET_TEMPLATE) do |str, attr|
         str.sub(attr.to_s.upcase, gadget.__send__(attr).inspect)
@@ -80,7 +80,7 @@ OneGadget::Gadget.add(build_id, OFFSET,
     fname = filename.sub('../libcdb', 'https://gitlab.com/david942j/libcdb/blob/master')
     {
       build_id: build_id,
-      info: fname + "\n\n" + arch + "\n\n" + str[st, len]
+      info: "#{fname}\n\n#{arch}\n\n#{str[st, len]}"
     }
   rescue ELFTools::ELFError, EOFError # corrupted elf file
     nil
