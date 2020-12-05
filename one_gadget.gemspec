@@ -33,7 +33,7 @@ Gem::Specification.new do |s|
     'source_code_uri' => 'https://github.com/david942j/one_gadget'
   }
 
-  s.required_ruby_version = '>= 2.3'
+  s.required_ruby_version = '>= 2.4'
 
   s.add_runtime_dependency 'elftools', '>= 1.0.2', '< 1.2.0'
 
