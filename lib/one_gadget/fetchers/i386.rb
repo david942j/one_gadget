@@ -25,18 +25,19 @@ module OneGadget
       end
 
       def resolve(processor)
-        # use arg(0) to fetch the got base register
+        # use arg(0) to fetch the GOT base register
         # first check if argument 0 is '/bin/sh' to prevent error
         arg0 = processor.argument(0)
         return nil unless str_bin_sh?(arg0.to_s)
 
         @base_reg = arg0.deref.obj.to_s # this should be esi or ebx..
-        # now we can let parent to invoke global_var?
+        # now we can let parent invoke "global_var?"
         res = super
         return if res.nil?
 
         # unshift GOT constraint into cons
         res[:constraints].unshift("#{@base_reg} is the GOT address of libc")
+        res[:constraints].delete_if { |c| c.start_with?("writable: #{@base_reg}") }
         res
       end
 

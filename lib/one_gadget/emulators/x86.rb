@@ -58,7 +58,7 @@ module OneGadget
         else
           # Just ignore strange case...
           # TODO(david942j): #120
-          return unless dst.include?(sp)
+          return add_writable(dst) unless dst.include?(sp)
 
           dst = OneGadget::Emulators::Lambda.parse(dst, predefined: registers)
           return if dst.deref_count != 1 # should not happen
@@ -174,6 +174,14 @@ module OneGadget
 
         # unhandled case or checker's condition fails
         :fail
+      end
+
+      def add_writable(dst)
+        lmda = OneGadget::Emulators::Lambda.parse(dst, predefined: registers).ref!
+        # pc-relative addresses should be writable
+        return if lmda.obj == pc
+
+        @constraints << [:writable, lmda]
       end
 
       def to_lambda(reg)
