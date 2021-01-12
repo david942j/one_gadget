@@ -15,7 +15,7 @@ require 'one_gadget/gadget'
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 840475,
-                      constraints: ["ebx is the GOT address of libc", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL", "[esi] == NULL || esi == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "writable: ebp-0x20", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL", "[esi] == NULL || esi == NULL"],
                       effect: "execve(\"/bin/sh\", [ebp-0x2c], esi)")
 OneGadget::Gadget.add(build_id, 1343387,
                       constraints: ["ebp is the GOT address of libc", "eax == NULL"],
