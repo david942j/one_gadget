@@ -25,3 +25,9 @@ jobs:
       run: sudo apt update && sudo apt install -yy grep binutils-multiarch
     - name: Run tests
       run: bundle exec rake
+    - name: Publish code coverage
+      if: ${{ success() }}
+      uses: paambaati/codeclimate-action@v2.7.5
+      env:
+        CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+      coverageCommand: bundle exec rake spec
