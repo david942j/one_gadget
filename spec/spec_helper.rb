@@ -8,6 +8,7 @@ SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new(
 SimpleCov.start do
   add_filter '/spec/'
   add_filter '/lib/one_gadget/builds/'
+  enable_coverage :branch
 end
 
 # These requirements must be put after SimpleCov.start,
