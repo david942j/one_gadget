@@ -40,8 +40,9 @@ describe 'one_gadget_amd64' do
     end
 
     it 'not glibc' do
-      expect { hook_logger { OneGadget.gadgets(file: '/bin/ls') } }.to output(<<-EOS).to_stdout
-[OneGadget] ArgumentError: File "/bin/ls" doesn't contain string "/bin/sh", not glibc?
+      realpath = `which ls`.strip
+      expect { hook_logger { OneGadget.gadgets(file: realpath) } }.to output(<<-EOS).to_stdout
+[OneGadget] ArgumentError: File "#{realpath}" doesn't contain string "/bin/sh", not glibc?
       EOS
     end
   end
