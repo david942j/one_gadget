@@ -137,7 +137,7 @@ RUBY_OUTPUT_OF(one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0'))
 ```python
 import subprocess
 def one_gadget(filename):
-  return map(int, subprocess.check_output(['one_gadget', '--raw', filename]).split(' '))
+  return [int(i) for i in subprocess.check_output(['one_gadget', '--raw', filename]).decode().split(' ')]
 
 RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6'))
 ```
