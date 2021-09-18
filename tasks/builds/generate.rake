@@ -48,7 +48,8 @@ namespace :builds do
       File.open(filename, 'w') { |f| f.write(content) }
       puts 'done'
     end
-    puts "Total #{total} files, skipped #{@skipped} files, failed #{@failed} files"
+    puts "Total #{total} files, \e[32m#{total - @skipped - @failed}\e[0m succeeded, " \
+      "\e[33m#{@skipped}\e[0m skipped, and \e[31m#{@failed}\e[0m failed."
   end
 
   def template(info, gadgets)
