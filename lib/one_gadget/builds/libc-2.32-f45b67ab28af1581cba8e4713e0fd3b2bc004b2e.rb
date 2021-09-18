@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/david942j/libcdb/blob/master/libc/glibc-2.32-1-x86_64.pkg.tar/usr/lib/libc-2.32.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/glibc-2.32-4-x86_64.pkg.tar/usr/lib/libc-2.32.so
 # 
 # Advanced Micro Devices X86-64
 # 
@@ -23,4 +23,10 @@ OneGadget::Gadget.add(build_id, 842333,
 OneGadget::Gadget.add(build_id, 842336,
                       constraints: ["[rsi] == NULL || rsi == NULL", "[rdx] == NULL || rdx == NULL"],
                       effect: "execve(\"/bin/sh\", rsi, rdx)")
+OneGadget::Gadget.add(build_id, 842426,
+                      constraints: ["writable: rbp-0x38", "[rbp-0x40] == NULL || rbp-0x40 == NULL", "[r13] == NULL || r13 == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x40, r13)")
+OneGadget::Gadget.add(build_id, 842433,
+                      constraints: ["writable: rbp-0x40", "[rbp-0x40] == NULL || rbp-0x40 == NULL", "[r13] == NULL || r13 == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x40, r13)")
 

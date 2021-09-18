@@ -29,4 +29,19 @@ OneGadget::Gadget.add(build_id, 911621,
 OneGadget::Gadget.add(build_id, 911625,
                       constraints: ["writable: rbp-0x78", "[r10] == NULL || r10 == NULL", "[rdx] == NULL || rdx == NULL"],
                       effect: "execve(\"/bin/sh\", r10, rdx)")
+OneGadget::Gadget.add(build_id, 911734,
+                      constraints: ["writable: rbp-0x48", "[rbp-0x50] == NULL || rbp-0x50 == NULL", "[r12] == NULL || r12 == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x50, r12)")
+OneGadget::Gadget.add(build_id, 911741,
+                      constraints: ["writable: rbp-0x50", "[rbp-0x50] == NULL || rbp-0x50 == NULL", "[r12] == NULL || r12 == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x50, r12)")
+OneGadget::Gadget.add(build_id, 911803,
+                      constraints: ["writable: rbp-0x48", "[rbp-0x50] == NULL || rbp-0x50 == NULL", "[[rbp-0x70]] == NULL || [rbp-0x70] == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x50, [rbp-0x70])")
+OneGadget::Gadget.add(build_id, 911810,
+                      constraints: ["writable: rbp-0x50", "[rbp-0x50] == NULL || rbp-0x50 == NULL", "[[rbp-0x70]] == NULL || [rbp-0x70] == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x50, [rbp-0x70])")
+OneGadget::Gadget.add(build_id, 911814,
+                      constraints: ["writable: r10+0x10", "writable: rbp-0x50", "[r10] == NULL || r10 == NULL", "[[rbp-0x70]] == NULL || [rbp-0x70] == NULL"],
+                      effect: "execve(\"/bin/sh\", r10, [rbp-0x70])")
 

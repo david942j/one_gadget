@@ -1,5 +1,5 @@
 require 'one_gadget/gadget'
-# https://gitlab.com/david942j/libcdb/blob/master/libc/glibc-2.30-2-x86_64.pkg.tar/usr/lib/libc-2.30.so
+# https://gitlab.com/david942j/libcdb/blob/master/libc/glibc-2.30-3-x86_64.pkg.tar/usr/lib/libc-2.30.so
 # 
 # Advanced Micro Devices X86-64
 # 
@@ -23,6 +23,12 @@ OneGadget::Gadget.add(build_id, 840621,
 OneGadget::Gadget.add(build_id, 840624,
                       constraints: ["[rsi] == NULL || rsi == NULL", "[rdx] == NULL || rdx == NULL"],
                       effect: "execve(\"/bin/sh\", rsi, rdx)")
+OneGadget::Gadget.add(build_id, 840714,
+                      constraints: ["writable: rbp-0x38", "[rbp-0x40] == NULL || rbp-0x40 == NULL", "[r13] == NULL || r13 == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x40, r13)")
+OneGadget::Gadget.add(build_id, 840721,
+                      constraints: ["writable: rbp-0x40", "[rbp-0x40] == NULL || rbp-0x40 == NULL", "[r13] == NULL || r13 == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x40, r13)")
 OneGadget::Gadget.add(build_id, 962475,
                       constraints: ["[rsp+0x60] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x60, environ)")
