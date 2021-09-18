@@ -28,6 +28,15 @@ OneGadget::Gadget.add(build_id, 265183,
 OneGadget::Gadget.add(build_id, 765680,
                       constraints: ["[r12] == NULL || r12 == NULL", "[r13] == NULL || r13 == NULL"],
                       effect: "execve(\"/bin/sh\", r12, r13)")
+OneGadget::Gadget.add(build_id, 765738,
+                      constraints: ["writable: rbp-0x38", "[rbp-0x40] == NULL || rbp-0x40 == NULL", "[r13] == NULL || r13 == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x40, r13)")
+OneGadget::Gadget.add(build_id, 765742,
+                      constraints: ["writable: rbp-0x30", "[rbp-0x40] == NULL || rbp-0x40 == NULL", "[r13] == NULL || r13 == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x40, r13)")
+OneGadget::Gadget.add(build_id, 765750,
+                      constraints: ["writable: rbp-0x40", "[rbp-0x40] == NULL || rbp-0x40 == NULL", "[r13] == NULL || r13 == NULL"],
+                      effect: "execve(\"/bin/sh\", rbp-0x40, r13)")
 OneGadget::Gadget.add(build_id, 890131,
                       constraints: ["[rsp+0x80] == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x80, environ)")
