@@ -32,7 +32,7 @@ module OneGadget
       #   ...
       #   call execve
       def jmp_case_candidates
-        `#{@objdump.command}|egrep '# #{bin_sh_hex}' -A 6`.split('--').map do |cand|
+        `#{@objdump.command}|egrep '# #{bin_sh_hex}' -A 8`.split('--').map do |cand|
           cand = cand.lines.map(&:strip).reject(&:empty?)
           jmp_at = cand.index { |c| c.include?('jmp') }
           next nil if jmp_at.nil?

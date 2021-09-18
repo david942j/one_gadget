@@ -16,10 +16,12 @@ EOS
 namespace :builds do
   desc 'Generates lib/builds/*.rb from libc files'
   # bundle exec rake "builds:generate[../libcdb/libc/**/*]"
-  task :generate, :pattern do |_t, args|
+  # bundle exec rake "builds:generate[../libcdb/libc/**/*, overwrite]"
+  task :generate, :pattern, :mode do |_t, args|
     require 'elftools'
     require 'one_gadget'
     entries = Dir.glob(args.pattern).select { |f| File.file?(f) && !File.symlink?(f) }
+    overwrite = args.mode == 'overwrite'
     total = entries.size
     if total > 1
       print "Process #{total} files? (Y/n) "
@@ -39,7 +41,7 @@ namespace :builds do
       next skipped('version too old') if Gem::Version.new(version) < Gem::Version.new('2.19')
 
       filename = File.join(path, "libc-#{version}-#{info[:build_id]}.rb")
-      next skipped('file exists') if File.file?(filename)
+      next skipped('file exists') if !overwrite && File.file?(filename)
 
       gadgets = OneGadget.gadgets(file: libc_file, force_file: true, details: true, level: 100)
       next failed('no gadgets found') if gadgets.empty?
