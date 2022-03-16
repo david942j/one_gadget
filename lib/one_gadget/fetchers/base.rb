@@ -192,7 +192,7 @@ module OneGadget
       end
 
       def str_offset(str)
-        IO.binread(file).index("#{str}\x00") ||
+        File.binread(file).index("#{str}\x00") ||
           raise(Error::ArgumentError, "File #{file.inspect} doesn't contain string #{str.inspect}, not glibc?")
       end
 

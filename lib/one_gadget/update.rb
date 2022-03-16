@@ -42,7 +42,7 @@ module OneGadget
         # don't check if not CLI
         return false unless $stdout.tty?
         return false if cache.nil? # cache file fails, no update check.
-        return false if IO.binread(cache).strip == 'never'
+        return false if File.binread(cache).strip == 'never'
 
         Time.now >= last_check + FREQUENCY
       end
@@ -57,7 +57,7 @@ module OneGadget
       def cache_file
         dir = File.dirname(CACHE_FILE)
         FileUtils.mkdir_p(dir) unless File.directory?(dir)
-        IO.binwrite(CACHE_FILE, '') unless File.exist?(CACHE_FILE)
+        File.binwrite(CACHE_FILE, '') unless File.exist?(CACHE_FILE)
         CACHE_FILE
       rescue Errno::EACCES # prevent dir is not writable
         nil

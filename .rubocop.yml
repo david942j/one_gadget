@@ -5,6 +5,9 @@ AllCops:
   Exclude:
     - lib/one_gadget/builds/*.rb
 
+Gemspec/RequireMFA:
+  Enabled: false
+
 Gemspec/RequiredRubyVersion:
   Enabled: false
 
@@ -17,6 +20,12 @@ Layout/HeredocIndentation:
 Layout/LineLength:
   Enabled: true
   Max: 120
+
+Lint/AmbiguousOperatorPrecedence:
+  Enabled: false
+
+Lint/AmbiguousRange:
+  Enabled: false
 
 Metrics/AbcSize:
   Enabled: false

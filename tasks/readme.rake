@@ -4,7 +4,7 @@ desc 'To auto generate README.md from README.tpl'
 task :readme do
   next if ENV['CI']
 
-  @tpl = IO.binread('README.tpl.md')
+  @tpl = File.binread('README.tpl.md')
 
   def replace(prefix)
     @tpl.gsub!(/#{prefix}\(.*\)/) do |s|
@@ -27,5 +27,5 @@ task :readme do
     "#{cmd}\n#=> #{res.inspect}\n"
   end
 
-  IO.binwrite('README.md', @tpl)
+  File.binwrite('README.md', @tpl)
 end
