@@ -47,11 +47,11 @@ namespace :builds do
       next failed('no gadgets found') if gadgets.empty?
 
       content = template(info, gadgets)
-      File.open(filename, 'w') { |f| f.write(content) }
+      File.write(filename, content)
       puts 'done'
     end
     puts "Total #{total} files, \e[32m#{total - @skipped - @failed}\e[0m succeeded, " \
-      "\e[33m#{@skipped}\e[0m skipped, and \e[31m#{@failed}\e[0m failed."
+         "\e[33m#{@skipped}\e[0m skipped, and \e[31m#{@failed}\e[0m failed."
   end
 
   def template(info, gadgets)

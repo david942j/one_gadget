@@ -120,7 +120,7 @@ module OneGadget
         end
 
         opts.on('-n', '--near FUNCTIONS/FILE', 'Order gadgets by their distance to the given functions'\
-                ' or to the GOT functions of the given file.') do |n|
+                                               ' or to the GOT functions of the given file.') do |n|
           @options[:near] = n
         end
 

@@ -40,7 +40,7 @@ describe OneGadget::Update do
       allow(Time).to receive(:now).and_return(now + 30 * 24 * 3600)
       allow($stdout).to receive(:tty?).and_return(true)
       expect(described_class.__send__(:need_check?)).to be true
-      IO.binwrite(path, 'never')
+      File.binwrite(path, 'never')
       expect(described_class.__send__(:need_check?)).to be false
     end
   end
