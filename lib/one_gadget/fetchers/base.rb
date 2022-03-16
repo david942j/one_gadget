@@ -7,12 +7,12 @@ module OneGadget
   module Fetcher
     # Define common methods for gadget fetchers.
     class Base
-      # The absolute path of glibc.
+      # The absolute path to glibc.
       # @return [String] The filename.
       attr_reader :file
 
       # Instantiate a fetcher object.
-      # @param [String] file Absolute path of target libc.
+      # @param [String] file Absolute path to the target libc.
       def initialize(file)
         @file = file
         arch = self.class.name.split('::').last.downcase.to_sym
@@ -30,7 +30,7 @@ module OneGadget
           (lines.size - 2).downto(0) do |i|
             processor = emulate(lines[i..-1])
             options = resolve(processor)
-            next if options.nil? # impossible be a gadget
+            next if options.nil? # impossible to be a gadget
 
             offset = offset_of(lines[i])
             gadgets << OneGadget::Gadget::Gadget.new(offset, **options)
@@ -41,7 +41,7 @@ module OneGadget
 
       # Fetch candidates that end with call exec*.
       #
-      # Give a block to filter gadget candidates.
+      # Provide a block to filter gadget candidates.
       # @yieldparam [String] cand
       #   Is this candidate valid?
       # @yieldreturn [Boolean]
@@ -69,7 +69,7 @@ module OneGadget
 
       private
 
-      # Generating constraints to be a valid gadget.
+      # Generating constraints for being a valid gadget.
       # @param [OneGadget::Emulators::Processor] processor The processor after executing the gadgets.
       # @return [Hash{Symbol => Array<String>, String}?]
       #   The options to create a {OneGadget::Gadget::Gadget} object.

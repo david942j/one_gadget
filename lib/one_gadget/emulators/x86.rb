@@ -99,7 +99,7 @@ module OneGadget
         end
       end
 
-      # check if (dst, src) in form (xmm*, [sp+*])
+      # check whether (dst, src) is in form (xmm*, [sp+*])
       def check_xmm_sp(dst, src)
         return yield unless dst.start_with?('xmm') && register?(dst) && src.include?(sp)
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module OneGadget
-  # Defines the abi of different architectures.
+  # Defines the ABI of different architectures.
   module ABI
     # Registers of i386.
     X86_32 = %w[eax ebx ecx edx edi esi ebp esp] + 0.upto(7).map { |i| "xmm#{i}" }
@@ -19,7 +19,7 @@ module OneGadget
     # Registers' name of amd64.
     # @return [Array<String>] List of registers.
     def amd64
-      X86_64.uniq
+      X86_64
     end
 
     # Registers' name of i386.
