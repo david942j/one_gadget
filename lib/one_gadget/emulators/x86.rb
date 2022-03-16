@@ -45,7 +45,8 @@ module OneGadget
           Instruction.new('xor', 2),
           Instruction.new('movq', 2),
           Instruction.new('movaps', 2),
-          Instruction.new('movhps', 2)
+          Instruction.new('movhps', 2),
+          Instruction.new('punpcklqdq', 2)
         ]
       end
 
@@ -121,6 +122,17 @@ module OneGadget
 
       def xmm_reg?(reg)
         reg.start_with?('xmm') && register?(reg)
+      end
+
+      # dst[64:128] = src[0:64]
+      def inst_punpcklqdq(dst, src)
+        raise_unsupported('punpcklqdq', dst, src) unless xmm_reg?(dst) && xmm_reg?(src)
+
+        dst = arg_to_lambda(dst)
+        src = arg_to_lambda(src)
+        (64 / self.class.bits).times do |i|
+          dst[i + 64 / self.class.bits] = src[i]
+        end
       end
 
       def inst_lea(dst, src)

@@ -47,6 +47,18 @@ describe OneGadget::Emulators::Amd64 do
         expect(@processor.stack[0x48].to_s).to eq 'rax'
       end
 
+      it 'punpcklqdq' do
+        gadget = <<-EOS
+        movq   xmm1,rax
+        movq   xmm0,rcx
+        punpcklqdq xmm0,xmm1
+        movaps XMMWORD PTR [rsp+0x50],xmm0
+        EOS
+        gadget.each_line { |s| @processor.process(s) }
+        expect(@processor.stack[0x50].to_s).to eq 'rcx'
+        expect(@processor.stack[0x58].to_s).to eq 'rax'
+      end
+
       it 'unsupported form' do
         expect { @processor.process!('movaps xmm0, [rsp+0x40]') }
           .to raise_error(OneGadget::Error::UnsupportedInstructionArgumentError)
