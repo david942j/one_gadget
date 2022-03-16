@@ -80,8 +80,16 @@ module OneGadget
       end
 
       # Move *src to dst[:64]
+      # Supported forms:
+      #   movq xmm*, [sp+*]
+      #   movq xmm*, reg64
       def inst_movq(dst, src)
-        # XXX: here we only support `movq xmm*, [sp+*]`
+        if self.class.bits == 64 && xmm_reg?(dst) && src.start_with?('r') && register?(src)
+          dst = arg_to_lambda(dst)
+          src = arg_to_lambda(src)
+          dst[0] = src
+          return
+        end
         dst, src = check_xmm_sp(dst, src) { raise_unsupported('movq', dst, src) }
         off = src.evaluate(eval_dict)
         (64 / self.class.bits).times do |i|
@@ -101,7 +109,7 @@ module OneGadget
 
       # check whether (dst, src) is in form (xmm*, [sp+*])
       def check_xmm_sp(dst, src)
-        return yield unless dst.start_with?('xmm') && register?(dst) && src.include?(sp)
+        return yield unless xmm_reg?(dst) && src.include?(sp)
 
         dst_lm = arg_to_lambda(dst)
         src_lm = arg_to_lambda(src)
@@ -109,6 +117,10 @@ module OneGadget
 
         src_lm.ref!
         [dst_lm, src_lm]
+      end
+
+      def xmm_reg?(reg)
+        reg.start_with?('xmm') && register?(reg)
       end
 
       def inst_lea(dst, src)
