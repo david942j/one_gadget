@@ -52,7 +52,7 @@ module OneGadget
       private
 
       def inst_mov(dst, src)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        src = arg_to_lambda(src)
         if register?(dst)
           registers[dst] = src
         else
@@ -60,7 +60,7 @@ module OneGadget
           # TODO(david942j): #120
           return add_writable(dst) unless dst.include?(sp)
 
-          dst = OneGadget::Emulators::Lambda.parse(dst, predefined: registers)
+          dst = arg_to_lambda(dst)
           return if dst.deref_count != 1 # should not happen
 
           dst.ref!
@@ -103,8 +103,8 @@ module OneGadget
       def check_xmm_sp(dst, src)
         return yield unless dst.start_with?('xmm') && register?(dst) && src.include?(sp)
 
-        dst_lm = OneGadget::Emulators::Lambda.parse(dst, predefined: registers)
-        src_lm = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        dst_lm = arg_to_lambda(dst)
+        src_lm = arg_to_lambda(src)
         return yield if src_lm.deref_count != 1
 
         src_lm.ref!
@@ -114,13 +114,11 @@ module OneGadget
       def inst_lea(dst, src)
         check_register!(dst)
 
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        src.ref!
-        registers[dst] = src
+        registers[dst] = arg_to_lambda(src).ref!
       end
 
       def inst_push(val)
-        val = OneGadget::Emulators::Lambda.parse(val, predefined: registers)
+        val = arg_to_lambda(val)
         registers[sp] -= size_t
         cur_top = registers[sp].evaluate(eval_dict)
         raise Error::InstructionArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
@@ -141,12 +139,12 @@ module OneGadget
       def inst_add(dst, src)
         check_register!(dst)
 
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        src = arg_to_lambda(src)
         registers[dst] += src
       end
 
       def inst_sub(dst, src)
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        src = arg_to_lambda(src)
         raise Error::UnsupportedInstructionArgumentError, "Unhandled -= of type #{src.class}" unless src.is_a?(Integer)
 
         registers[dst] -= src
@@ -177,7 +175,7 @@ module OneGadget
       end
 
       def add_writable(dst)
-        lmda = OneGadget::Emulators::Lambda.parse(dst, predefined: registers).ref!
+        lmda = arg_to_lambda(dst).ref!
         # pc-relative addresses should be writable
         return if lmda.obj == pc
 

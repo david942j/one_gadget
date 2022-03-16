@@ -115,6 +115,14 @@ module OneGadget
         OneGadget::Emulators::Lambda.new(reg)
       end
 
+      # Fetch the corresponding lambda value of instruction arguments from the current register sets.
+      #
+      # @param [String] arg The instruction argument passed to inst_* functions.
+      # @return [Lambda]
+      def arg_to_lambda(arg)
+        OneGadget::Emulators::Lambda.parse(arg, predefined: registers)
+      end
+
       def raise_unsupported(inst, *args)
         raise OneGadget::Error::UnsupportedInstructionArgumentError, "#{inst} #{args.join(', ')}"
       end
