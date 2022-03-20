@@ -80,7 +80,7 @@ module OneGadget
         end
       end
 
-      # Move *src to dst[:64]
+      # Move src to dst[:64]
       # Supported forms:
       #   movq xmm*, [sp+*]
       #   movq xmm*, reg64
@@ -98,7 +98,7 @@ module OneGadget
         end
       end
 
-      # Move *src to dst[64:128]
+      # Move src to dst[64:128]
       def inst_movhps(dst, src)
         # XXX: here we only support `movhps xmm*, [sp+*]`
         dst, src = check_xmm_sp(dst, src) { raise_unsupported('movhps', dst, src) }
@@ -210,7 +210,8 @@ module OneGadget
         return super unless reg =~ /^xmm\d+$/
 
         Array.new(128 / self.class.bits) do |i|
-          OneGadget::Emulators::Lambda.new("#{reg}__#{i}")
+          cast = "(u#{self.class.bits})"
+          OneGadget::Emulators::Lambda.new(i.zero? ? "#{cast}#{reg}" : "#{cast}(#{reg} >> #{self.class.bits * i})")
         end
       end
     end
