@@ -46,13 +46,13 @@ module OneGadget
         self.+(-other)
       end
 
-      # Increase dereference count with 1.
+      # Increase dereference count by 1.
       # @return [void]
       def deref!
         @deref_count += 1
       end
 
-      # Decrease dereference count with 1.
+      # Decrease dereference count by 1.
       # @return [self]
       # @raise [Error::InstrutionArgumentError] When this object cannot be referenced anymore.
       def ref!
@@ -105,7 +105,7 @@ module OneGadget
         # @param [Hash{String => Lambda}] predefined
         #   Predefined values.
         # @return [OneGadget::Emulators::Lambda, Integer]
-        #   If +argument+ contains number only, returns the value.
+        #   If +argument+ contains numbers only, returns the value.
         #   Otherwise, returns a {Lambda} object.
         # @example
         #   obj = Lambda.parse('[rsp+0x50]')
@@ -117,9 +117,16 @@ module OneGadget
         #   #=> #<Lambda @obj='x0', @immi=-104, @deref_count=1>
         def parse(argument, predefined: {})
           arg = argument.dup
+          return 0 if arg.empty? || arg == '!'
           return Integer(arg) if OneGadget::Helper.integer?(arg)
           # nested []
-          return parse(arg[1...arg.rindex(']')], predefined: predefined).deref if arg[0] == '['
+          if arg[0] == '['
+            ridx = arg.rindex(']')
+            immi = parse(arg[(ridx + 1)..-1])
+            lm = parse(arg[1...ridx], predefined: predefined).deref
+            lm += immi unless immi.zero?
+            return lm
+          end
 
           base, disp = mem_obj(arg)
           obj = predefined[base] || Lambda.new(base)
