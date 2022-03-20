@@ -119,6 +119,7 @@ module OneGadget
           arg = argument.dup
           return 0 if arg.empty? || arg == '!'
           return Integer(arg) if OneGadget::Helper.integer?(arg)
+
           # nested []
           if arg[0] == '['
             ridx = arg.rindex(']')

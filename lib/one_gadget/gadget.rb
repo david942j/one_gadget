@@ -63,13 +63,12 @@ module OneGadget
       # REG: OneGadget::ABI.all
       # IMM: [+-]0x[\da-f]+
       # BITS: 8, 16, 32, 64
-      # CAST:
       # CAST: (<s|u><BITS>)
       # Identity: <REG><IMM>?
       # Identity: [<Identity>]
       # Expr: <REG> is the GOT address of libc
       # Expr: writable: <Identity>
-      # Expr: <CAST><Identity> == NULL
+      # Expr: <CAST>?<Identity> == NULL
       # Expr: <REG> & 0xf == <IMM>
       # Expr: (s32)[<Identity>] <= 0
       # Expr: <Expr> || <Expr>
