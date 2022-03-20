@@ -27,6 +27,9 @@ module OneGadget
         when 0 then registers['rdi']
         when 1 then registers['rsi']
         when 2 then registers['rdx']
+        when 3 then registers['rcx']
+        when 4 then registers['r8']
+        when 5 then registers['r9']
         end
       end
     end
