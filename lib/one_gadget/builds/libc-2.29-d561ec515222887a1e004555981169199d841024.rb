@@ -14,6 +14,21 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 339072,
+                      constraints: ["rsp & 0xf == 0", "rcx == NULL", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rbx == NULL || (u16)[rbx] == NULL"],
+                      effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rbx, rsp+0x60, environ)")
+OneGadget::Gadget.add(build_id, 339093,
+                      constraints: ["rsp & 0xf == 0", "[r8] == NULL", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rbx == NULL || (u16)[rbx] == NULL"],
+                      effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rbx, r8, environ)")
+OneGadget::Gadget.add(build_id, 339096,
+                      constraints: ["rsp & 0xf == 0", "[r8] == NULL", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rcx, r8, environ)")
+OneGadget::Gadget.add(build_id, 539140,
+                      constraints: ["rsp & 0xf == 0", "[r8] == NULL", "rbx+0xe0 == NULL || writable: rbx+0xe0", "r12 == NULL || (s32)[r12+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      effect: "posix_spawn(rbx+0xe0, \"/bin/sh\", r12, rcx, r8, environ)")
+OneGadget::Gadget.add(build_id, 539182,
+                      constraints: ["rsp & 0xf == 0", "[r8] == NULL", "rbx+0xe0 == NULL || writable: rbx+0xe0", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      effect: "posix_spawn(rbx+0xe0, \"/bin/sh\", rdx, rcx, r8, environ)")
 OneGadget::Gadget.add(build_id, 926158,
                       constraints: ["[r15] == NULL || r15 == NULL", "[r13] == NULL || r13 == NULL"],
                       effect: "execve(\"/bin/sh\", r15, r13)")
