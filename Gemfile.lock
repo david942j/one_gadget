@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    one_gadget (1.7.4)
+    one_gadget (1.8.0)
       elftools (>= 1.0.2, < 1.2.0)
 
 GEM
