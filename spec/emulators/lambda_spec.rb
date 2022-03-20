@@ -38,10 +38,10 @@ describe OneGadget::Emulators::Lambda do
 
   it 'parse' do
     expect(described_class.parse('[rsp+0x50]').to_s).to eq '[rsp+0x50]'
-    # ARM form
+    # ARM forms
     expect(described_class.parse('[x0, 1160]').to_s).to eq '[x0+0x488]'
     expect(described_class.parse('[x22, -104]').to_s).to eq '[x22-0x68]'
-    # test if OK with bang
+    # test argument with bang
     expect(described_class.parse('[x2, -8]!').to_s).to eq '[x2-0x8]'
     expect(described_class.parse('[rsp+80]').to_s).to eq '[rsp+0x50]'
     expect(described_class.parse('esp').to_s).to eq 'esp'
@@ -54,6 +54,7 @@ describe OneGadget::Emulators::Lambda do
 
     # Nested []
     expect(described_class.parse('[[rsp+0x33]]').to_s).to eq '[[rsp+0x33]]'
+    expect(described_class.parse('[[rdx+0x33]+0x4154]').to_s).to eq '[[rdx+0x33]+0x4154]'
   end
 
   it 'evaluate' do

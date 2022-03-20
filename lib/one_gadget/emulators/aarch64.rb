@@ -49,8 +49,8 @@ module OneGadget
       def inst_add(dst, src, op2, mode = 'sxtw')
         check_register!(dst)
 
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        op2 = OneGadget::Emulators::Lambda.parse(op2, predefined: registers)
+        src = arg_to_lambda(src)
+        op2 = arg_to_lambda(op2)
         raise_unsupported('add', dst, src, op2) unless op2.is_a?(Integer) && mode == 'sxtw'
 
         registers[dst] = src + op2
@@ -84,7 +84,7 @@ module OneGadget
       def inst_ldr(dst, src, index = 0)
         check_register!(dst)
 
-        src_l = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
+        src_l = arg_to_lambda(src)
         registers[dst] = src_l
         raise_unsupported('ldr', dst, src, index) unless OneGadget::Helper.integer?(index)
 
@@ -101,28 +101,27 @@ module OneGadget
       def inst_mov(dst, src)
         check_register!(dst)
 
-        src = OneGadget::Emulators::Lambda.parse(src, predefined: registers)
-        registers[dst] = src
+        registers[dst] = arg_to_lambda(src)
       end
 
       def inst_stp(reg1, reg2, dst)
         raise_unsupported('stp', reg1, reg2, dst) unless reg64?(reg1) && reg64?(reg2)
 
-        dst_l = OneGadget::Emulators::Lambda.parse(dst, predefined: registers).ref!
+        dst_l = arg_to_lambda(dst).ref!
         raise_unsupported('stp', reg1, reg2, dst) unless dst_l.obj == sp && dst_l.deref_count.zero?
 
         cur_top = dst_l.evaluate(eval_dict)
         stack[cur_top] = registers[reg1]
         stack[cur_top + size_t] = registers[reg2]
 
-        registers[sp] += OneGadget::Emulators::Lambda.parse(dst).immi if dst.end_with?('!')
+        registers[sp] += arg_to_lambda(dst).immi if dst.end_with?('!')
       end
 
       def inst_str(src, dst, index = 0)
         check_register!(src)
         raise_unsupported('str', src, dst, index) unless OneGadget::Helper.integer?(index)
 
-        dst_l = OneGadget::Emulators::Lambda.parse(dst, predefined: registers).ref!
+        dst_l = arg_to_lambda(dst).ref!
         # Only stores on stack.
         if dst_l.obj == sp && dst_l.deref_count.zero?
           cur_top = dst_l.evaluate(eval_dict)

@@ -33,6 +33,15 @@ describe 'one_gadget_amd64' do
       expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
     end
 
+    it 'libc-2.31' do
+      path = data_path('libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
+      expect(OneGadget.gadgets(file: path, force_file: true,
+                               level: 1)).to eq [0x51e39, 0x51e45, 0x51e5a, 0x51e62, 0x84173, 0x84180, 0x8418c,
+                                                 0x84199, 0xe3b2e, 0xe3b31, 0xe3b34, 0xe3d23, 0xe3d26, 0xe3d99,
+                                                 0xe3da0, 0xe3de5, 0xe3ded, 0x1075da, 0x1075e2, 0x1075e7, 0x1075f1]
+      expect(OneGadget.gadgets(file: path)).to eq [0xe3b2e, 0xe3b31, 0xe3b34]
+    end
+
     it 'not ELF' do
       expect { hook_logger { OneGadget.gadgets(file: __FILE__) } }.to output(<<-EOS).to_stdout
 [OneGadget] ArgumentError: Not an ELF file, expected glibc as input

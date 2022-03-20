@@ -10,7 +10,6 @@ require 'one_gadget/version'
 Gem::Specification.new do |s|
   s.name          = 'one_gadget'
   s.version       = ::OneGadget::VERSION
-  s.date          = Date.today.to_s
   s.summary       = 'one_gadget'
   s.description   = <<-EOS
   When playing ctf pwn challenges we usually needs the one-gadget of execve('/bin/sh', NULL, NULL).

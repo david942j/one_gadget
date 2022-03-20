@@ -47,7 +47,7 @@ module OneGadget
       # @return [Boolean]
       def process(cmd)
         process!(cmd)
-      # rescue OneGadget::Error::UnsupportedError # for debugging
+      # rescue OneGadget::Error::UnsupportedError => e; p e # for debugging
       rescue OneGadget::Error::Error
         false
       end
@@ -113,6 +113,14 @@ module OneGadget
 
       def to_lambda(reg)
         OneGadget::Emulators::Lambda.new(reg)
+      end
+
+      # Fetch the corresponding lambda value of instruction arguments from the current register sets.
+      #
+      # @param [String] arg The instruction argument passed to inst_* functions.
+      # @return [Lambda]
+      def arg_to_lambda(arg)
+        OneGadget::Emulators::Lambda.parse(arg, predefined: registers)
       end
 
       def raise_unsupported(inst, *args)
