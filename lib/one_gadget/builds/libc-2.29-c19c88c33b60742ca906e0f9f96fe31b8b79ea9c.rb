@@ -14,6 +14,18 @@ require 'one_gadget/gadget'
 # <https://bugs.archlinux.org/>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 281245,
+                      constraints: ["rax == NULL", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rcx, rsp+0x50, environ)")
+OneGadget::Gadget.add(build_id, 281267,
+                      constraints: ["[r8] == NULL", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rcx, r8, environ)")
+OneGadget::Gadget.add(build_id, 465972,
+                      constraints: ["[r8] == NULL", "rbx+0xe0 == NULL || writable: rbx+0xe0", "r12 == NULL || (s32)[r12+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      effect: "posix_spawn(rbx+0xe0, \"/bin/sh\", r12, rcx, r8, environ)")
+OneGadget::Gadget.add(build_id, 465987,
+                      constraints: ["[r8] == NULL", "rbx+0xe0 == NULL || writable: rbx+0xe0", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      effect: "posix_spawn(rbx+0xe0, \"/bin/sh\", rdx, rcx, r8, environ)")
 OneGadget::Gadget.add(build_id, 819914,
                       constraints: ["[r13] == NULL || r13 == NULL", "[r12] == NULL || r12 == NULL"],
                       effect: "execve(\"/bin/sh\", r13, r12)")
