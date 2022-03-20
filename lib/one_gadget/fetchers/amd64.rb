@@ -16,6 +16,7 @@ module OneGadget
       def candidates
         # one basic block case
         cands = super do |candidate|
+          next true if candidate.include?('posix_spawn@')
           next false unless candidate.include?(bin_sh_hex) # works in x86-64
           next false unless candidate.lines.last.include?('execve') # only care execve
 

@@ -62,12 +62,16 @@ module OneGadget
 
       # REG: OneGadget::ABI.all
       # IMM: [+-]0x[\da-f]+
+      # BITS: 8, 16, 32, 64
+      # CAST:
+      # CAST: (<s|u><BITS>)
       # Identity: <REG><IMM>?
       # Identity: [<Identity>]
       # Expr: <REG> is the GOT address of libc
       # Expr: writable: <Identity>
-      # Expr: <Identity> == NULL
+      # Expr: <CAST><Identity> == NULL
       # Expr: <REG> & 0xf == <IMM>
+      # Expr: (s32)[<Identity>] <= 0
       # Expr: <Expr> || <Expr>
       def calculate_score(expr)
         return expr.split(' || ').map(&method(:calculate_score)).max if expr.include?(' || ')
@@ -76,15 +80,16 @@ module OneGadget
         when / & 0xf/ then 0.95
         when /GOT address/ then 0.9
         when /^writable/ then 0.81
-        when / == NULL$/ then calculate_null_score(expr)
+        when / == NULL$/ then calculate_null_score(expr.slice(0...expr.rindex(' == NULL')))
+        when / <= 0$/ then calculate_null_score(expr.slice(0...expr.rindex(' <= ')))
         end
       end
 
-      def calculate_null_score(expr)
-        identity = expr.slice(0...expr.rindex(' == NULL'))
+      def calculate_null_score(identity)
+        # remove <CAST>
+        identity.sub!(/^\([s|u]\d+\)/, '')
         # Thank God we are already able to parse this
         lmda = OneGadget::Emulators::Lambda.parse(identity)
-        # raise Error::ArgumentError, expr unless OneGadget::ABI.all.include?(lmda.obj)
         # rax == 0 is easy; rax + 0x10 == 0 is damn hard.
         return lmda.immi.zero? ? 0.9 : 0.1 if lmda.deref_count.zero?
 

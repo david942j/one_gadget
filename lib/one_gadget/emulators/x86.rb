@@ -182,7 +182,7 @@ module OneGadget
       # because it just invokes syscall.
       def inst_call(addr)
         # This is the last call
-        return registers[pc] = addr if %w[execve execl].any? { |n| addr.include?(n) }
+        return registers[pc] = addr if %w[execve execl posix_spawn].any? { |n| addr.include?(n) }
 
         # TODO: handle some registers would be fucked after call
         checker = {

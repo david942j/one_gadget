@@ -49,7 +49,7 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&block)
-        call_regexp = "#{call_str}.*<exec[^+]*>$"
+        call_regexp = "#{call_str}.*<(exec[^+]*|posix_spawn[^+]*)>$"
         cands = []
         `#{@objdump.command}|egrep '#{call_regexp}' -B 30`.split('--').each do |cand|
           lines = cand.lines.map(&:strip).reject(&:empty?)
@@ -79,28 +79,28 @@ module OneGadget
       #   If the constraints can never be satisfied, +nil+ is returned.
       def resolve(processor)
         call = processor.registers[processor.pc].to_s
-        # This costs cheaper, so check first.
-        # check call execve / execl
-        return unless %w[execve execl].any? { |n| call.include?(n) }
-        # check first argument contains /bin/sh
-        # since the logic is different between amd64 and i386,
-        # invoke str_bin_sh? for checking
-        return unless str_bin_sh?(processor.argument(0).to_s)
-
-        if call.include?('execve')
-          resolve_execve(processor)
-        elsif call.include?('execl')
-          resolve_execl(processor)
-        end
+        return resolve_posix_spawn(processor) if call.include?('posix_spawn')
+        return resolve_execve(processor) if call.include?('execve')
+        return resolve_execl(processor) if call.include?('execl')
       end
 
       def resolve_execve(processor)
-        # arg[1] == NULL || [arg[1]] == NULL
-        # arg[2] == NULL || [arg[2]] == NULL || arg[2] == envp
+        arg0 = processor.argument(0).to_s
         arg1 = processor.argument(1).to_s
         arg2 = processor.argument(2).to_s
+        res = resolve_execve_args(processor, arg0, arg1, arg2)
+        return nil if res.nil?
+
+        { constraints: res[:constraints], effect: %(execve("/bin/sh", #{arg1}, #{res[:envp]})) }
+      end
+
+      def resolve_execve_args(processor, arg0, arg1, arg2, allow_null_argv: true)
+        return unless str_bin_sh?(arg0)
+
+        # arg1 == NULL || [arg1] == NULL
+        # arg2 == NULL || [arg2] == NULL || arg[2] == envp
         cons = processor.constraints
-        cons << check_execve_arg(processor, arg1)
+        cons << check_execve_arg(processor, arg1, allow_null_argv)
         return nil unless cons.all?
 
         envp = 'environ'
@@ -109,38 +109,42 @@ module OneGadget
           envp = arg2
         end
 
-        { constraints: cons, effect: %(execve("/bin/sh", #{arg1}, #{envp})) }
+        { constraints: cons, envp: envp }
       end
 
-      # arg[1] == NULL || [arg[1]] == NULL
-      def check_execve_arg(processor, arg)
+      # arg == NULL || [arg] == NULL
+      def check_execve_arg(processor, arg, allow_null)
         if arg.start_with?(processor.sp) # arg = sp+<num>
-          # in this case, the only constraint is [sp+<num>] == NULL
+          # in this case, the only chance is [sp+<num>] == NULL
           num = Integer(arg[processor.sp.size..-1])
           slot = processor.stack[num].to_s
           return if global_var?(slot)
 
           "#{slot} == NULL"
-        else
+        elsif allow_null
           "[#{arg}] == NULL || #{arg} == NULL"
+        else
+          "[#{arg}] == NULL"
         end
       end
 
       def check_envp(processor, arg)
-        # if str starts with [[ and is global var,
-        # believe it is environ
-        # if starts with [[ but not global, drop it.
+        # If str starts with [[ and is a global variable,
+        # believe it is environ.
+        # If it starts with [[ but not a global var, drop it.
         return global_var?(arg) if arg.start_with?('[[')
 
         # normal
-        cons = check_execve_arg(processor, arg)
+        cons = check_execve_arg(processor, arg, true)
         return nil if cons.nil?
 
         yield cons
       end
 
-      # Resolve +call execl+ case.
+      # Resolve +call execl+ cases.
       def resolve_execl(processor)
+        return unless str_bin_sh?(processor.argument(0).to_s)
+
         args = []
         arg = processor.argument(1).to_s
         if str_sh?(arg)
@@ -151,8 +155,35 @@ module OneGadget
 
         args << arg
         cons = processor.constraints + ["#{arg} == NULL"]
-        # now arg is the constraint.
         { constraints: cons, effect: %(execl("/bin/sh", #{args.join(', ')})) }
+      end
+
+      # posix_spawn (*pid, *path, *file_actions, *attrp, argv[], envp[])
+      # Constraints are
+      # * pid == NULL || *pid is writable
+      # * file_actions == NULL || (int) (file_actions->__used) <= 0
+      # * attrp == NULL || attrp->flags == 0
+      # Meet all constraints then posix_spawn eventually calls execve(path, argv, envp)
+      def resolve_posix_spawn(processor)
+        args = Array.new(6) { |i| processor.argument(i) }
+        res = resolve_execve_args(processor, args[1].to_s, args[4].to_s, args[5].to_s, allow_null_argv: false)
+        return nil if res.nil?
+
+        cons = res[:constraints]
+        arg0 = args[0]
+        if arg0.to_s != '0'
+          if arg0.deref_count.zero? && arg0.to_s.include?(processor.sp)
+            # Assume stack is always writable, no additional constraints.
+          else
+            cons << "#{arg0} == NULL || writable: #{arg0}"
+          end
+        end
+        arg2 = args[2]
+        cons << "#{arg2} == NULL || (s32)#{(arg2 + 4).deref} <= 0" if arg2.to_s != '0'
+        arg3 = args[3]
+        cons << "#{arg3} == NULL || (u16)#{arg3.deref} == NULL" if arg3.to_s != '0'
+
+        { constraints: cons, effect: %(posix_spawn(#{arg0}, "/bin/sh", #{arg2}, #{arg3}, #{args[4]}, #{res[:envp]})) }
       end
 
       def global_var?(_str); raise NotImplementedError
