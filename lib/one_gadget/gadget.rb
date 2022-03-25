@@ -79,8 +79,8 @@ module OneGadget
         when / & 0xf/ then 0.95
         when /GOT address/ then 0.9
         when /^writable/ then calculate_writable_score(expr.sub('writable: ', ''))
-        when / == NULL$/ then calculate_null_score(expr.slice(0...expr.rindex(' == NULL')))
-        when / <= 0$/ then calculate_null_score(expr.slice(0...expr.rindex(' <= ')))
+        when / == NULL$/ then calculate_null_score(expr.sub(' == NULL', ''))
+        when / <= 0$/ then calculate_null_score(expr.sub(' <= 0', ''))
         end
       end
 
