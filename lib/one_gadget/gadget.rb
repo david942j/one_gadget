@@ -78,10 +78,17 @@ module OneGadget
         case expr
         when / & 0xf/ then 0.95
         when /GOT address/ then 0.9
-        when /^writable/ then 0.81
+        when /^writable/ then calculate_writable_score(expr.sub('writable: ', ''))
         when / == NULL$/ then calculate_null_score(expr.slice(0...expr.rindex(' == NULL')))
         when / <= 0$/ then calculate_null_score(expr.slice(0...expr.rindex(' <= ')))
         end
+      end
+
+      def calculate_writable_score(identity)
+        lmda = OneGadget::Emulators::Lambda.parse(identity)
+        return 0.81 if lmda.deref_count != 0
+
+        OneGadget::ABI.stack_register?(lmda.obj) ? 0.95 : 0.81
       end
 
       def calculate_null_score(identity)
