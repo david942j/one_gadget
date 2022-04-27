@@ -12,7 +12,7 @@ module OneGadget
     # At least 30 days between check for new version.
     FREQUENCY = 30 * 24 * 60 * 60
     # Path to cache file.
-    CACHE_FILE = File.join(ENV['HOME'], '.cache', 'one_gadget', 'update').freeze
+    CACHE_FILE = File.join(ENV.fetch('HOME', Dir.tmpdir), '.cache', 'one_gadget', 'update').freeze
 
     class << self
       # Check if new releases have been drafted.
