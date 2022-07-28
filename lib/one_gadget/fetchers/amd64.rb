@@ -44,7 +44,9 @@ module OneGadget
           jmp_addr = cand.last.scan(/jmp\s+([\da-f]+)\s/)[0][0].to_i(16)
           dump = `#{@objdump.command(start: jmp_addr, stop: jmp_addr + 100)}|egrep '[0-9a-f]+:'`
           remain = dump.lines.map(&:strip).reject(&:empty?)
-          remain = remain[0..remain.index { |r| r.match(/call.*<execve[^+]*>/) }]
+          call_execve = remain.index { |r| r.match(/call.*<execve[^+]*>/) }
+          next if call_execve.nil?
+          remain = remain[0..call_execve]
           [cand + remain].join("\n")
         end.compact
       end
