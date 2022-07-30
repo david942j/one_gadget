@@ -46,6 +46,7 @@ module OneGadget
           remain = dump.lines.map(&:strip).reject(&:empty?)
           call_execve = remain.index { |r| r.match(/call.*<execve[^+]*>/) }
           next if call_execve.nil?
+
           remain = remain[0..call_execve]
           [cand + remain].join("\n")
         end.compact
