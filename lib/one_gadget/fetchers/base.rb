@@ -51,7 +51,7 @@ module OneGadget
       def candidates(&block)
         call_regexp = "#{call_str}.*<(exec[^+]*|posix_spawn[^+]*)>$"
         cands = []
-        `#{@objdump.command}|egrep '#{call_regexp}' -B 30`.split('--').each do |cand|
+        `#{@objdump.command}|grep -E '#{call_regexp}' -B 30`.split('--').each do |cand|
           lines = cand.lines.map(&:strip).reject(&:empty?)
           # split with call_regexp
           loop do
