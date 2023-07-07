@@ -43,8 +43,8 @@ describe OneGadget::Emulators::Amd64 do
         movaps [rsp+0x40], xmm0
         EOS
         gadget.each_line { |s| @processor.process(s) }
-        expect(@processor.stack[0x40].to_s).to eq '[rsp+0x8]'
-        expect(@processor.stack[0x48].to_s).to eq 'rax'
+        expect(@processor.sp_based_stack[0x40].to_s).to eq '[rsp+0x8]'
+        expect(@processor.sp_based_stack[0x48].to_s).to eq 'rax'
       end
 
       it 'punpcklqdq' do
@@ -55,8 +55,8 @@ describe OneGadget::Emulators::Amd64 do
         movaps XMMWORD PTR [rsp+0x50],xmm0
         EOS
         gadget.each_line { |s| @processor.process(s) }
-        expect(@processor.stack[0x50].to_s).to eq 'rcx'
-        expect(@processor.stack[0x58].to_s).to eq 'rax'
+        expect(@processor.sp_based_stack[0x50].to_s).to eq 'rcx'
+        expect(@processor.sp_based_stack[0x58].to_s).to eq 'rax'
       end
 
       it 'unsupported form' do

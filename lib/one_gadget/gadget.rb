@@ -71,6 +71,8 @@ module OneGadget
       # Expr: <CAST>?<Identity> == NULL
       # Expr: <REG> & 0xf == <IMM>
       # Expr: (s32)[<Identity>] <= 0
+      # Expr: .+ is a valid argv
+      # Expr: .+ is a valid envp
       # Expr: <Expr> || <Expr>
       def calculate_score(expr)
         return expr.split(' || ').map(&method(:calculate_score)).max if expr.include?(' || ')
@@ -81,6 +83,8 @@ module OneGadget
         when /^writable/ then calculate_writable_score(expr.sub('writable: ', ''))
         when / == NULL$/ then calculate_null_score(expr.sub(' == NULL', ''))
         when / <= 0$/ then calculate_null_score(expr.sub(' <= 0', ''))
+        when / is a valid argv$/ then 0.5 # TODO: Calculate the score more precisely
+        when / is a valid envp$/ then 0.5 # TODO: Calculate the score more precisely
         end
       end
 

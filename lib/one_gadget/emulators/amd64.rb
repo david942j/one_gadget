@@ -16,7 +16,7 @@ module OneGadget
 
       # Instantiate an {Amd64} object.
       def initialize
-        super(OneGadget::ABI.amd64, 'rsp', 'rip')
+        super(OneGadget::ABI.amd64, 'rsp', 'rbp', 'rip')
       end
 
       # Return the argument value of calling a function.

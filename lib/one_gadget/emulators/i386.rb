@@ -16,7 +16,7 @@ module OneGadget
 
       # Instantiate an {I386} object.
       def initialize
-        super(OneGadget::ABI.i386, 'esp', 'eip')
+        super(OneGadget::ABI.i386, 'esp', 'ebp', 'eip')
       end
 
       # Get function call arguments.
@@ -29,7 +29,7 @@ module OneGadget
       # @return [Lambda, Integer]
       def argument(idx)
         cur_top = registers['esp'].evaluate('esp' => 0)
-        stack[cur_top + idx * 4]
+        sp_based_stack[cur_top + idx * 4]
       end
     end
   end

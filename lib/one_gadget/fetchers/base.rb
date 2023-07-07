@@ -100,7 +100,8 @@ module OneGadget
         # arg1 == NULL || [arg1] == NULL
         # arg2 == NULL || [arg2] == NULL || arg[2] == envp
         cons = processor.constraints
-        cons << check_execve_arg(processor, arg1, allow_null_argv)
+        con = check_argv(processor, arg1, allow_null_argv)
+        cons << con unless con.nil?
         return nil unless cons.all?
 
         envp = 'environ'
@@ -112,19 +113,50 @@ module OneGadget
         { constraints: cons, envp: envp }
       end
 
-      # arg == NULL || [arg] == NULL
-      def check_execve_arg(processor, arg, allow_null)
-        if arg.start_with?(processor.sp) # arg = sp+<num>
-          # in this case, the only chance is [sp+<num>] == NULL
-          num = Integer(arg[processor.sp.size..-1])
-          slot = processor.stack[num].to_s
-          return if global_var?(slot)
+      def check_argv(processor, arg, allow_null)
+        stack = processor.get_corresponding_stack(arg)
+        lmda = OneGadget::Emulators::Lambda.parse(arg)
+        if !stack.nil? && OneGadget::ABI::stack_register?(lmda.obj) && lmda.deref_count == 0
+          num = lmda.immi
+          argv = (0..3).map { |i| stack[num + processor.class.bits / 8 * i].to_s }
+          return if argv[0] == "0" || global_var?(argv[0]) && argv[1] == "0" # argv is already valid, no constraints are needed! (but probably won't happen :p)
 
-          "#{slot} == NULL"
+          if global_var?(argv[0])
+            # argv[0] is not controlled by the user, argv[0] probably is "/bin/sh" or "sh" (but actually, the content of argv[0] doesn't quite matter, just need to make sure it's readable)
+            # So far (I checked glibc 2.37), we can make argv to be {"/bin/sh", sth, NULL} or {"sh", "-c", sth, NULL}
+            # TODO: We need to update this when the above assumption is no longer true
+            return "#{argv[1]} == NULL || {\"/bin/sh\", #{argv[1]}, NULL} is a valid argv" if argv[2] == "0" && !global_var?(argv[1])
+            rest_argv = argv[3] == "0" ? "NULL" :  "#{argv[3]}, ..."
+            if global_var?(argv[1])
+              return "{\"sh\", \"-c\", #{argv[2]}, #{rest_argv}} is a valid argv"
+            else
+              return "#{argv[1]} == NULL || {\"sh\", #{argv[1]}, #{argv[2]}, #{rest_argv}} is a valid argv"
+            end
+          end
+
+          argv_cons = "{#{argv[0]}"
+          (1..argv.length - 1).each { |i|
+            if argv[i] == "0"
+              argv_cons += ", NULL"
+              break
+            else
+              argv_cons += ", #{argv[i]}"
+            end
+          }
+          argv_cons += ", ..." unless argv_cons.end_with?("NULL")
+          argv_cons += "} is a valid argv"
+
+          if allow_null && argv.all? { |a| OneGadget::ABI::stack_register?(a) }
+            # If libc writes something into the stack, arg cannot be NULL.
+            # TODO: Find a better way to check can arg be NULL
+            "#{arg} == NULL || #{argv[0]} == NULL || #{argv_cons}"
+          else
+            "#{argv[0]} == NULL || #{argv_cons}"
+          end
         elsif allow_null
-          "[#{arg}] == NULL || #{arg} == NULL"
+          "[#{arg}] == NULL || #{arg} == NULL || #{arg} is a valid argv"
         else
-          "[#{arg}] == NULL"
+          "[#{arg}] == NULL || #{arg} is a valid argv"
         end
       end
 
@@ -134,8 +166,16 @@ module OneGadget
         # If it starts with [[ but not a global var, drop it.
         return global_var?(arg) if arg.start_with?('[[')
 
-        # normal
-        cons = check_execve_arg(processor, arg, true)
+        stack = processor.get_corresponding_stack(arg)
+        lmda = OneGadget::Emulators::Lambda.parse(arg)
+        if !stack.nil? && OneGadget::ABI::stack_register?(lmda.obj) && lmda.deref_count == 0
+          num = lmda.immi
+          envp = (0..3).map { |i| stack[num + processor.class.bits / 8 * i].to_s }
+          # I haven't see this case after some tests, but just in case :)
+          cons = global_var?(envp[0]) ? nil : "#{arg} == 0 || {#{envp.join(', ')}, ...} is a valid envp"
+        else
+          cons = "[#{arg}] == NULL || #{arg} == NULL || #{arg} is a valid envp"
+        end
         return nil if cons.nil?
 
         yield cons

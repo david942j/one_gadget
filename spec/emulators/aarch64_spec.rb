@@ -40,14 +40,14 @@ describe OneGadget::Emulators::AArch64 do
     it 'stp' do
       @processor.process('stp x2, x3, [sp, #16]')
       expect(@processor.registers['sp'].to_s).to eq 'sp'
-      expect(@processor.stack[16].to_s).to eq 'x2'
-      expect(@processor.stack[24].to_s).to eq 'x3'
+      expect(@processor.sp_based_stack[16].to_s).to eq 'x2'
+      expect(@processor.sp_based_stack[24].to_s).to eq 'x3'
 
       # equivalent to 'push x1; push x0'
       @processor.process('stp x0, x1, [sp, #-16]!')
       expect(@processor.registers['sp'].to_s).to eq 'sp-0x10'
-      expect(@processor.stack[-8].to_s).to eq 'x1'
-      expect(@processor.stack[-16].to_s).to eq 'x0'
+      expect(@processor.sp_based_stack[-8].to_s).to eq 'x1'
+      expect(@processor.sp_based_stack[-16].to_s).to eq 'x0'
     end
 
     it 'str' do
@@ -56,13 +56,13 @@ describe OneGadget::Emulators::AArch64 do
       @processor.process('str x0, [x1], #-8')
       expect(@processor.registers['sp'].to_s).to eq 'sp'
       expect(@processor.registers['x1'].to_s).to eq 'sp-0x8'
-      expect(@processor.stack[0].to_s).to eq 'x0'
+      expect(@processor.sp_based_stack[0].to_s).to eq 'x0'
 
       @processor.process('str xzr, [sp, #200]')
-      expect(@processor.stack[200]).to be_zero
+      expect(@processor.sp_based_stack[200]).to be_zero
 
       @processor.process('str x2, [sp, #0x100]!')
-      expect(@processor.stack[0x100].to_s).to eq 'x2'
+      expect(@processor.sp_based_stack[0x100].to_s).to eq 'x2'
       expect(@processor.registers['sp'].to_s).to eq 'sp+0x100'
 
       @processor.process('str x3, [x4]')
