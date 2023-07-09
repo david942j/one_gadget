@@ -31,10 +31,8 @@ module OneGadget
       # @param [Integer] stop The end address.
       # @return [String] The CLI command to be executed.
       def command(start: nil, stop: nil)
-        # --dwarf-start=0 is to make sure `suppress_bfd_header` is true to eliminate the information that includes the file path:
-        # https://github.com/CyberGrandChallenge/binutils/blob/ccdf202188a21ff0f0c2abfdb0814c244c251436/binutils/objdump.c#L3628-L3632
-        # https://github.com/CyberGrandChallenge/binutils/blob/ccdf202188a21ff0f0c2abfdb0814c244c251436/binutils/objdump.c#L3206-L3208
-        # See also: #204
+        # --dwarf-start=0 is to make sure `suppress_bfd_header` is true to eliminate the file path in the output, see
+        # issue #204 for more details.
         # Note: We might need to update this when the objdump act differently in the future.
         cmd = [bin, '--dwarf-start=0', '--no-show-raw-insn', '-w', '-d', *@options, @file]
         cmd.push('--start-address', start) if start
