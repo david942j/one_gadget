@@ -9,7 +9,7 @@ module OneGadget
     # Base class of a processor.
     class Processor
       attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
-      attr_reader :sp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] The content on stack based on sp register.
+      attr_reader :sp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on sp.
       attr_reader :sp # @return [String] Stack pointer.
       attr_reader :pc # @return [String] Program counter.
 

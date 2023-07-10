@@ -116,7 +116,7 @@ module OneGadget
       def check_argv(processor, arg, allow_null)
         lmda = OneGadget::Emulators::Lambda.parse(arg)
 
-        if lmda.deref_count.zero? && OneGadget::ABI::stack_register?(lmda.obj)
+        if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
           return check_stack_argv(processor, lmda, allow_null)
         end
 
@@ -142,18 +142,18 @@ module OneGadget
       end
 
       def argv_already_valid?(argv)
-        argv[0] == "0" || (global_var?(argv[0]) && argv[1] == "0")
+        argv[0] == '0' || (global_var?(argv[0]) && argv[1] == '0')
       end
 
       def generate_argv_with_sh(argv)
-        if argv[2] == "0" && !global_var?(argv[1])
+        if argv[2] == '0' && !global_var?(argv[1])
           "#{argv[1]} == NULL || {\"/bin/sh\", #{argv[1]}, NULL} is a valid argv"
         else
-          argv_gte_3 = argv[3] == "0" ? "NULL" : "#{argv[3]}, ..."
+          argv_gte3 = argv[3] == '0' ? 'NULL' : "#{argv[3]}, ..."
           if global_var?(argv[1])
-            "{\"sh\", \"-c\", #{argv[2]}, #{argv_gte_3}} is a valid argv"
+            "{\"sh\", \"-c\", #{argv[2]}, #{argv_gte3}} is a valid argv"
           else
-            "#{argv[1]} == NULL || {\"sh\", #{argv[1]}, #{argv[2]}, #{argv_gte_3}} is a valid argv"
+            "#{argv[1]} == NULL || {\"sh\", #{argv[1]}, #{argv[2]}, #{argv_gte3}} is a valid argv"
           end
         end
       end
@@ -161,17 +161,17 @@ module OneGadget
       def generate_argv_without_sh(argv, allow_null)
         argv_cons = "{#{argv[0]}"
         (1..argv.length - 1).each do |i|
-          if argv[i] == "0"
-            argv_cons += ", NULL"
+          if argv[i] == '0'
+            argv_cons += ', NULL'
             break
           else
             argv_cons += ", #{argv[i]}"
           end
         end
-        argv_cons += ", ..." unless argv_cons.end_with?("NULL")
-        argv_cons += "} is a valid argv"
+        argv_cons += ', ...' unless argv_cons.end_with?('NULL')
+        argv_cons += '} is a valid argv'
 
-        if allow_null && argv.all? { |a| OneGadget::ABI::stack_register?(a) }
+        if allow_null && argv.all? { |a| OneGadget::ABI.stack_register?(a) }
           # If libc writes something into the stack, arg cannot be NULL.
           # TODO: Find a better way to check can arg be NULL
           "#{arg} == NULL || #{argv[0]} == NULL || #{argv_cons}"
@@ -195,7 +195,7 @@ module OneGadget
         return global_var?(arg) if arg.start_with?('[[')
 
         lmda = OneGadget::Emulators::Lambda.parse(arg)
-        if lmda.deref_count.zero? && OneGadget::ABI::stack_register?(lmda.obj)
+        if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
           stack = processor.get_corresponding_stack(lmda.obj)
           envp = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
           # I haven't see this case after some tests, but just in case :)

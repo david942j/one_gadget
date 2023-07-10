@@ -10,7 +10,8 @@ module OneGadget
     # Super class for amd64 and i386 processor.
     class X86 < Processor
       attr_reader :bp # @return [String] Base pointer.
-      attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] The content on stack based on bp register.
+      attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp
+
       # Constructor for a x86 processor.
       def initialize(registers, sp, bp, pc)
         super(registers, sp)
@@ -64,8 +65,6 @@ module OneGadget
           sp_based_stack
         elsif obj.to_s.include?(bp)
           bp_based_stack
-        else
-          nil
         end
       end
 
@@ -75,18 +74,17 @@ module OneGadget
         src = arg_to_lambda(src)
         if register?(dst)
           registers[dst] = src
-        else
-          # Just ignore strange case...
-          dst = arg_to_lambda(dst)
-          add_writable(dst.to_s)
-          # TODO: Is it possible that only considering sp and bp is not enough? If it is, we need to document every memory access
-          stack = get_corresponding_stack(dst)
-          unless stack.nil?
-            return if dst.deref_count != 1 # should not happen
-            dst.ref!
-            stack[dst.evaluate(eval_dict)] = src
-          end
+          return
         end
+        dst = arg_to_lambda(dst)
+        add_writable(dst.to_s)
+        # TODO: Is it possible that only considering sp and bp is not enough?
+        # If it is, we need to document every memory access
+        stack = get_corresponding_stack(dst)
+        return if stack.nil? || dst.deref_count != 1
+
+        dst.ref!
+        stack[dst.evaluate(eval_dict)] = src
       end
 
       # This instruction moves 128bits.
@@ -236,7 +234,7 @@ module OneGadget
       end
 
       def eval_dict
-        { sp => 0 , bp => 0}
+        { sp => 0, bp => 0 }
       end
     end
   end
