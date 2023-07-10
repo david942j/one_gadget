@@ -196,10 +196,11 @@ module OneGadget
 
         lmda = OneGadget::Emulators::Lambda.parse(arg)
         if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
+          # I haven't see this case after some tests, but just in case :)
           stack = processor.get_corresponding_stack(lmda.obj)
           envp = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
-          # I haven't see this case after some tests, but just in case :)
-          cons = global_var?(envp[0]) ? nil : "#{arg} == 0 || {#{envp.join(', ')}, ...} is a valid envp"
+          # TODO: Handle the case when libc will write something into envp
+          cons = global_var?(envp[0]) ? nil : "#{arg} == NULL || {#{envp.join(', ')}, ...} is a valid envp"
         else
           cons = "[#{arg}] == NULL || #{arg} == NULL || #{arg} is a valid envp"
         end
