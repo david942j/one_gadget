@@ -83,8 +83,7 @@ module OneGadget
         when /^writable/ then calculate_writable_score(expr.sub('writable: ', ''))
         when / == NULL$/ then calculate_null_score(expr.sub(' == NULL', ''))
         when / <= 0$/ then calculate_null_score(expr.sub(' <= 0', ''))
-        when / is a valid argv$/ then 0.5 # TODO: Calculate the score more precisely
-        when / is a valid envp$/ then 0.5 # TODO: Calculate the score more precisely
+        when / is a valid (argv|envp)$/ then 0.2 # TODO: Calculate the score more precisely
         end
       end
 
