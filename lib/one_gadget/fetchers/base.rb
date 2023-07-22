@@ -164,6 +164,8 @@ module OneGadget
           if argv[i] == '0'
             argv_cons += ', NULL'
             break
+          elsif i == 1 && global_var?(argv[i])
+            argv_cons += ', "-c"'
           else
             argv_cons += ", #{argv[i]}"
           end
