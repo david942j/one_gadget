@@ -10,7 +10,9 @@ jobs:
   test:
 
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.ruby-version == 'head' }}
     strategy:
+      fast-fail: false
       matrix:
         ruby-version: ['2.6', '2.7', '3.0', '3.1', 'head']
 
