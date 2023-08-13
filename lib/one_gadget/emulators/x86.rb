@@ -9,8 +9,8 @@ module OneGadget
   module Emulators
     # Super class for amd64 and i386 processor.
     class X86 < Processor
-      attr_reader :bp # @return [String] Base pointer.
-      attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp
+      attr_reader :bp # @return [String] Stack base register.
+      attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp.
 
       # Constructor for a x86 processor.
       def initialize(registers, sp, bp, pc)
