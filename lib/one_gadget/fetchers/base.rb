@@ -163,6 +163,7 @@ module OneGadget
             argv_cons += ', NULL'
             break
           elsif i == 1 && global_var?(argv[i])
+            # TODO: We probably need to get the true content of the global variable for a more accurate result
             argv_cons += ', "-c"'
           else
             argv_cons += ", #{argv[i]}"
