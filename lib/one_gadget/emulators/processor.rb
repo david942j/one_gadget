@@ -94,6 +94,13 @@ module OneGadget
         cons.map { |type, obj| type == :writable ? "writable: #{obj}" : obj }.sort
       end
 
+      # Method need to be implemented in inheritors.
+      #
+      # @param [String | Lambda] obj
+      #  A lambda object or its string.
+      # @return [Hash{Integer => Lambda}, nil]
+      #  The corresponding stack that +obj+ used,
+      #  or nil if +obj+ doesn't use the stack.
       def get_corresponding_stack(obj); raise NotImplementedError
       end
 

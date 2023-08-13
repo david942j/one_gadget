@@ -60,6 +60,20 @@ module OneGadget
         ]
       end
 
+      # @param [String | Lambda] obj
+      #  A lambda object or its string.
+      # @return [Hash{Integer => Lambda}, nil]
+      #  The corresponding stack (based on esp/rsp or ebp/rbp) that +obj+ used,
+      #  or nil if +obj+ doesn't use the stack.
+      # @example
+      #   get_corresponding_stack('rsp+0x10')
+      #   #=> sp_based_stack
+      #   get_corresponding_stack('rbp-0x10')
+      #   #=> bp_based_stack
+      #   get_corresponding_stack('[rbp-0x10]')
+      #   #=> bp_based_stack
+      #   get_corresponding_stack('rax')
+      #   #=> nil
       def get_corresponding_stack(obj)
         if obj.to_s.include?(sp)
           sp_based_stack

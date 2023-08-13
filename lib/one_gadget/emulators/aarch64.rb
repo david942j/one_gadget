@@ -44,6 +44,18 @@ module OneGadget
         registers["x#{idx}"]
       end
 
+      # @param [String | Lambda] obj
+      #  A lambda object or its string.
+      # @return [Hash{Integer => Lambda}, nil]
+      #  The corresponding stack (based on sp) that +obj+ used,
+      #  or nil if +obj+ doesn't use the stack.
+      # @example
+      #   get_corresponding_stack('sp+0x10')
+      #   #=> sp_based_stack
+      #   get_corresponding_stack('[sp+0x10]')
+      #   #=> sp_based_stack
+      #   get_corresponding_stack('x21')
+      #   #=> nil
       def get_corresponding_stack(obj)
         return nil unless obj.to_s.include?(sp)
 
