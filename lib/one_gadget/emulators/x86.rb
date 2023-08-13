@@ -93,7 +93,7 @@ module OneGadget
         dst = arg_to_lambda(dst)
         add_writable(dst.to_s)
         # TODO: Is it possible that only considering sp and bp is not enough?
-        # If it is, we need to document every memory access
+        # If it is, we need to record every memory access
         stack = get_corresponding_stack(dst)
         return if stack.nil? || dst.deref_count != 1
 
