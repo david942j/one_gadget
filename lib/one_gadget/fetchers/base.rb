@@ -130,13 +130,7 @@ module OneGadget
         # if argv is already valid, no constraints are needed! (but probably won't happen :p)
         return if argv_already_valid?(argv)
 
-        if global_var?(argv[0])
-          # argv[0] is not controlled by the user, argv[0] probably is "/bin/sh" or "sh" (but actually, the content of
-          # argv[0] doesn't quite matter, just need to make sure it's readable)
-          # So far (I checked glibc 2.37), we can make argv to be {"/bin/sh", sth, NULL} or {"sh", "-c", sth, NULL}
-          # TODO: We need to update this when the above assumption is no longer true
-          return generate_argv_with_sh(argv)
-        end
+        return generate_argv_with_sh(argv) if global_var?(argv[0])
 
         generate_argv_without_sh(argv, allow_null)
       end
@@ -146,6 +140,10 @@ module OneGadget
       end
 
       def generate_argv_with_sh(argv)
+        # argv[0] is not controlled by the user, argv[0] probably is "/bin/sh" or "sh" (but actually, the content of
+        # argv[0] doesn't quite matter, just need to make sure it's readable)
+        # So far (I checked glibc 2.37), we can make argv to be {"/bin/sh", sth, NULL} or {"sh", "-c", sth, NULL}
+        # TODO: We need to update this when the above assumption is no longer true
         if argv[2] == '0' && !global_var?(argv[1])
           "#{argv[1]} == NULL || {\"/bin/sh\", #{argv[1]}, NULL} is a valid argv"
         else
