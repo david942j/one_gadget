@@ -83,7 +83,7 @@ module OneGadget
         when /^writable/ then calculate_writable_score(expr.sub('writable: ', ''))
         when / == NULL$/ then calculate_null_score(expr.sub(' == NULL', ''))
         when / <= 0$/ then calculate_null_score(expr.sub(' <= 0', ''))
-        when / is a valid (argv|envp)$/ then 0.2 # TODO: Calculate the score more precisely
+        when / is a valid (argv|envp)$/ then 0.2 # This usually means the register has to be a readable pointer.
         end
       end
 
