@@ -10,7 +10,9 @@ describe 'one_gadget_i386' do
 
     it 'libc-2.19' do
       path = data_path('libc-2.19-fd51b20e670e9a9f60dc3b06dc9761fb08c9358b.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3fd27, 0x64c64, 0x64c6a, 0x64c6e]
+      expect(OneGadget.gadgets(file: path,
+                               force_file: true)).to eq [0x3fd17, 0x3fd1e, 0x3fd27,
+                                                         0x64c60, 0x64c64, 0x64c6a, 0x64c6e]
     end
 
     it 'libc-2.23' do

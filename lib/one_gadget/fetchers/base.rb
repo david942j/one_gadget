@@ -100,7 +100,8 @@ module OneGadget
         # arg1 == NULL || [arg1] == NULL
         # arg2 == NULL || [arg2] == NULL || arg[2] == envp
         cons = processor.constraints
-        cons << check_execve_arg(processor, arg1, allow_null_argv)
+        con = check_argv(processor, arg1, allow_null_argv)
+        cons << con unless con.nil?
         return nil unless cons.all?
 
         envp = 'environ'
@@ -112,19 +113,79 @@ module OneGadget
         { constraints: cons, envp: envp }
       end
 
-      # arg == NULL || [arg] == NULL
-      def check_execve_arg(processor, arg, allow_null)
-        if arg.start_with?(processor.sp) # arg = sp+<num>
-          # in this case, the only chance is [sp+<num>] == NULL
-          num = Integer(arg[processor.sp.size..-1])
-          slot = processor.stack[num].to_s
-          return if global_var?(slot)
+      def check_argv(processor, arg, allow_null)
+        lmda = OneGadget::Emulators::Lambda.parse(arg)
 
-          "#{slot} == NULL"
-        elsif allow_null
-          "[#{arg}] == NULL || #{arg} == NULL"
+        if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
+          return check_stack_argv(processor, lmda, allow_null)
+        end
+
+        check_nonstack_argv(arg, allow_null)
+      end
+
+      def check_stack_argv(processor, lmda, allow_null)
+        stack = processor.get_corresponding_stack(lmda.obj)
+        argv = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
+
+        # if argv is already valid, no constraints are needed! (but probably won't happen :p)
+        return if argv_already_valid?(argv)
+
+        return generate_argv_with_sh(argv) if global_var?(argv[0])
+
+        generate_argv_without_sh(argv, allow_null)
+      end
+
+      def argv_already_valid?(argv)
+        argv[0] == '0' || (global_var?(argv[0]) && argv[1] == '0')
+      end
+
+      def generate_argv_with_sh(argv)
+        # argv[0] is not controlled by the user, argv[0] probably is "/bin/sh" or "sh" (but actually, the content of
+        # argv[0] doesn't quite matter, just need to make sure it's readable)
+        # So far (I checked glibc 2.37), we can make argv to be {"/bin/sh", sth, NULL} or {"sh", "-c", sth, NULL}
+        # TODO: We need to update this when the above assumption is no longer true
+        if argv[2] == '0' && !global_var?(argv[1])
+          "#{argv[1]} == NULL || {\"/bin/sh\", #{argv[1]}, NULL} is a valid argv"
         else
-          "[#{arg}] == NULL"
+          argv_gte3 = argv[3] == '0' ? 'NULL' : "#{argv[3]}, ..."
+          if global_var?(argv[1])
+            "{\"sh\", \"-c\", #{argv[2]}, #{argv_gte3}} is a valid argv"
+          else
+            "#{argv[1]} == NULL || {\"sh\", #{argv[1]}, #{argv[2]}, #{argv_gte3}} is a valid argv"
+          end
+        end
+      end
+
+      def generate_argv_without_sh(argv, allow_null)
+        argv_cons = "{#{argv[0]}"
+        (1..argv.length - 1).each do |i|
+          if argv[i] == '0'
+            argv_cons += ', NULL'
+            break
+          elsif i == 1 && global_var?(argv[i])
+            # TODO: We probably need to get the true content of the global variable for a more accurate result
+            argv_cons += ', "-c"'
+          else
+            argv_cons += ", #{argv[i]}"
+          end
+        end
+        argv_cons += ', ...' unless argv_cons.end_with?('NULL')
+        argv_cons += '} is a valid argv'
+
+        if allow_null && argv.all? { |a| OneGadget::ABI.stack_register?(a) }
+          # If libc writes something into the stack, arg cannot be NULL.
+          # TODO: Find a better way to check can arg be NULL
+          "#{arg} == NULL || #{argv[0]} == NULL || #{argv_cons}"
+        else
+          "#{argv[0]} == NULL || #{argv_cons}"
+        end
+      end
+
+      def check_nonstack_argv(arg, allow_null)
+        if allow_null
+          "[#{arg}] == NULL || #{arg} == NULL || #{arg} is a valid argv"
+        else
+          "[#{arg}] == NULL || #{arg} is a valid argv"
         end
       end
 
@@ -134,8 +195,16 @@ module OneGadget
         # If it starts with [[ but not a global var, drop it.
         return global_var?(arg) if arg.start_with?('[[')
 
-        # normal
-        cons = check_execve_arg(processor, arg, true)
+        lmda = OneGadget::Emulators::Lambda.parse(arg)
+        if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
+          # I haven't see this case after some tests, but just in case :)
+          stack = processor.get_corresponding_stack(lmda.obj)
+          envp = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
+          # TODO: Handle the case when libc will write something into envp
+          cons = global_var?(envp[0]) ? nil : "#{arg} == NULL || {#{envp.join(', ')}, ...} is a valid envp"
+        else
+          cons = "[#{arg}] == NULL || #{arg} == NULL || #{arg} is a valid envp"
+        end
         return nil if cons.nil?
 
         yield cons

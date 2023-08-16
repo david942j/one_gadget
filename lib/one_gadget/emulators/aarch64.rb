@@ -44,6 +44,24 @@ module OneGadget
         registers["x#{idx}"]
       end
 
+      # @param [String | Lambda] obj
+      #  A lambda object or its string.
+      # @return [Hash{Integer => Lambda}, nil]
+      #  The corresponding stack (based on sp) that +obj+ used,
+      #  or nil if +obj+ doesn't use the stack.
+      # @example
+      #   get_corresponding_stack('sp+0x10')
+      #   #=> sp_based_stack
+      #   get_corresponding_stack('[sp+0x10]')
+      #   #=> sp_based_stack
+      #   get_corresponding_stack('x21')
+      #   #=> nil
+      def get_corresponding_stack(obj)
+        return nil unless obj.to_s.include?(sp)
+
+        sp_based_stack
+      end
+
       private
 
       def inst_add(dst, src, op2, mode = 'sxtw')
@@ -111,8 +129,8 @@ module OneGadget
         raise_unsupported('stp', reg1, reg2, dst) unless dst_l.obj == sp && dst_l.deref_count.zero?
 
         cur_top = dst_l.evaluate(eval_dict)
-        stack[cur_top] = registers[reg1]
-        stack[cur_top + size_t] = registers[reg2]
+        sp_based_stack[cur_top] = registers[reg1]
+        sp_based_stack[cur_top + size_t] = registers[reg2]
 
         registers[sp] += arg_to_lambda(dst).immi if dst.end_with?('!')
       end
@@ -125,7 +143,7 @@ module OneGadget
         # Only stores on stack.
         if dst_l.obj == sp && dst_l.deref_count.zero?
           cur_top = dst_l.evaluate(eval_dict)
-          stack[cur_top] = registers[src]
+          sp_based_stack[cur_top] = registers[src]
         else
           # Unlike the stack case, don't know where to save the value.
           # Simply add a constraint.

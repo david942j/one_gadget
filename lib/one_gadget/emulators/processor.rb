@@ -9,7 +9,7 @@ module OneGadget
     # Base class of a processor.
     class Processor
       attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
-      attr_reader :stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] The content on stack.
+      attr_reader :sp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on sp.
       attr_reader :sp # @return [String] Stack pointer.
       attr_reader :pc # @return [String] Program counter.
 
@@ -22,7 +22,7 @@ module OneGadget
         @registers = registers.map { |reg| [reg, to_lambda(reg)] }.to_h
         @sp = sp
         @constraints = []
-        @stack = Hash.new do |h, k|
+        @sp_based_stack = Hash.new do |h, k|
           h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
             lmda.immi = k
             lmda.deref!
@@ -92,6 +92,16 @@ module OneGadget
           obj.deref_count.zero? ? obj.obj.to_s : obj.to_s
         end
         cons.map { |type, obj| type == :writable ? "writable: #{obj}" : obj }.sort
+      end
+
+      # Method need to be implemented in inheritors.
+      #
+      # @param [String | Lambda] obj
+      #  A lambda object or its string.
+      # @return [Hash{Integer => Lambda}, nil]
+      #  The corresponding stack that +obj+ used,
+      #  or nil if +obj+ doesn't use the stack.
+      def get_corresponding_stack(obj); raise NotImplementedError
       end
 
       private

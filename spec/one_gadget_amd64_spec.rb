@@ -12,7 +12,7 @@ describe 'one_gadget_amd64' do
     it 'libc-2.19' do
       path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
-        .to eq [0x46428, 0x4647c, 0xc1ba3, 0xc1bf2, 0xe4968, 0xe5765, 0xe5771, 0xe66bd]
+        .to eq [0x46421, 0x46428, 0x4647c, 0xc1ba3, 0xc1bf2, 0xe4968, 0xe5765, 0xe5771, 0xe66bd]
     end
 
     it 'libc-2.24' do
@@ -23,22 +23,24 @@ describe 'one_gadget_amd64' do
 
     it 'libc-2.26' do
       path = data_path('libc-2.26-ddcc13122ddbfe5e5ef77d4ebe66d124ae5762c2.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x47c46, 0x47c9a, 0xfccde, 0xfdb8e]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x47c9a, 0xfccde, 0xfdb8e]
       expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
     end
 
     it 'libc-2.27' do
       path = data_path('libc-2.27-b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x4f2c5, 0x4f322, 0x10a38c]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x4f2be, 0x4f2c5, 0x4f322, 0x10a38c]
       expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
     end
 
     it 'libc-2.31' do
       path = data_path('libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
       expect(OneGadget.gadgets(file: path, force_file: true,
-                               level: 1)).to eq [0x51e39, 0x51e45, 0x51e5a, 0x51e62, 0x84173, 0x84180, 0x8418c,
-                                                 0x84199, 0xe3b2e, 0xe3b31, 0xe3b34, 0xe3d23, 0xe3d26, 0xe3d99,
-                                                 0xe3da0, 0xe3de5, 0xe3ded, 0x1075da, 0x1075e2, 0x1075e7, 0x1075f1]
+                               level: 1)).to eq [0x51e2b, 0x51e32, 0x51e39, 0x51e40, 0x51e45, 0x51e55, 0x51e5a,
+                                                 0x51e5d, 0x51e62, 0x84165, 0x8416c, 0x84173, 0x84176, 0x8417b,
+                                                 0x84180, 0x8418c, 0x84192, 0x84199, 0x841a0, 0xe3b2e, 0xe3b31,
+                                                 0xe3b34, 0xe3d23, 0xe3d26, 0xe3d92, 0xe3d99, 0xe3da0, 0xe3dd7,
+                                                 0xe3de1, 0xe3de5, 0xe3ded, 0x1075da, 0x1075e2, 0x1075e7, 0x1075f1]
       expect(OneGadget.gadgets(file: path)).to eq [0xe3b2e, 0xe3b31, 0xe3b34]
     end
 

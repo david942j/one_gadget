@@ -9,10 +9,20 @@ module OneGadget
   module Emulators
     # Super class for amd64 and i386 processor.
     class X86 < Processor
+      attr_reader :bp # @return [String] Stack base register.
+      attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp.
+
       # Constructor for a x86 processor.
-      def initialize(registers, sp, pc)
+      def initialize(registers, sp, bp, pc)
         super(registers, sp)
+        @bp = bp
         @pc = pc
+        @bp_based_stack = Hash.new do |h, k|
+          h[k] = OneGadget::Emulators::Lambda.new(bp).tap do |lmda|
+            lmda.immi = k
+            lmda.deref!
+          end
+        end
       end
 
       # Process one command.
@@ -50,23 +60,45 @@ module OneGadget
         ]
       end
 
+      # @param [String | Lambda] obj
+      #  A lambda object or its string.
+      # @return [Hash{Integer => Lambda}, nil]
+      #  The corresponding stack (based on esp/rsp or ebp/rbp) that +obj+ used,
+      #  or nil if +obj+ doesn't use the stack.
+      # @example
+      #   get_corresponding_stack('rsp+0x10')
+      #   #=> sp_based_stack
+      #   get_corresponding_stack('rbp-0x10')
+      #   #=> bp_based_stack
+      #   get_corresponding_stack('[rbp-0x10]')
+      #   #=> bp_based_stack
+      #   get_corresponding_stack('rax')
+      #   #=> nil
+      def get_corresponding_stack(obj)
+        if obj.to_s.include?(sp)
+          sp_based_stack
+        elsif obj.to_s.include?(bp)
+          bp_based_stack
+        end
+      end
+
       private
 
       def inst_mov(dst, src)
         src = arg_to_lambda(src)
         if register?(dst)
           registers[dst] = src
-        else
-          # Just ignore strange case...
-          # TODO(david942j): #120
-          return add_writable(dst) unless dst.include?(sp)
-
-          dst = arg_to_lambda(dst)
-          return if dst.deref_count != 1 # should not happen
-
-          dst.ref!
-          stack[dst.evaluate(eval_dict)] = src
+          return
         end
+        dst = arg_to_lambda(dst)
+        add_writable(dst.to_s)
+        # TODO: Is it possible that only considering sp and bp is not enough?
+        # If it is, we need to record every memory access
+        stack = get_corresponding_stack(dst)
+        return if stack.nil? || dst.deref_count != 1
+
+        dst.ref!
+        stack[dst.evaluate(eval_dict)] = src
       end
 
       # This instruction moves 128bits.
@@ -76,7 +108,7 @@ module OneGadget
         off = dst.evaluate(eval_dict)
         @constraints << [:raw, "#{sp} & 0xf == #{0x10 - off & 0xf}"]
         (128 / self.class.bits).times do |i|
-          stack[off + i * size_t] = src[i]
+          sp_based_stack[off + i * size_t] = src[i]
         end
       end
 
@@ -94,7 +126,7 @@ module OneGadget
         dst, src = check_xmm_sp(dst, src) { raise_unsupported('movq', dst, src) }
         off = src.evaluate(eval_dict)
         (64 / self.class.bits).times do |i|
-          dst[i] = stack[off + i * size_t]
+          dst[i] = sp_based_stack[off + i * size_t]
         end
       end
 
@@ -104,7 +136,7 @@ module OneGadget
         dst, src = check_xmm_sp(dst, src) { raise_unsupported('movhps', dst, src) }
         off = src.evaluate(eval_dict)
         (64 / self.class.bits).times do |i|
-          dst[i + 64 / self.class.bits] = stack[off + i * size_t]
+          dst[i + 64 / self.class.bits] = sp_based_stack[off + i * size_t]
         end
       end
 
@@ -147,7 +179,7 @@ module OneGadget
         cur_top = registers[sp].evaluate(eval_dict)
         raise Error::InstructionArgumentError, "Corrupted stack pointer: #{cur_top}" unless cur_top.is_a?(Integer)
 
-        stack[cur_top] = val
+        sp_based_stack[cur_top] = val
       end
 
       def inst_xor(dst, src)
@@ -213,6 +245,10 @@ module OneGadget
           cast = "(u#{self.class.bits})"
           OneGadget::Emulators::Lambda.new(i.zero? ? "#{cast}#{reg}" : "#{cast}(#{reg} >> #{self.class.bits * i})")
         end
+      end
+
+      def eval_dict
+        { sp => 0, bp => 0 }
       end
     end
   end

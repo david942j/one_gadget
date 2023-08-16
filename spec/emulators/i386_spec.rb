@@ -23,11 +23,11 @@ describe OneGadget::Emulators::I386 do
       EOS
       gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['esp'].to_s).to eq 'esp'
-      expect(@processor.stack[0].to_s).to eq 'esi-0x55f61'
-      expect(@processor.stack[4].to_s).to eq 'esp+0x34'
-      expect(@processor.stack[8].to_s).to eq '[[esi-0xb8]]'
+      expect(@processor.sp_based_stack[0].to_s).to eq 'esi-0x55f61'
+      expect(@processor.sp_based_stack[4].to_s).to eq 'esp+0x34'
+      expect(@processor.sp_based_stack[8].to_s).to eq '[[esi-0xb8]]'
       # The default value of stack is a lambda
-      expect(@processor.stack[3].to_s).to eq '[esp+0x3]'
+      expect(@processor.sp_based_stack[3].to_s).to eq '[esp+0x3]'
     end
 
     it 'libc-2.23-execl' do
@@ -41,9 +41,9 @@ describe OneGadget::Emulators::I386 do
       EOS
       gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['esp'].to_s).to eq 'esp-0xc'
-      expect(@processor.stack[-0xc].to_s).to eq 'esi-0x55f61'
-      expect(@processor.stack[-0x8].to_s).to eq 'esi-0x55f5c'
-      expect(@processor.stack[-0x4].to_s).to eq 'eax'
+      expect(@processor.sp_based_stack[-0xc].to_s).to eq 'esi-0x55f61'
+      expect(@processor.sp_based_stack[-0x8].to_s).to eq 'esi-0x55f5c'
+      expect(@processor.sp_based_stack[-0x4].to_s).to eq 'eax'
     end
 
     it 'add sub push' do
@@ -57,8 +57,8 @@ describe OneGadget::Emulators::I386 do
       expect(@processor.registers['esp'].to_s).to eq 'esp-0x3c'
       @processor.process('add esp, 0x3c')
       expect(@processor.registers['esp'].to_s).to eq 'esp'
-      expect(@processor.stack[-0x3c].to_s).to eq '1337'
-      expect(@processor.stack[-0x4].to_s).to eq '1'
+      expect(@processor.sp_based_stack[-0x3c].to_s).to eq '1337'
+      expect(@processor.sp_based_stack[-0x4].to_s).to eq '1'
     end
 
     it 'libc-2.19' do
@@ -72,9 +72,9 @@ describe OneGadget::Emulators::I386 do
       EOS
       gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['esp'].to_s).to eq 'esp'
-      expect(@processor.stack[0].to_s).to eq 'ebx-0x49574'
-      expect(@processor.stack[4].to_s).to eq 'ebx-0x4956f'
-      expect(@processor.stack[8].to_s).to eq 'eax'
+      expect(@processor.sp_based_stack[0].to_s).to eq 'ebx-0x49574'
+      expect(@processor.sp_based_stack[4].to_s).to eq 'ebx-0x4956f'
+      expect(@processor.sp_based_stack[8].to_s).to eq 'eax'
     end
   end
 end
