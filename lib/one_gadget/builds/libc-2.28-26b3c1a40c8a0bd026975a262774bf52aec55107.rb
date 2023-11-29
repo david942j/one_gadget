@@ -14,14 +14,23 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 258248,
+                      constraints: ["writable: x20+0x360", "{\"sh\", \"-c\", x24, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x70, environ)")
+OneGadget::Gadget.add(build_id, 258252,
+                      constraints: ["writable: x20+0x360", "x4+0x430 == NULL || {x4+0x430, \"-c\", x24, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x70, environ)")
 OneGadget::Gadget.add(build_id, 258256,
-                      constraints: ["writable: x20+0x360", "x4+0x430 == NULL"],
+                      constraints: ["writable: x20+0x360", "x4+0x430 == NULL || {x4+0x430, x3+0x438, x24, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x70, environ)")
+OneGadget::Gadget.add(build_id, 258260,
+                      constraints: ["writable: x20+0x360", "x4 == NULL || {x4, x3+0x438, x24, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", sp+0x70, environ)")
 OneGadget::Gadget.add(build_id, 258264,
-                      constraints: ["writable: x20+0x360", "x4 == NULL"],
+                      constraints: ["writable: x20+0x360", "x4 == NULL || {x4, x3, x24, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", sp+0x70, environ)")
 OneGadget::Gadget.add(build_id, 258328,
-                      constraints: ["writable: x19+0x4", "writable: x20+0x360", "[x21] == NULL || x21 == NULL"],
+                      constraints: ["writable: x19+0x4", "writable: x20+0x360", "[x21] == NULL || x21 == NULL || x21 is a valid argv"],
                       effect: "execve(\"/bin/sh\", x21, environ)")
 OneGadget::Gadget.add(build_id, 409712,
                       constraints: ["x2+0x438 == NULL"],

@@ -20,22 +20,31 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/eglibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 261567,
+                      constraints: ["ebx is the GOT address of libc", "writable: esp", "[esp+0x34] == NULL || {[esp+0x34], [esp+0x38], [esp+0x3c], [esp+0x40], ...} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", esp+0x34, environ)")
+OneGadget::Gadget.add(build_id, 261574,
+                      constraints: ["ebx is the GOT address of libc", "writable: esp+0x4", "[esp+0x34] == NULL || {[esp+0x34], [esp+0x38], [esp+0x3c], [esp+0x40], ...} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", esp+0x34, environ)")
 OneGadget::Gadget.add(build_id, 261583,
-                      constraints: ["ebx is the GOT address of libc", "[esp+0x34] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "writable: esp+0x8", "[esp+0x34] == NULL || {[esp+0x34], [esp+0x38], [esp+0x3c], [esp+0x40], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", esp+0x34, environ)")
 OneGadget::Gadget.add(build_id, 261619,
-                      constraints: ["ebx is the GOT address of libc", "[eax] == NULL || eax == NULL", "[[esp+0x8]] == NULL || [esp+0x8] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "writable: esp+0x4", "[eax] == NULL || eax == NULL || eax is a valid argv", "[[esp+0x8]] == NULL || [esp+0x8] == NULL || [esp+0x8] is a valid envp"],
                       effect: "execve(\"/bin/sh\", eax, [esp+0x8])")
 OneGadget::Gadget.add(build_id, 261623,
-                      constraints: ["ebx is the GOT address of libc", "[[esp+0x4]] == NULL || [esp+0x4] == NULL", "[[esp+0x8]] == NULL || [esp+0x8] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "writable: esp", "[[esp+0x4]] == NULL || [esp+0x4] == NULL || [esp+0x4] is a valid argv", "[[esp+0x8]] == NULL || [esp+0x8] == NULL || [esp+0x8] is a valid envp"],
                       effect: "execve(\"/bin/sh\", [esp+0x4], [esp+0x8])")
+OneGadget::Gadget.add(build_id, 415184,
+                      constraints: ["ebx is the GOT address of libc", "writable: esp+0x8", "eax == NULL"],
+                      effect: "execl(\"/bin/sh\", \"sh\", eax)")
 OneGadget::Gadget.add(build_id, 415188,
-                      constraints: ["ebx is the GOT address of libc", "[esp+0x8] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "writable: esp+0x4", "[esp+0x8] == NULL"],
                       effect: "execl(\"/bin/sh\", \"sh\", [esp+0x8])")
 OneGadget::Gadget.add(build_id, 415194,
-                      constraints: ["ebx is the GOT address of libc", "eax == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "writable: esp+0x4", "eax == NULL"],
                       effect: "execl(\"/bin/sh\", eax)")
 OneGadget::Gadget.add(build_id, 415198,
-                      constraints: ["ebx is the GOT address of libc", "[esp+0x4] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "writable: esp", "[esp+0x4] == NULL"],
                       effect: "execl(\"/bin/sh\", [esp+0x4])")
 

@@ -19,14 +19,23 @@ require 'one_gadget/gadget'
 # <https://bugs.archlinux.org/>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 250588,
+                      constraints: ["writable: x19+0x258", "{\"sh\", \"-c\", x23, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x58, environ)")
+OneGadget::Gadget.add(build_id, 250596,
+                      constraints: ["writable: x19+0x258", "writable: x20+0x4", "x4+0x7e0 == NULL || {x4+0x7e0, \"-c\", x23, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x58, environ)")
 OneGadget::Gadget.add(build_id, 250600,
-                      constraints: ["writable: x19+0x258", "writable: x20+0x4", "x4+0x7e0 == NULL"],
+                      constraints: ["writable: x19+0x258", "writable: x20+0x4", "x4+0x7e0 == NULL || {x4+0x7e0, x3+0x7e8, x23, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x58, environ)")
+OneGadget::Gadget.add(build_id, 250604,
+                      constraints: ["writable: x19+0x258", "writable: x20+0x4", "x4 == NULL || {x4, x3+0x7e8, x23, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", sp+0x58, environ)")
 OneGadget::Gadget.add(build_id, 250612,
-                      constraints: ["writable: x19+0x258", "writable: x20+0x4", "x4 == NULL"],
+                      constraints: ["writable: x19+0x258", "writable: x20+0x4", "x4 == NULL || {x4, x3, x23, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", sp+0x58, environ)")
 OneGadget::Gadget.add(build_id, 250672,
-                      constraints: ["writable: x20+0x4", "[x22] == NULL || x22 == NULL"],
+                      constraints: ["writable: x20+0x4", "[x22] == NULL || x22 == NULL || x22 is a valid argv"],
                       effect: "execve(\"/bin/sh\", x22, environ)")
 OneGadget::Gadget.add(build_id, 400676,
                       constraints: ["x2+0x7e8 == NULL"],

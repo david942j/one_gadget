@@ -20,28 +20,31 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 281025,
+                      constraints: ["writable: rsp+0x40", "{\"sh\", \"-c\", rbx, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
 OneGadget::Gadget.add(build_id, 281032,
-                      constraints: ["rax == NULL"],
+                      constraints: ["writable: rsp+0x40", "rax == NULL || {rax, \"-c\", rbx, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
 OneGadget::Gadget.add(build_id, 281116,
-                      constraints: ["[rsp+0x30] == NULL"],
+                      constraints: ["[rsp+0x30] == NULL || {[rsp+0x30], [rsp+0x38], [rsp+0x40], [rsp+0x48], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", rsp+0x30, environ)")
 OneGadget::Gadget.add(build_id, 796211,
-                      constraints: ["[rsi] == NULL || rsi == NULL", "[r12] == NULL || r12 == NULL"],
+                      constraints: ["[rsi] == NULL || rsi == NULL || rsi is a valid argv", "[r12] == NULL || r12 == NULL || r12 is a valid envp"],
                       effect: "execve(\"/bin/sh\", rsi, r12)")
 OneGadget::Gadget.add(build_id, 796290,
-                      constraints: ["[[rbp-0x48]] == NULL || [rbp-0x48] == NULL", "[r12] == NULL || r12 == NULL"],
+                      constraints: ["[[rbp-0x48]] == NULL || [rbp-0x48] == NULL || [rbp-0x48] is a valid argv", "[r12] == NULL || r12 == NULL || r12 is a valid envp"],
                       effect: "execve(\"/bin/sh\", [rbp-0x48], r12)")
 OneGadget::Gadget.add(build_id, 937909,
-                      constraints: ["[rsp+0x50] == NULL"],
+                      constraints: ["[rsp+0x50] == NULL || {[rsp+0x50], [rsp+0x58], [rsp+0x60], [rsp+0x68], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", rsp+0x50, environ)")
 OneGadget::Gadget.add(build_id, 937921,
-                      constraints: ["[rsi] == NULL || rsi == NULL", "[[rax]] == NULL || [rax] == NULL"],
+                      constraints: ["[rsi] == NULL || rsi == NULL || rsi is a valid argv", "[[rax]] == NULL || [rax] == NULL || [rax] is a valid envp"],
                       effect: "execve(\"/bin/sh\", rsi, [rax])")
 OneGadget::Gadget.add(build_id, 941662,
-                      constraints: ["[rsp+0x60] == NULL"],
+                      constraints: ["[rsp+0x60] == NULL || {[rsp+0x60], [rsp+0x68], [rsp+0x70], [rsp+0x78], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", rsp+0x60, environ)")
 OneGadget::Gadget.add(build_id, 963176,
-                      constraints: ["[rsi] == NULL || rsi == NULL", "[[rbp-0xf0]] == NULL || [rbp-0xf0] == NULL"],
+                      constraints: ["[rsi] == NULL || rsi == NULL || rsi is a valid argv", "[[rbp-0xf0]] == NULL || [rbp-0xf0] == NULL || [rbp-0xf0] is a valid envp"],
                       effect: "execve(\"/bin/sh\", rsi, [rbp-0xf0])")
 

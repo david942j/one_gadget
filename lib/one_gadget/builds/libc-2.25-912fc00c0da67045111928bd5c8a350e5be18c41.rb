@@ -20,22 +20,22 @@ require 'one_gadget/gadget'
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 246145,
-                      constraints: ["esi is the GOT address of libc", "[esp+0x34] == NULL"],
+                      constraints: ["esi is the GOT address of libc", "[esp+0x34] == NULL || {[esp+0x34], [esp+0x38], [esp+0x3c], [esp+0x40], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", esp+0x34, environ)")
 OneGadget::Gadget.add(build_id, 246147,
-                      constraints: ["esi is the GOT address of libc", "[esp+0x38] == NULL"],
+                      constraints: ["esi is the GOT address of libc", "[esp+0x38] == NULL || {[esp+0x38], [esp+0x3c], [esp+0x40], [esp+0x44], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", esp+0x38, environ)")
 OneGadget::Gadget.add(build_id, 246151,
-                      constraints: ["esi is the GOT address of libc", "[esp+0x3c] == NULL"],
+                      constraints: ["esi is the GOT address of libc", "[esp+0x3c] == NULL || {[esp+0x3c], [esp+0x40], [esp+0x44], [esp+0x48], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", esp+0x3c, environ)")
 OneGadget::Gadget.add(build_id, 246158,
-                      constraints: ["esi is the GOT address of libc", "[esp+0x40] == NULL"],
+                      constraints: ["esi is the GOT address of libc", "[esp+0x40] == NULL || {[esp+0x40], [esp+0x44], [esp+0x48], [esp+0x4c], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", esp+0x40, environ)")
 OneGadget::Gadget.add(build_id, 246193,
-                      constraints: ["esi is the GOT address of libc", "[eax] == NULL || eax == NULL", "[[esp]] == NULL || [esp] == NULL"],
+                      constraints: ["esi is the GOT address of libc", "[eax] == NULL || eax == NULL || eax is a valid argv", "[[esp]] == NULL || [esp] == NULL || [esp] is a valid envp"],
                       effect: "execve(\"/bin/sh\", eax, [esp])")
 OneGadget::Gadget.add(build_id, 246194,
-                      constraints: ["esi is the GOT address of libc", "[[esp]] == NULL || [esp] == NULL", "[[esp+0x4]] == NULL || [esp+0x4] == NULL"],
+                      constraints: ["esi is the GOT address of libc", "[[esp]] == NULL || [esp] == NULL || [esp] is a valid argv", "[[esp+0x4]] == NULL || [esp+0x4] == NULL || [esp+0x4] is a valid envp"],
                       effect: "execve(\"/bin/sh\", [esp], [esp+0x4])")
 OneGadget::Gadget.add(build_id, 401519,
                       constraints: ["edi is the GOT address of libc", "eax == NULL"],

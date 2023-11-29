@@ -14,8 +14,11 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 848496,
+                      constraints: ["ebx is the GOT address of libc", "writable: ebp-0x20", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", ebp-0x28, [ebp-0x2c])")
 OneGadget::Gadget.add(build_id, 848499,
-                      constraints: ["ebx is the GOT address of libc", "writable: ebp-0x20", "[ebp-0x28] == NULL || ebp-0x28 == NULL", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL"],
+                      constraints: ["ebx is the GOT address of libc", "writable: ebp-0x20", "eax == NULL || {\"/bin/sh\", eax, NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
                       effect: "execve(\"/bin/sh\", ebp-0x28, [ebp-0x2c])")
 OneGadget::Gadget.add(build_id, 1370571,
                       constraints: ["ebp is the GOT address of libc", "eax == NULL"],

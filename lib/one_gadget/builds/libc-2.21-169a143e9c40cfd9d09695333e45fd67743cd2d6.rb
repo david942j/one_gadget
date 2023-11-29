@@ -19,14 +19,23 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 252888,
+                      constraints: ["writable: x19+0x2a0", "{\"sh\", \"-c\", x23, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x58, environ)")
+OneGadget::Gadget.add(build_id, 252896,
+                      constraints: ["writable: x19+0x2a0", "writable: x20+0x4", "x4+0x9d8 == NULL || {x4+0x9d8, \"-c\", x23, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x58, environ)")
 OneGadget::Gadget.add(build_id, 252900,
-                      constraints: ["writable: x19+0x2a0", "writable: x20+0x4", "x4+0x9d8 == NULL"],
+                      constraints: ["writable: x19+0x2a0", "writable: x20+0x4", "x4+0x9d8 == NULL || {x4+0x9d8, x3+0x9e0, x23, NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x58, environ)")
+OneGadget::Gadget.add(build_id, 252904,
+                      constraints: ["writable: x19+0x2a0", "writable: x20+0x4", "x4 == NULL || {x4, x3+0x9e0, x23, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", sp+0x58, environ)")
 OneGadget::Gadget.add(build_id, 252908,
-                      constraints: ["writable: x19+0x2a0", "writable: x20+0x4", "x4 == NULL"],
+                      constraints: ["writable: x19+0x2a0", "writable: x20+0x4", "x4 == NULL || {x4, x3, x23, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", sp+0x58, environ)")
 OneGadget::Gadget.add(build_id, 252976,
-                      constraints: ["writable: x20+0x4", "[sp+0x58] == NULL"],
+                      constraints: ["writable: x20+0x4", "[sp+0x58] == NULL || {[sp+0x58], [sp+0x60], [sp+0x68], [sp+0x70], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", sp+0x58, environ)")
 OneGadget::Gadget.add(build_id, 408244,
                       constraints: ["x2+0x9e0 == NULL"],

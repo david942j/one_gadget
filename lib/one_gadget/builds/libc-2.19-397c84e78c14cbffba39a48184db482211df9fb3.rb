@@ -20,19 +20,22 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 261720,
+                      constraints: ["writable: x21+0x2e0", "{\"sh\", \"-c\", x22, x1, ...} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", sp+0x68, environ)")
 OneGadget::Gadget.add(build_id, 261724,
-                      constraints: ["writable: x21+0x2e0", "x3+0x9e0 == NULL"],
+                      constraints: ["writable: x21+0x2e0", "x3+0x9e0 == NULL || {x3+0x9e0, \"-c\", x22, x1, ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", sp+0x68, environ)")
 OneGadget::Gadget.add(build_id, 261732,
-                      constraints: ["writable: x20", "writable: x21+0x2e0", "[x20] == NULL || x20 == NULL"],
+                      constraints: ["writable: x20", "writable: x21+0x2e0", "[x20] == NULL || x20 == NULL || x20 is a valid argv"],
                       effect: "execve(\"/bin/sh\", x20, environ)")
 OneGadget::Gadget.add(build_id, 261808,
-                      constraints: ["writable: x21+0x2e0", "writable: x24+0x4", "[x20] == NULL || x20 == NULL"],
+                      constraints: ["writable: x21+0x2e0", "writable: x24+0x4", "[x20] == NULL || x20 == NULL || x20 is a valid argv"],
                       effect: "execve(\"/bin/sh\", x20, environ)")
 OneGadget::Gadget.add(build_id, 261820,
-                      constraints: ["writable: x21+0x2e0", "writable: x24+0x4", "[x1] == NULL || x1 == NULL", "[[x0]] == NULL || [x0] == NULL"],
+                      constraints: ["writable: x21+0x2e0", "writable: x24+0x4", "[x1] == NULL || x1 == NULL || x1 is a valid argv", "[[x0]] == NULL || [x0] == NULL || [x0] is a valid envp"],
                       effect: "execve(\"/bin/sh\", x1, [x0])")
 OneGadget::Gadget.add(build_id, 261824,
-                      constraints: ["writable: x21+0x2e0", "writable: x24+0x4", "[x1] == NULL || x1 == NULL", "[x2] == NULL || x2 == NULL"],
+                      constraints: ["writable: x21+0x2e0", "writable: x24+0x4", "[x1] == NULL || x1 == NULL || x1 is a valid argv", "[x2] == NULL || x2 == NULL || x2 is a valid envp"],
                       effect: "execve(\"/bin/sh\", x1, x2)")
 
