@@ -52,9 +52,7 @@ GEM
     simplecov-html (0.12.3)
     simplecov_json_formatter (0.1.4)
     unicode-display_width (2.1.0)
-    webrick (1.7.0)
-    yard (0.9.28)
-      webrick (~> 1.7.0)
+    yard (0.9.34)
 
 PLATFORMS
   ruby
