@@ -28,7 +28,7 @@ module OneGadget
           # use processor to find which can lead to a valid one-gadget call.
           gadgets = []
           (lines.size - 2).downto(0) do |i|
-            processor = emulate(lines[i..-1])
+            processor = emulate(lines[i..])
             options = resolve(processor)
             next if options.nil? # impossible to be a gadget
 
@@ -48,7 +48,7 @@ module OneGadget
       #   True for valid.
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
-      def candidates(&block)
+      def candidates(&)
         call_regexp = "#{call_str}.*<(exec[^+]*|posix_spawn[^+]*)>$"
         cands = []
         `#{@objdump.command}|grep -E '#{call_regexp}' -B 30`.split('--').each do |cand|
@@ -63,7 +63,7 @@ module OneGadget
         end
         # remove all jmps
         cands = slice_prefix(cands, &method(:branch?))
-        cands.select!(&block) if block_given?
+        cands.select!(&) if block_given?
         cands
       end
 
@@ -81,7 +81,8 @@ module OneGadget
         call = processor.registers[processor.pc].to_s
         return resolve_posix_spawn(processor) if call.include?('posix_spawn')
         return resolve_execve(processor) if call.include?('execve')
-        return resolve_execl(processor) if call.include?('execl')
+
+        resolve_execl(processor) if call.include?('execl')
       end
 
       def resolve_execve(processor)
@@ -110,7 +111,7 @@ module OneGadget
           envp = arg2
         end
 
-        { constraints: cons, envp: envp }
+        { constraints: cons, envp: }
       end
 
       def check_argv(processor, arg, allow_null)
@@ -282,7 +283,7 @@ module OneGadget
         cands.map do |cand|
           lines = cand.lines
           to_rm = lines[0...-1].rindex(&block)
-          lines = lines[to_rm + 1..-1] unless to_rm.nil?
+          lines = lines[to_rm + 1..] unless to_rm.nil?
           lines.join
         end
       end

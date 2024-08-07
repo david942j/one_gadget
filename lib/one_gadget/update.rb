@@ -24,14 +24,14 @@ module OneGadget
         FileUtils.touch(cache_file)
         OneGadget::Logger.info("Checking for new versions of OneGadget\n" \
                                "To disable this functionality, do\n$ echo never > #{CACHE_FILE}\n\n")
-        latest = Helper.latest_tag[1..-1] # remove 'v'
+        latest = Helper.latest_tag[1..] # remove 'v'
         if Gem::Version.new(latest) <= Gem::Version.new(OneGadget::VERSION)
           return OneGadget::Logger.info("You have the latest version of OneGadget (#{latest})!\n\n")
         end
 
         # show update message
         msg = format('A newer version of OneGadget is available (%s --> %s).', OneGadget::VERSION, latest)
-        OneGadget::Logger.ask_update(msg: msg)
+        OneGadget::Logger.ask_update(msg:)
       end
 
       private

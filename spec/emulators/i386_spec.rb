@@ -62,7 +62,7 @@ describe OneGadget::Emulators::I386 do
     end
 
     it 'libc-2.19' do
-      gadget = <<-'EOS'
+      gadget = <<-EOS
   64c60: mov DWORD PTR [esp+0x8],eax
   64c64: lea eax,[ebx-0x4956f]
   64c6a: mov DWORD PTR [esp+0x4],eax

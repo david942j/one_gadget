@@ -13,7 +13,7 @@ module OneGadget
   # Define some helpful methods here.
   module Helper
     # Format of build-id, 40 hex numbers.
-    BUILD_ID_FORMAT = /[0-9a-f]{40}/.freeze
+    BUILD_ID_FORMAT = /[0-9a-f]{40}/
 
     module_function
 
@@ -35,7 +35,7 @@ module OneGadget
     # @return [Array<String>]
     #   Lines of comments.
     def comments_of_file(file)
-      File.readlines(file).map { |s| s[2..-1].rstrip if s.start_with?('# ') }.compact
+      File.readlines(file).map { |s| s[2..].rstrip if s.start_with?('# ') }.compact
     end
 
     # Get absolute path from relative path. Support symlink.

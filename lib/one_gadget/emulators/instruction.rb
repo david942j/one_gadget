@@ -31,7 +31,7 @@ module OneGadget
         idx = cmd.index(inst)
         cmd = cmd[0...cmd.rindex('//')] if cmd.rindex('//')
         cmd = cmd[0...cmd.rindex('#')] if cmd.rindex('#')
-        args = parse_args(cmd[idx + inst.size..-1])
+        args = parse_args(cmd[idx + inst.size..])
         unless argc.include?(args.size)
           raise OneGadget::Error::InstructionArgumentError, "Incorrect argument number in #{cmd}, expect: #{argc}"
         end

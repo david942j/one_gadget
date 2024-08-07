@@ -19,7 +19,7 @@ module OneGadget
       # @param [String] sp
       #   The stack register.
       def initialize(registers, sp)
-        @registers = registers.map { |reg| [reg, to_lambda(reg)] }.to_h
+        @registers = registers.to_h { |reg| [reg, to_lambda(reg)] }
         @sp = sp
         @constraints = []
         @sp_based_stack = Hash.new do |h, k|

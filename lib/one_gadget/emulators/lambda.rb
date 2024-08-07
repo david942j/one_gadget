@@ -43,7 +43,7 @@ module OneGadget
       # @param [Numeric] other Value to substract.
       # @return [Lambda] The result.
       def -(other)
-        self.+(-other)
+        self + -other
       end
 
       # Increase dereference count by 1.
@@ -123,8 +123,8 @@ module OneGadget
           # nested []
           if arg[0] == '['
             ridx = arg.rindex(']')
-            immi = parse(arg[(ridx + 1)..-1])
-            lm = parse(arg[1...ridx], predefined: predefined).deref
+            immi = parse(arg[(ridx + 1)..])
+            lm = parse(arg[1...ridx], predefined:).deref
             lm += immi unless immi.zero?
             return lm
           end
