@@ -64,18 +64,20 @@ $ one_gadget
 
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6
-# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
+# 0xe3afe execve("/bin/sh", r15, r12)
 # constraints:
-#   rsp & 0xf == 0
-#   rcx == NULL
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
 #
-# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
+# 0xe3b01 execve("/bin/sh", r15, rdx)
 # constraints:
-#   [rsp+0x40] == NULL
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
 #
-# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
+# 0xe3b04 execve("/bin/sh", rsi, rdx)
 # constraints:
-#   [rsp+0x70] == NULL
+#   [rsi] == NULL || rsi == NULL || rsi is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
 
 ```
 ![x86_64](https://github.com/david942j/one_gadget/blob/master/examples/x86_64.png?raw=true)
@@ -83,21 +85,17 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6
 #### Given BuildID
 ```bash
 $ one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d
-# 0x45526 execve("/bin/sh", rsp+0x30, environ)
-# constraints:
-#   rax == NULL
-#
 # 0x4557a execve("/bin/sh", rsp+0x30, environ)
 # constraints:
-#   [rsp+0x30] == NULL
+#   [rsp+0x30] == NULL || {[rsp+0x30], [rsp+0x38], [rsp+0x40], [rsp+0x48], ...} is a valid argv
 #
 # 0xf1651 execve("/bin/sh", rsp+0x40, environ)
 # constraints:
-#   [rsp+0x40] == NULL
+#   [rsp+0x40] == NULL || {[rsp+0x40], [rsp+0x48], [rsp+0x50], [rsp+0x58], ...} is a valid argv
 #
 # 0xf24cb execve("/bin/sh", rsp+0x60, environ)
 # constraints:
-#   [rsp+0x60] == NULL
+#   [rsp+0x60] == NULL || {[rsp+0x60], [rsp+0x68], [rsp+0x70], [rsp+0x78], ...} is a valid argv
 
 ```
 ![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
@@ -120,33 +118,37 @@ Reorder gadgets according to the distance of given functions.
 
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near exit,mkdir
-# [OneGadget] Gadgets near exit(0x43120):
-# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
+# [OneGadget] Gadgets near exit(0x46a40):
+# 0xe3afe execve("/bin/sh", r15, r12)
 # constraints:
-#   rsp & 0xf == 0
-#   rcx == NULL
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
 #
-# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
+# 0xe3b01 execve("/bin/sh", r15, rdx)
 # constraints:
-#   [rsp+0x40] == NULL
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
 #
-# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
+# 0xe3b04 execve("/bin/sh", rsi, rdx)
 # constraints:
-#   [rsp+0x70] == NULL
+#   [rsi] == NULL || rsi == NULL || rsi is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
 #
-# [OneGadget] Gadgets near mkdir(0x10fbb0):
-# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
+# [OneGadget] Gadgets near mkdir(0x10de70):
+# 0xe3b04 execve("/bin/sh", rsi, rdx)
 # constraints:
-#   [rsp+0x70] == NULL
+#   [rsi] == NULL || rsi == NULL || rsi is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
 #
-# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
+# 0xe3b01 execve("/bin/sh", r15, rdx)
 # constraints:
-#   [rsp+0x40] == NULL
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
 #
-# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
+# 0xe3afe execve("/bin/sh", r15, r12)
 # constraints:
-#   rsp & 0xf == 0
-#   rcx == NULL
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
 #
 
 ```
@@ -155,11 +157,11 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near exit,mkdir
 Regular expression is acceptable.
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near 'write.*' --raw
-# [OneGadget] Gadgets near writev(0x1166a0):
-# 1090444 324386 324293
+# [OneGadget] Gadgets near writev(0x114690):
+# 932612 932609 932606
 #
-# [OneGadget] Gadgets near write(0x110140):
-# 1090444 324386 324293
+# [OneGadget] Gadgets near write(0x10e280):
+# 932612 932609 932606
 #
 
 ```
@@ -167,23 +169,23 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near 'write.*' --raw
 Pass an ELF file as the argument, OneGadget will take all GOT functions for processing.
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near spec/data/test_near_file.elf --raw
-# [OneGadget] Gadgets near exit(0x43120):
-# 324293 324386 1090444
+# [OneGadget] Gadgets near exit(0x46a40):
+# 932606 932609 932612
 #
-# [OneGadget] Gadgets near puts(0x809c0):
-# 324386 324293 1090444
+# [OneGadget] Gadgets near puts(0x84420):
+# 932606 932609 932612
 #
-# [OneGadget] Gadgets near printf(0x64e80):
-# 324386 324293 1090444
+# [OneGadget] Gadgets near printf(0x61c90):
+# 932606 932609 932612
 #
-# [OneGadget] Gadgets near strlen(0x9dc70):
-# 324386 324293 1090444
+# [OneGadget] Gadgets near strlen(0x9f630):
+# 932606 932609 932612
 #
-# [OneGadget] Gadgets near __cxa_finalize(0x43520):
-# 324293 324386 1090444
+# [OneGadget] Gadgets near __cxa_finalize(0x46f10):
+# 932606 932609 932612
 #
-# [OneGadget] Gadgets near __libc_start_main(0x21ab0):
-# 324293 324386 1090444
+# [OneGadget] Gadgets near __libc_start_main(0x23f90):
+# 932606 932609 932612
 #
 
 ```
@@ -197,43 +199,263 @@ Use option `--level 1` to show all gadgets found instead of only those with high
 
 ```bash
 $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
-# 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
+# 0x51dfb posix_spawn(rsp+0xc, "/bin/sh", 0, rbp, rsp+0x50, environ)
 # constraints:
+#   address rsp+0x60 is writable
 #   rsp & 0xf == 0
-#   rcx == NULL
+#   {"sh", "-c", rbx, NULL} is a valid argv
+#   rbp == NULL || (u16)[rbp] == NULL
 #
-# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
+# 0x51e02 posix_spawn(rsp+0xc, "/bin/sh", 0, rbp, rsp+0x50, environ)
 # constraints:
-#   [rsp+0x40] == NULL
+#   address rsp+0x60 is writable
+#   rsp & 0xf == 0
+#   rax == NULL || {"sh", rax, rbx, NULL} is a valid argv
+#   rbp == NULL || (u16)[rbp] == NULL
 #
-# 0xe569f execve("/bin/sh", r14, r12)
+# 0x51e09 posix_spawn(rsp+0xc, "/bin/sh", 0, rbp, rsp+0x50, environ)
 # constraints:
-#   [r14] == NULL || r14 == NULL
-#   [r12] == NULL || r12 == NULL
+#   address rsp+0x60 is writable
+#   rsp & 0xf == 0
+#   rcx == NULL || {rcx, rax, rbx, NULL} is a valid argv
+#   rbp == NULL || (u16)[rbp] == NULL
 #
-# 0xe5858 execve("/bin/sh", [rbp-0x88], [rbp-0x70])
+# 0x51e10 posix_spawn(rsp+0xc, "/bin/sh", rdx, rbp, rsp+0x50, environ)
 # constraints:
-#   [[rbp-0x88]] == NULL || [rbp-0x88] == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
+#   address rsp+0x60 is writable
+#   rsp & 0xf == 0
+#   rcx == NULL || {rcx, (u64)xmm1, rbx, NULL} is a valid argv
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#   rbp == NULL || (u16)[rbp] == NULL
 #
-# 0xe585f execve("/bin/sh", r10, [rbp-0x70])
+# 0x51e15 posix_spawn(rsp+0xc, "/bin/sh", rdx, rbp, rsp+0x50, environ)
 # constraints:
-#   [r10] == NULL || r10 == NULL
-#   [[rbp-0x70]] == NULL || [rbp-0x70] == NULL
+#   address rsp+0x60 is writable
+#   rsp & 0xf == 0
+#   (u64)xmm0 == NULL || {(u64)xmm0, (u64)xmm1, rbx, NULL} is a valid argv
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#   rbp == NULL || (u16)[rbp] == NULL
 #
-# 0xe5863 execve("/bin/sh", r10, rdx)
+# 0x51e25 posix_spawn(rdi, "/bin/sh", rdx, rbp, rsp+0x50, [rax])
 # constraints:
-#   [r10] == NULL || r10 == NULL
-#   [rdx] == NULL || rdx == NULL
+#   address rsp+0x60 is writable
+#   rsp & 0xf == 0
+#   (u64)xmm0 == NULL || {(u64)xmm0, (u64)(xmm0 >> 64), rbx, NULL} is a valid argv
+#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
+#   rdi == NULL || writable: rdi
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#   rbp == NULL || (u16)[rbp] == NULL
 #
-# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
+# 0x51e2a posix_spawn(rdi, "/bin/sh", rdx, rbp, r8, [rax])
 # constraints:
-#   [rsp+0x70] == NULL
+#   address rsp+0x60 is writable
+#   rsp & 0xf == 0
+#   [r8] == NULL || r8 is a valid argv
+#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
+#   rdi == NULL || writable: rdi
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#   rbp == NULL || (u16)[rbp] == NULL
 #
-# 0x10a398 execve("/bin/sh", rsi, [rax])
+# 0x51e2d posix_spawn(rdi, "/bin/sh", rdx, rcx, r8, [rax])
 # constraints:
-#   [rsi] == NULL || rsi == NULL
-#   [[rax]] == NULL || [rax] == NULL
+#   address rsp+0x60 is writable
+#   rsp & 0xf == 0
+#   [r8] == NULL || r8 is a valid argv
+#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
+#   rdi == NULL || writable: rdi
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#   rcx == NULL || (u16)[rcx] == NULL
+#
+# 0x51e32 posix_spawn(rdi, "/bin/sh", rdx, rcx, r8, [rax])
+# constraints:
+#   address rsp+0x68 is writable
+#   rsp & 0xf == 0
+#   [r8] == NULL || r8 is a valid argv
+#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
+#   rdi == NULL || writable: rdi
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#   rcx == NULL || (u16)[rcx] == NULL
+#
+# 0x84135 posix_spawn(rbx+0xe0, "/bin/sh", r12, 0, rsp+0x60, environ)
+# constraints:
+#   address rsp+0x70 is writable
+#   rsp & 0xf == 0
+#   {"sh", "-c", rbp, NULL} is a valid argv
+#   rbx+0xe0 == NULL || writable: rbx+0xe0
+#   r12 == NULL || (s32)[r12+0x4] <= 0
+#
+# 0x8413c posix_spawn(rbx+0xe0, "/bin/sh", r12, 0, rsp+0x60, environ)
+# constraints:
+#   address rsp+0x70 is writable
+#   rsp & 0xf == 0
+#   rax == NULL || {"sh", rax, rbp, NULL} is a valid argv
+#   rbx+0xe0 == NULL || writable: rbx+0xe0
+#   r12 == NULL || (s32)[r12+0x4] <= 0
+#
+# 0x84143 posix_spawn(rbx+0xe0, "/bin/sh", r12, 0, rsp+0x60, environ)
+# constraints:
+#   address rsp+0x70 is writable
+#   rsp & 0xf == 0
+#   rcx == NULL || {rcx, rax, rbp, NULL} is a valid argv
+#   rbx+0xe0 == NULL || writable: rbx+0xe0
+#   r12 == NULL || (s32)[r12+0x4] <= 0
+#
+# 0x84146 posix_spawn(rbx+0xe0, "/bin/sh", rdx, 0, rsp+0x60, environ)
+# constraints:
+#   address rsp+0x70 is writable
+#   rsp & 0xf == 0
+#   rcx == NULL || {rcx, rax, rbp, NULL} is a valid argv
+#   rbx+0xe0 == NULL || writable: rbx+0xe0
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#
+# 0x8414b posix_spawn(rbx+0xe0, "/bin/sh", rdx, 0, rsp+0x60, environ)
+# constraints:
+#   address rsp+0x78 is writable
+#   rsp & 0xf == 0
+#   rcx == NULL || {rcx, rax, [rsp+0x70], NULL} is a valid argv
+#   rbx+0xe0 == NULL || writable: rbx+0xe0
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#
+# 0x84150 posix_spawn(rbx+0xe0, "/bin/sh", rdx, 0, rsp+0x60, environ)
+# constraints:
+#   address rsp+0x78 is writable
+#   rsp & 0xf == 0
+#   rcx == NULL || {rcx, (u64)xmm1, [rsp+0x70], NULL} is a valid argv
+#   rbx+0xe0 == NULL || writable: rbx+0xe0
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#
+# 0x8415c posix_spawn(rbx+0xe0, "/bin/sh", rdx, 0, rsp+0x60, [rax])
+# constraints:
+#   address rsp+0x78 is writable
+#   rsp & 0xf == 0
+#   (u64)xmm0 == NULL || {(u64)xmm0, (u64)xmm1, [rsp+0x70], NULL} is a valid argv
+#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
+#   rbx+0xe0 == NULL || writable: rbx+0xe0
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#
+# 0x84162 posix_spawn(rbx+0xe0, "/bin/sh", rdx, rcx, rsp+0x60, [rax])
+# constraints:
+#   address rsp+0x78 is writable
+#   rsp & 0xf == 0
+#   (u64)xmm0 == NULL || {(u64)xmm0, (u64)(xmm0 >> 64), [rsp+0x70], NULL} is a valid argv
+#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
+#   rbx+0xe0 == NULL || writable: rbx+0xe0
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#   rcx == NULL || (u16)[rcx] == NULL
+#
+# 0x84169 posix_spawn(rdi, "/bin/sh", rdx, rcx, rsp+0x60, [rax])
+# constraints:
+#   address rsp+0x78 is writable
+#   rsp & 0xf == 0
+#   (u64)xmm0 == NULL || {(u64)xmm0, (u64)(xmm0 >> 64), [rsp+0x70], NULL} is a valid argv
+#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
+#   rdi == NULL || writable: rdi
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#   rcx == NULL || (u16)[rcx] == NULL
+#
+# 0x84170 posix_spawn(rdi, "/bin/sh", rdx, rcx, r8, [rax])
+# constraints:
+#   address rsp+0x78 is writable
+#   rsp & 0xf == 0
+#   [r8] == NULL || r8 is a valid argv
+#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
+#   rdi == NULL || writable: rdi
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#   rcx == NULL || (u16)[rcx] == NULL
+#
+# 0xe3afe execve("/bin/sh", r15, r12)
+# constraints:
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe3b01 execve("/bin/sh", r15, rdx)
+# constraints:
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
+#
+# 0xe3b04 execve("/bin/sh", rsi, rdx)
+# constraints:
+#   [rsi] == NULL || rsi == NULL || rsi is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
+#
+# 0xe3cf3 execve("/bin/sh", r10, r12)
+# constraints:
+#   address rbp-0x78 is writable
+#   [r10] == NULL || r10 == NULL || r10 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe3cf6 execve("/bin/sh", r10, rdx)
+# constraints:
+#   address rbp-0x78 is writable
+#   [r10] == NULL || r10 == NULL || r10 is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
+#
+# 0xe3d62 execve("/bin/sh", rbp-0x50, r12)
+# constraints:
+#   address rbp-0x48 is writable
+#   r13 == NULL || {"/bin/sh", r13, NULL} is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe3d69 execve("/bin/sh", rbp-0x50, r12)
+# constraints:
+#   address rbp-0x48 is writable
+#   rax == NULL || {rax, r13, NULL} is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe3d70 execve("/bin/sh", rbp-0x50, r12)
+# constraints:
+#   address rbp-0x50 is writable
+#   rax == NULL || {rax, [rbp-0x48], NULL} is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe3da7 execve("/bin/sh", rbp-0x50, r12)
+# constraints:
+#   address rbp-0x50 is writable
+#   [rbp-0x68] == NULL || {"/bin/sh", [rbp-0x68], NULL} is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe3db1 execve("/bin/sh", rbp-0x50, r12)
+# constraints:
+#   address rbp-0x50 is writable
+#   rax == NULL || {rax, [rbp-0x68], NULL} is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe3db5 execve("/bin/sh", r10, r12)
+# constraints:
+#   addresses r10+0x10, rbp-0x50 are writable
+#   [r10] == NULL || r10 == NULL || r10 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe3dbd execve("/bin/sh", r10, r12)
+# constraints:
+#   addresses r10+0x10, rbp-0x48 are writable
+#   [r10] == NULL || r10 == NULL || r10 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0x1077ca posix_spawn(rsp+0x64, "/bin/sh", [rsp+0x38], 0, rsp+0x70, [rsp+0xf0])
+# constraints:
+#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
+#   [[rsp+0xf0]] == NULL || [rsp+0xf0] == NULL || [rsp+0xf0] is a valid envp
+#   [rsp+0x38] == NULL || (s32)[[rsp+0x38]+0x4] <= 0
+#
+# 0x1077d2 posix_spawn(rsp+0x64, "/bin/sh", [rsp+0x38], 0, rsp+0x70, r9)
+# constraints:
+#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
+#   [r9] == NULL || r9 == NULL || r9 is a valid envp
+#   [rsp+0x38] == NULL || (s32)[[rsp+0x38]+0x4] <= 0
+#
+# 0x1077d7 posix_spawn(rsp+0x64, "/bin/sh", rdx, 0, rsp+0x70, r9)
+# constraints:
+#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
+#   [r9] == NULL || r9 == NULL || r9 is a valid envp
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
+#
+# 0x1077e1 posix_spawn(rdi, "/bin/sh", rdx, 0, r8, r9)
+# constraints:
+#   [r8] == NULL || r8 is a valid argv
+#   [r9] == NULL || r9 == NULL || r9 is a valid envp
+#   rdi == NULL || writable: rdi
+#   rdx == NULL || (s32)[rdx+0x4] <= 0
 
 ```
 
@@ -242,44 +464,21 @@ $ one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1
 ##### i386
 ```bash
 $ one_gadget /lib32/libc.so.6
-# 0x3cbea execve("/bin/sh", esp+0x34, environ)
+# 0xc890b execve("/bin/sh", [ebp-0x2c], esi)
 # constraints:
-#   esi is the GOT address of libc
-#   [esp+0x34] == NULL
+#   address ebp-0x20 is writable
+#   ebx is the GOT address of libc
+#   [[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid argv
+#   [esi] == NULL || esi == NULL || esi is a valid envp
 #
-# 0x3cbec execve("/bin/sh", esp+0x38, environ)
+# 0x1421b3 execl("/bin/sh", eax)
 # constraints:
-#   esi is the GOT address of libc
-#   [esp+0x38] == NULL
-#
-# 0x3cbf0 execve("/bin/sh", esp+0x3c, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x3c] == NULL
-#
-# 0x3cbf7 execve("/bin/sh", esp+0x40, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x40] == NULL
-#
-# 0x6729f execl("/bin/sh", eax)
-# constraints:
-#   esi is the GOT address of libc
+#   ebp is the GOT address of libc
 #   eax == NULL
 #
-# 0x672a0 execl("/bin/sh", [esp])
+# 0x1421b4 execl("/bin/sh", [esp])
 # constraints:
-#   esi is the GOT address of libc
-#   [esp] == NULL
-#
-# 0x13573e execl("/bin/sh", eax)
-# constraints:
-#   ebx is the GOT address of libc
-#   eax == NULL
-#
-# 0x13573f execl("/bin/sh", [esp])
-# constraints:
-#   ebx is the GOT address of libc
+#   ebp is the GOT address of libc
 #   [esp] == NULL
 
 ```
@@ -324,15 +523,15 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6')
-#=> [324293, 324386, 1090444]
+#=> [932606, 932609, 932612]
 
 # or in shorter way
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1)
-#=> [324293, 324386, 939679, 940120, 940127, 940131, 1090444, 1090456]
+#=> [335355, 335362, 335369, 335376, 335381, 335397, 335402, 335405, 335410, 540981, 540988, 540995, 540998, 541003, 541008, 541020, 541026, 541033, 541040, 932606, 932609, 932612, 933107, 933110, 933218, 933225, 933232, 933287, 933297, 933301, 933309, 1079242, 1079250, 1079255, 1079265]
 
 # from build id
 one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0')
-#=> [324293, 324386, 1090444]
+#=> [324286, 324293, 324386, 1090444]
 
 ```
 
@@ -343,7 +542,7 @@ def one_gadget(filename):
   return [int(i) for i in subprocess.check_output(['one_gadget', '--raw', filename]).decode().split(' ')]
 
 one_gadget('/lib/x86_64-linux-gnu/libc.so.6')
-#=> [324293, 324386, 1090444]
+#=> [932606, 932609, 932612]
 
 ```
 

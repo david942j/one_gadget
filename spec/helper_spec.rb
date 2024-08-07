@@ -33,9 +33,9 @@ describe OneGadget::Helper do
 
   it 'url_request' do
     val = :val
-    expect { hook_logger { val = described_class.url_request('oao') } }.to output(include(<<-EOS)).to_stdout
-[OneGadget] undefined method `request_uri' for #<URI::Generic oao>
-    EOS
+    expect do
+      hook_logger { val = described_class.url_request('oao') }
+    end.to output(include('[OneGadget] undefined method')).to_stdout
     expect(val).to be_nil
   end
 

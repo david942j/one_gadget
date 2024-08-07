@@ -36,7 +36,7 @@ module OneGadget
         # return registers[pc] = args[0] if inst.inst == 'call'
         return true if inst.inst == 'jmp' # believe the fetcher has handled jmp.
 
-        sym = "inst_#{inst.inst}".to_sym
+        sym = :"inst_#{inst.inst}"
         __send__(sym, *args) != :fail
       end
 

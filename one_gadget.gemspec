@@ -9,7 +9,7 @@ require 'one_gadget/version'
 
 Gem::Specification.new do |s|
   s.name          = 'one_gadget'
-  s.version       = ::OneGadget::VERSION
+  s.version       = OneGadget::VERSION
   s.summary       = 'one_gadget'
   s.description   = <<-EOS
   When playing ctf pwn challenges we usually needs the one-gadget of execve('/bin/sh', NULL, NULL).
@@ -32,9 +32,9 @@ Gem::Specification.new do |s|
     'source_code_uri' => 'https://github.com/david942j/one_gadget'
   }
 
-  s.required_ruby_version = '>= 2.4'
+  s.required_ruby_version = '>= 3.1'
 
-  s.add_runtime_dependency 'elftools', '>= 1.0.2', '< 1.2.0'
+  s.add_dependency 'elftools', '>= 1.0.2', '< 1.2.0'
 
   s.add_development_dependency 'rake', '~> 13.0'
   s.add_development_dependency 'rspec', '~> 3.7'

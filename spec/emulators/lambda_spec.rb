@@ -50,7 +50,7 @@ describe OneGadget::Emulators::Lambda do
     expect(described_class.parse('0xabc123')).to be 0xabc123
 
     predefined = { 'rsp' => described_class.new('rsp') + 0x10 }
-    expect(described_class.parse('rsp+0x20', predefined: predefined).to_s).to eq 'rsp+0x30'
+    expect(described_class.parse('rsp+0x20', predefined:).to_s).to eq 'rsp+0x30'
 
     # Nested []
     expect(described_class.parse('[[rsp+0x33]]').to_s).to eq '[[rsp+0x33]]'

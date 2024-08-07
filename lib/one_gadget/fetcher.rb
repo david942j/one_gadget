@@ -20,7 +20,7 @@ module OneGadget
       #   +nil+ is returned if cannot find target id in database.
       def from_build_id(build_id, remote: true)
         OneGadget::Helper.verify_build_id!(build_id)
-        OneGadget::Gadget.builds(build_id, remote: remote)
+        OneGadget::Gadget.builds(build_id, remote:)
       end
 
       # Fetch one-gadget offsets from file.

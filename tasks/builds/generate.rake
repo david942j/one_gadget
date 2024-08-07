@@ -77,12 +77,12 @@ namespace :builds do
     st = str.index('GNU C Library')
     return nil if st.nil?
 
-    len = str[st..-1].index("\x00")
+    len = str[st..].index("\x00")
     return nil if len.nil?
 
     fname = filename.sub('../libcdb', 'https://gitlab.com/david942j/libcdb/blob/master')
     {
-      build_id: build_id,
+      build_id:,
       info: "#{fname}\n\n#{arch}\n\n#{str[st, len]}"
     }
   rescue ELFTools::ELFError, EOFError # corrupted elf file

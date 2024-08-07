@@ -49,9 +49,9 @@ module OneGadget
       return show(parser.help) && false unless build_id || libc_file
 
       gadgets = if build_id
-                  OneGadget.gadgets(build_id: build_id, details: true, level: level)
+                  OneGadget.gadgets(build_id:, details: true, level:)
                 else # libc_file
-                  OneGadget.gadgets(file: libc_file, details: true, force_file: @options[:force_file], level: level)
+                  OneGadget.gadgets(file: libc_file, details: true, force_file: @options[:force_file], level:)
                 end
       gadgets.each { |g| g.base = @options[:base] }
       handle_gadgets(gadgets, libc_file)
@@ -119,8 +119,8 @@ module OneGadget
           @options[:level] = l
         end
 
-        opts.on('-n', '--near FUNCTIONS/FILE', 'Order gadgets by their distance to the given functions'\
-                                               ' or to the GOT functions of the given file.') do |n|
+        opts.on('-n', '--near FUNCTIONS/FILE', 'Order gadgets by their distance to the given functions ' \
+                                               'or to the GOT functions of the given file.') do |n|
           @options[:near] = n
         end
 

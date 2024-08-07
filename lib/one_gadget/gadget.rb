@@ -112,7 +112,7 @@ module OneGadget
         w_cons, normal = constraints.partition { |c| c.start_with?(key) }
         return normal if w_cons.empty?
 
-        w_cons.map! { |c| c[key.size..-1] }
+        w_cons.map! { |c| c[key.size..] }
         ["address#{w_cons.size > 1 ? 'es' : ''} #{w_cons.join(', ')} #{w_cons.size > 1 ? 'are' : 'is'} writable"] +
           normal
       end
@@ -161,7 +161,7 @@ module OneGadget
       def builds_info(build_id)
         raise Error::ArgumentError, "Invalid BuildID #{build_id.inspect}" if build_id =~ /[^0-9a-f]/
 
-        files = Dir.glob(File.join(BUILDS_PATH, "*-#{build_id}*.rb")).sort
+        files = Dir.glob(File.join(BUILDS_PATH, "*-#{build_id}*.rb"))
         return OneGadget::Logger.not_found(build_id) && nil if files.empty?
 
         if files.size > 1
@@ -189,7 +189,7 @@ module OneGadget
       def find_build(id)
         return BUILDS[id] if BUILDS.key?(id)
 
-        Dir.glob(File.join(BUILDS_PATH, "*-#{id}.rb")).sort.each do |dic|
+        Dir.glob(File.join(BUILDS_PATH, "*-#{id}.rb")).each do |dic|
           require dic
         end
         BUILDS[id] if BUILDS.key?(id)
