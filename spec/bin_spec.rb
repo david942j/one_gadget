@@ -16,7 +16,9 @@ Usage: one_gadget <FILE|-b BuildID> [options]
                                      Increase this level to ask OneGadget show more gadgets it found.
                                      Default: 0
     -n, --near FUNCTIONS/FILE        Order gadgets by their distance to the given functions or to the GOT functions of the given file.
-    -r, --[no-]raw                   Output gadgets offset only, split with one space.
+    -o, --output-format FORMAT       Output format. FORMAT should be one of <pretty|raw|json>.
+                                     Default: pretty
+    -r, --raw                        Alias of -o raw. Output gadgets offset only, split with one space.
     -s, --script exploit-script      Run exploit script with all possible gadgets.
                                      The script will be run as 'exploit-script $offset'.
         --info BuildID               Show version information given BuildID.

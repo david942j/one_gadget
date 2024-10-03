@@ -12,7 +12,7 @@ module OneGadget
     # Help message.
     USAGE = 'Usage: one_gadget <FILE|-b BuildID> [options]'
     # Default options.
-    DEFAULT_OPTIONS = { raw: false, force_file: false, level: 0, base: 0 }.freeze
+    DEFAULT_OPTIONS = { format: :pretty, force_file: false, level: 0, base: 0 }.freeze
 
     module_function
 
@@ -66,7 +66,7 @@ module OneGadget
       return handle_script(gadgets, @options[:script]) if @options[:script]
       return handle_near(libc_file, gadgets, @options[:near]) if @options[:near]
 
-      display_gadgets(gadgets, @options[:raw])
+      display_gadgets(gadgets, @options[:format])
     end
 
     # Displays libc information given BuildID.
@@ -124,8 +124,13 @@ module OneGadget
           @options[:near] = n
         end
 
-        opts.on('-r', '--[no-]raw', 'Output gadgets offset only, split with one space.') do |v|
-          @options[:raw] = v
+        opts.on('-o FORMAT', '--output-format FORMAT', %i[pretty raw json],
+                'Output format. FORMAT should be one of <pretty|raw|json>.', 'Default: pretty') do |o|
+          @options[:format] = o
+        end
+
+        opts.on('-r', '--raw', 'Alias of -o raw. Output gadgets offset only, split with one space.') do |_|
+          @options[:format] = :raw
         end
 
         opts.on('-s', '--script exploit-script', 'Run exploit script with all possible gadgets.',
@@ -176,13 +181,15 @@ module OneGadget
 
     # Writes gadgets to stdout.
     # @param [Array<OneGadget::Gadget::Gadget>] gadgets
-    # @param [Boolean] raw
-    #   In raw mode, only the offset of gadgets are printed.
+    # @param [Symbol] format
+    #   :pretty - Colorful and human-readable format.
+    #   :json - In JSON format.
+    #   :raw - Only the offset of gadgets are printed.
     # @return [true]
-    def display_gadgets(gadgets, raw)
-      if raw
+    def display_gadgets(gadgets, format)
+      if format == :raw
         show(gadgets.map(&:value).join(' '))
-      else
+      elsif format == :pretty
         show(gadgets.map(&:inspect).join("\n"))
       end
     end
@@ -216,7 +223,7 @@ module OneGadget
       function_offsets.each do |function, offset|
         colored_offset = OneGadget::Helper.colored_hex(offset)
         OneGadget::Logger.warn("Gadgets near #{OneGadget::Helper.colorize(function)}(#{colored_offset}):")
-        display_gadgets(gadgets.sort_by { |gadget| (gadget.offset - offset).abs }, @options[:raw])
+        display_gadgets(gadgets.sort_by { |gadget| (gadget.offset - offset).abs }, @options[:format])
         show("\n")
       end
       true
