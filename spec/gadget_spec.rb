@@ -38,6 +38,18 @@ constraints:
     end
   end
 
+  context 'to_obj' do
+    it 'simple' do
+      gadget = OneGadget::Gadget::Gadget.new(0x1234, constraints: ['[rsp+0x30] == NULL', 'rax == 0'],
+                                                     effect: 'execve("/bin/sh", rsp+0x30, rax)')
+      expect(gadget.to_obj).to eq({
+                                    value: 0x1234,
+                                    effect: 'execve("/bin/sh", rsp+0x30, rax)',
+                                    constraints: ['[rsp+0x30] == NULL', 'rax == 0']
+                                  })
+    end
+  end
+
   context 'score' do
     def new(cons)
       OneGadget::Gadget::Gadget.new(0, constraints: cons)

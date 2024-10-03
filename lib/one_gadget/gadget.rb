@@ -28,13 +28,12 @@ module OneGadget
         @base = 0
         @offset = offset
         @constraints = options[:constraints] || []
-        @effect = options[:effect]
+        @effect = options[:effect] || ''
       end
 
       # Show gadget in a pretty way.
       def inspect
-        str = OneGadget::Helper.hex(value)
-        str += effect ? " #{effect}\n" : "\n"
+        str = "#{OneGadget::Helper.hex(value)} #{effect}\n"
         unless constraints.empty?
           str += "#{OneGadget::Helper.colorize('constraints')}:\n  "
           str += merge_constraints.join("\n  ")
@@ -44,6 +43,15 @@ module OneGadget
           str.gsub!(/([^\w])(#{reg})([^\w])/, "\\1#{OneGadget::Helper.colorize('\2', sev: :reg)}\\3")
         end
         "#{str}\n"
+      end
+
+      # @return [Hash]
+      def to_obj
+        {
+          value:,
+          effect:,
+          constraints:
+        }
       end
 
       # @return [Integer]
