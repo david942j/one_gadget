@@ -56,6 +56,8 @@ module OneGadget
         }
       end
 
+      # To have this class can be serialized in JSON.
+      # @return [String]
       def to_json(*)
         to_obj.to_json
       end
