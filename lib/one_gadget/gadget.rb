@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'json'
+
 require 'one_gadget/abi'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/error'
@@ -52,6 +54,10 @@ module OneGadget
           effect:,
           constraints:
         }
+      end
+
+      def to_json(*)
+        to_obj.to_json
       end
 
       # @return [Integer]

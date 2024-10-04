@@ -182,15 +182,18 @@ module OneGadget
     # Writes gadgets to stdout.
     # @param [Array<OneGadget::Gadget::Gadget>] gadgets
     # @param [Symbol] format
+    #   :raw - Only the offset of gadgets are printed.
     #   :pretty - Colorful and human-readable format.
     #   :json - In JSON format.
-    #   :raw - Only the offset of gadgets are printed.
     # @return [true]
     def display_gadgets(gadgets, format)
-      if format == :raw
+      case format
+      when :raw
         show(gadgets.map(&:value).join(' '))
-      elsif format == :pretty
+      when :pretty
         show(gadgets.map(&:inspect).join("\n"))
+      when :json
+        show(gadgets.to_json)
       end
     end
 
@@ -206,7 +209,7 @@ module OneGadget
     # @param [String] libc_file
     # @param [Array<OneGadget::Gadget::Gadget>] gadgets
     # @param [String] near
-    #   This can be name of functions or an ELF file.
+    #   Either name of functions or path to an ELF file.
     #   - Use one comma without spaces to specify a list of functions: +printf,scanf,free+.
     #   - Path to an ELF file and take its GOT functions to process: +/bin/ls+
     def handle_near(libc_file, gadgets, near)
@@ -220,10 +223,19 @@ module OneGadget
       function_offsets = OneGadget::Helper.function_offsets(libc_file, functions)
       return error('No functions for processing') if function_offsets.empty?
 
-      function_offsets.each do |function, offset|
-        colored_offset = OneGadget::Helper.colored_hex(offset)
-        OneGadget::Logger.warn("Gadgets near #{OneGadget::Helper.colorize(function)}(#{colored_offset}):")
-        display_gadgets(gadgets.sort_by { |gadget| (gadget.offset - offset).abs }, @options[:format])
+      collection = function_offsets.map do |function, offset|
+        {
+          near: function,
+          near_offset: offset,
+          gadgets: gadgets.sort_by { |gadget| (gadget.offset - offset).abs }
+        }
+      end
+      return show(collection.to_json) if @options[:format] == :json
+
+      collection.each do |c|
+        colored_offset = OneGadget::Helper.colored_hex(c[:near_offset])
+        OneGadget::Logger.warn("Gadgets near #{OneGadget::Helper.colorize(c[:near])}(#{colored_offset}):")
+        display_gadgets(c[:gadgets], @options[:format])
         show("\n")
       end
       true
