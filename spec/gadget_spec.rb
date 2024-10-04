@@ -48,6 +48,12 @@ constraints:
                                     constraints: ['[rsp+0x30] == NULL', 'rax == 0']
                                   })
     end
+
+    it 'to_json' do
+      gadget = OneGadget::Gadget::Gadget.new(0x1234, constraints: ['everything is fine'],
+                                                     effect: 'side')
+      expect(gadget.to_json).to eq('{"value":4660,"effect":"side","constraints":["everything is fine"]}')
+    end
   end
 
   context 'score' do
