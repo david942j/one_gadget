@@ -20,7 +20,7 @@ module OneGadget
         'INFO' => :reg,
         'ERROR' => :error
       }[severity]
-      msg = +"[#{OneGadget::Helper.colorize('OneGadget', sev: color)}] #{message.join}"
+      msg = "[#{OneGadget::Helper.colorize('OneGadget', sev: color)}] #{message.join}"
       msg << "\n" unless msg.end_with?("\n")
       msg
     end
