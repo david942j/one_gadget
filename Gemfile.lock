@@ -3,6 +3,7 @@ PATH
   specs:
     one_gadget (1.10.0)
       elftools (>= 1.0.2, < 1.4.0)
+      logger
 
 GEM
   remote: https://rubygems.org/
@@ -15,6 +16,7 @@ GEM
       bindata (~> 2)
     json (2.9.0)
     language_server-protocol (3.17.0.3)
+    logger (1.6.5)
     parallel (1.26.3)
     parser (3.3.6.0)
       ast (~> 2.4.1)

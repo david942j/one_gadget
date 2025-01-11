@@ -35,6 +35,7 @@ Gem::Specification.new do |s|
   s.required_ruby_version = '>= 3.1'
 
   s.add_dependency 'elftools', '>= 1.0.2', '< 1.4.0'
+  s.add_dependency 'logger'
 
   s.add_development_dependency 'rake', '~> 13.0'
   s.add_development_dependency 'rspec', '~> 3.7'
