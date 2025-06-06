@@ -129,7 +129,7 @@ module OneGadget
         return normal if w_cons.empty?
 
         w_cons.map! { |c| c[key.size..] }
-        ["address#{w_cons.size > 1 ? 'es' : ''} #{w_cons.join(', ')} #{w_cons.size > 1 ? 'are' : 'is'} writable"] +
+        ["address#{'es' if w_cons.size > 1} #{w_cons.join(', ')} #{w_cons.size > 1 ? 'are' : 'is'} writable"] +
           normal
       end
     end

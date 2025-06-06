@@ -54,6 +54,9 @@ Naming/HeredocDelimiterNaming:
 Naming/MethodParameterName:
   Enabled: false
 
+Naming/PredicateMethod:
+  Enabled: false
+
 Style/AccessorGrouping:
   Enabled: false
 
