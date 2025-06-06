@@ -226,7 +226,7 @@ module OneGadget
     #   Helper.hex(0) #=> '0x0'
     #   Helper.hex(0, psign: true) #=> '+0x0'
     def hex(val, psign: false)
-      return format("#{psign ? '+' : ''}0x%x", val) if val >= 0
+      return format("#{'+' if psign}0x%x", val) if val >= 0
 
       format('-0x%x', -val)
     end
