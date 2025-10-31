@@ -1,8 +1,17 @@
 # frozen_string_literal: true
 
 require 'simplecov'
+require 'simplecov_json_formatter'
 
 SimpleCov.start do
+  add_filter '/spec/'
+  add_filter '/lib/one_gadget/builds/'
+end
+SimpleCov.start do
+  formatter SimpleCov::Formatter::MultiFormatter.new([
+    SimpleCov::Formatter::JSONFormatter,
+    SimpleCov::Formatter::HTMLFormatter
+  ])
   add_filter '/spec/'
   add_filter '/lib/one_gadget/builds/'
 end
