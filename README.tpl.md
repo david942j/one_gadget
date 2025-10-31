@@ -1,6 +1,8 @@
+[![Downloads](https://img.shields.io/endpoint?url=https://gem-badge-h3lg.onrender.com/downloads/one_gadget)](https://rubygems.org/gems/one_gadget)
+
+
 [![Gem Version](https://badge.fury.io/rb/one_gadget.svg)](https://badge.fury.io/rb/one_gadget)
 [![Build Status](https://github.com/david942j/one_gadget/workflows/build/badge.svg)](https://github.com/david942j/one_gadget/actions)
-[![Downloads](http://ruby-gem-downloads-badge.herokuapp.com/one_gadget?type=total&color=orange)](https://rubygems.org/gems/one_gadget)
 [![Maintainability](https://qlty.sh/gh/david942j/projects/one_gadget/maintainability.svg)](https://qlty.sh/gh/david942j/projects/one_gadget)
 [![Code Coverage](https://qlty.sh/gh/david942j/projects/one_gadget/coverage.svg)](https://qlty.sh/gh/david942j/projects/one_gadget)
 [![Inline docs](https://inch-ci.org/github/david942j/one_gadget.svg?branch=master)](https://inch-ci.org/github/david942j/one_gadget)
