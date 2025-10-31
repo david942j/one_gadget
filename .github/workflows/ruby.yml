@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  actions: write
+  contents: read
+
 jobs:
   test:
 
