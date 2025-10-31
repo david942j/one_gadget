@@ -30,6 +30,9 @@ jobs:
         CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
     - name: Publish code coverage
       if: ${{ success() && env.CC_TEST_REPORTER_ID }}
-      uses: paambaati/codeclimate-action@v5.0.0
+      uses: qltysh/qlty-action/coverage@v1
+      with:
+        oidc: true
+        files: coverage/coverage.json
       env:
         CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
