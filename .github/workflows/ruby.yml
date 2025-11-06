@@ -18,10 +18,10 @@ jobs:
     continue-on-error: ${{ matrix.ruby-version == 'head' }}
     strategy:
       matrix:
-        ruby-version: ['3.1', '3.2', '3.3', '3.4', 'head']
+        ruby-version: ['3.2', '3.3', '3.4', 'head']
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
       with:
@@ -31,13 +31,9 @@ jobs:
       run: sudo apt update && sudo apt install -yy grep binutils-multiarch
     - name: Run tests
       run: bundle exec rake
-      env:
-        CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
     - name: Publish code coverage
-      if: ${{ success() && env.CC_TEST_REPORTER_ID }}
+      if: ${{ success() }}
       uses: qltysh/qlty-action/coverage@v1
       with:
         oidc: true
         files: coverage/coverage.json
-      env:
-        CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
