@@ -29,10 +29,11 @@ Gem::Specification.new do |s|
     'bug_tracker_uri' => 'https://github.com/david942j/one_gadget/issues',
     'documentation_uri' => 'https://www.rubydoc.info/github/david942j/one_gadget/master',
     'homepage_uri' => 'https://github.com/david942j/one_gadget',
-    'source_code_uri' => 'https://github.com/david942j/one_gadget'
+    'source_code_uri' => 'https://github.com/david942j/one_gadget',
+    'rubygems_mfa_required' => 'true'
   }
 
-  s.required_ruby_version = '>= 3.1'
+  s.required_ruby_version = '>= 3.3'
 
   s.add_dependency 'elftools', '>= 1.0.2', '< 1.4.0'
   s.add_dependency 'logger'

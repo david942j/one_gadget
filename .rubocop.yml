@@ -5,10 +5,7 @@ AllCops:
   Exclude:
     - lib/one_gadget/builds/*.rb
 
-Gemspec/RequireMFA:
-  Enabled: false
-
-Gemspec/RequiredRubyVersion:
+Gemspec/DevelopmentDependencies:
   Enabled: false
 
 Layout/EndOfLine:
