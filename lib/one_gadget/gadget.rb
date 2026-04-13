@@ -196,8 +196,8 @@ module OneGadget
       # @param [Integer] offset The relative address offset of this gadget.
       # @param [Hash] options See {Gadget::Gadget#initialize} for more information.
       # @return [void]
-      def add(build_id, offset, **options)
-        BUILDS[build_id] << OneGadget::Gadget::Gadget.new(offset, **options)
+      def add(build_id, offset, **)
+        BUILDS[build_id] << OneGadget::Gadget::Gadget.new(offset, **)
       end
 
       private
