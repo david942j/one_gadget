@@ -197,7 +197,7 @@ module OneGadget
     def architecture(file)
       return :invalid unless File.exist?(file)
 
-      f = File.open(file)
+      f = File.open(file) # rubocop:disable Style/FileOpen
       str = ELFTools::ELFFile.new(f).machine
       {
         'Advanced Micro Devices X86-64' => :amd64,
