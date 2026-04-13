@@ -65,7 +65,7 @@ namespace :builds do
   end
 
   def libc_info(filename)
-    file = File.open(filename)
+    file = File.open(filename) # rubocop:disable Style/FileOpen
     libc = ELFTools::ELFFile.new(file)
     build_id = libc.build_id
     arch = libc.machine
