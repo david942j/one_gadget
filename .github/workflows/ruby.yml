@@ -22,14 +22,19 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Strip lockfile on Ruby Head to bypass mismatch bundler version
+      if: matrix.ruby-version == 'head'
+      run: |
+        echo "Removing Gemfile.lock"
+        rm -f Gemfile.lock
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby-version }}
-        # Forces setup-ruby to ignore the broken system bundler
-        # and download/build the matching latest release instead
-        bundler: latest 
-        bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+        bundler-cache: ${{ matrix.ruby-version != 'head' }} # runs 'bundle install' and caches installed gems automatically
+    - name: Install dependencies for Ruby head
+      if: matrix.ruby-version == 'head'
+      run: bundle install
     - name: Install apt packages
       run: sudo apt update && sudo apt install -yy grep binutils-multiarch
     - name: Run tests
