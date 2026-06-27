@@ -26,6 +26,9 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby-version }}
+        # Forces setup-ruby to ignore the broken system bundler
+        # and download/build the matching latest release instead
+        bundler: latest 
         bundler-cache: true # runs 'bundle install' and caches installed gems automatically
     - name: Install apt packages
       run: sudo apt update && sudo apt install -yy grep binutils-multiarch
