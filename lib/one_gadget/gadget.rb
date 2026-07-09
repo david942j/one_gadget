@@ -112,7 +112,7 @@ module OneGadget
 
       def calculate_null_score(identity)
         # remove <CAST>
-        identity.sub!(/^\([s|u]\d+\)/, '')
+        identity.sub!(/^\([su]\d+\)/, '')
         # Thank God we are already able to parse this
         lmda = OneGadget::Emulators::Lambda.parse(identity)
         # rax == 0 is easy; rax + 0x10 == 0 is damn hard.

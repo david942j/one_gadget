@@ -176,7 +176,7 @@ module OneGadget
         if allow_null && argv.all? { |a| OneGadget::ABI.stack_register?(a) }
           # If libc writes something into the stack, arg cannot be NULL.
           # TODO: Find a better way to check can arg be NULL
-          "#{arg} == NULL || #{argv[0]} == NULL || #{argv_cons}"
+          "#{argv[0]} == NULL || #{argv_cons}"
         else
           "#{argv[0]} == NULL || #{argv_cons}"
         end
