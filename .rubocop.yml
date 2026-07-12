@@ -57,6 +57,9 @@ Naming/PredicateMethod:
 Style/AccessorGrouping:
   Enabled: false
 
+Style/ArrayIntersect:
+  Enabled: false
+
 Style/FormatStringToken:
   Enabled: false
 
