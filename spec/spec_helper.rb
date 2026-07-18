@@ -8,8 +8,8 @@ SimpleCov.start do
                                                        SimpleCov::Formatter::JSONFormatter,
                                                        SimpleCov::Formatter::HTMLFormatter
                                                      ])
-  add_filter '/spec/'
-  add_filter '/lib/one_gadget/builds/'
+  skip '/spec/'
+  skip '/lib/one_gadget/builds/'
 end
 
 # These requirements must be put after SimpleCov.start,
