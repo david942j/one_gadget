@@ -33,7 +33,9 @@ module OneGadget
         @effect = options[:effect] || ''
       end
 
-      # Show gadget in a pretty way.
+      # Returns a human-readable, colorized representation of this gadget,
+      # showing its address followed by the effect and constraints.
+      # @return [String] The multi-line pretty-printed gadget.
       def inspect
         str = "#{OneGadget::Helper.hex(value)} #{effect}\n"
         unless constraints.empty?
@@ -47,7 +49,10 @@ module OneGadget
         "#{str}\n"
       end
 
-      # @return [Hash]
+      # Converts this gadget into a plain hash, suitable for serialization.
+      # @return [Hash{Symbol => Integer, String, Array<String>}]
+      #   A hash with keys +:value+ (the absolute address), +:effect+ (the
+      #   resulting function call) and +:constraints+ (the required constraints).
       def to_obj
         {
           value:,
@@ -56,8 +61,8 @@ module OneGadget
         }
       end
 
-      # To have this class can be serialized in JSON.
-      # @return [String]
+      # Serializes this gadget into a JSON string.
+      # @return [String] The gadget in JSON format. See {#to_obj} for the keys.
       def to_json(*)
         to_obj.to_json
       end

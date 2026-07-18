@@ -24,9 +24,10 @@ module OneGadget
       end
 
       # Extract arguments from command.
-      # @param [String] cmd
-      # @return [Array<String>] Arguments.
+      # @param [String] cmd One line of objdump output containing this instruction.
+      # @return [Array<String>] The instruction's operands, with size hints and comments stripped.
       # @raise [OneGadget::Error::InstructionArgumentError]
+      #   Raised when the number of operands does not match {#argc}.
       def fetch_args(cmd)
         idx = cmd.index(inst)
         cmd = cmd[0...cmd.rindex('//')] if cmd.rindex('//')
@@ -42,8 +43,8 @@ module OneGadget
       end
 
       # If the command contains this instruction.
-      # @param [String] cmd
-      # @return [Boolean]
+      # @param [String] cmd One line of objdump output.
+      # @return [Boolean] +true+ if +cmd+ contains this instruction's mnemonic.
       def match?(cmd)
         (cmd =~ /#{inst}\s/) != nil
       end

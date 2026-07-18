@@ -128,8 +128,8 @@ module OneGadget
     end
 
     # Returns the hexified and colorized integer.
-    # @param [Integer] val
-    # @return [String]
+    # @param [Integer] val The number to be formatted.
+    # @return [String] The value in hex format, wrapped with integer color codes.
     def colored_hex(val)
       colorize(hex(val), sev: :integer)
     end
@@ -142,8 +142,8 @@ module OneGadget
     end
 
     # Get the url which can fetch +filename+ from remote repo.
-    # @param [String] filename
-    # @return [String] The url.
+    # @param [String] filename The path of the file relative to the repository root.
+    # @return [String] The raw-content url of +filename+ at the latest release tag.
     def url_of_file(filename)
       raw_file_url = 'https://raw.githubusercontent.com/david942j/one_gadget/@tag/@file'
       raw_file_url.sub('@tag', latest_tag).sub('@file', filename)
@@ -190,7 +190,9 @@ module OneGadget
     # Fetch the ELF architecture of +file+.
     # @param [String] file The target ELF filename.
     # @return [Symbol]
-    #   Currently supports amd64, i386, arm, aarch64, and mips.
+    #   One of +:amd64+, +:i386+, +:arm+, +:aarch64+, or +:mips+ for a recognized
+    #   architecture, +:unknown+ for a valid ELF with an unsupported machine type,
+    #   or +:invalid+ when +file+ does not exist or is not a valid ELF.
     # @example
     #   Helper.architecture('/bin/cat')
     #   #=> :amd64
@@ -251,8 +253,8 @@ module OneGadget
 
     # Cross-platform way of finding an executable in +$PATH+.
     #
-    # @param [String] cmd
-    # @return [String?]
+    # @param [String] cmd The executable name to look for.
+    # @return [String?] The absolute path of the executable, or +nil+ if not found in +$PATH+.
     # @example
     #   Helper.which('ruby')
     #   #=> "/usr/bin/ruby"
@@ -268,8 +270,11 @@ module OneGadget
     end
 
     # Find objdump that supports architecture +arch+.
-    # @param [String] arch
-    # @return [String?]
+    #
+    # Prefers the generic +objdump+ if it supports +arch+, otherwise falls back to
+    # the architecture-specific binary (see {.arch_specific_objdump}).
+    # @param [Symbol] arch The target architecture, e.g. +:amd64+.
+    # @return [String?] The path of a suitable objdump, or +nil+ if none supports +arch+.
     # @example
     #   Helper.find_objdump(:amd64)
     #   #=> '/usr/bin/objdump'
@@ -283,9 +288,9 @@ module OneGadget
     end
 
     # Checks if the given objdump supports certain architecture.
-    # @param [String] bin
-    # @param [Symbol] arch
-    # @return [Boolean]
+    # @param [String?] bin Path to the objdump binary, or +nil+.
+    # @param [Symbol] arch The target architecture, e.g. +:i386+.
+    # @return [Boolean] +true+ if +bin+ exists and lists +arch+ among its supported targets.
     # @example
     #   Helper.objdump_arch_supported?('/usr/bin/objdump', :i386)
     #   #=> true
@@ -297,8 +302,8 @@ module OneGadget
     end
 
     # Converts to the architecture name shown in objdump's +--help+ command.
-    # @param [Symbol] arch
-    # @return [String]
+    # @param [Symbol] arch The internal architecture symbol, e.g. +:amd64+.
+    # @return [String] The corresponding target name as reported by objdump.
     # @example
     #   Helper.objdump_arch(:i386)
     #   #=> 'i386'
@@ -311,9 +316,11 @@ module OneGadget
       end
     end
 
-    # Returns the binary name of objdump.
-    # @param [Symbol] arch
-    # @return [String]
+    # Returns the architecture-specific objdump binary name for +arch+.
+    # @param [Symbol] arch The target architecture, e.g. +:aarch64+.
+    # @return [String?]
+    #   The cross-objdump binary name (e.g. +aarch64-linux-gnu-objdump+),
+    #   or +nil+ if +arch+ has no dedicated binary.
     def arch_specific_objdump(arch)
       {
         aarch64: 'aarch64-linux-gnu-objdump',
@@ -323,8 +330,8 @@ module OneGadget
     end
 
     # Returns the names of functions from the file's global offset table.
-    # @param [String] file
-    # @return [Array<String>]
+    # @param [String] file Path to the target ELF file.
+    # @return [Array<String>] The names of the GLIBC dynamic symbols found in +file+.
     def got_functions(file)
       arch = architecture(file)
       objdump_bin = find_objdump(arch)
@@ -332,9 +339,10 @@ module OneGadget
     end
 
     # Returns a dictionary that maps functions to their offsets.
-    # @param [String] file
-    # @param [Array<String>] functions
+    # @param [String] file Path to the target ELF file.
+    # @param [Array<String>] functions The function names to look up.
     # @return [Hash{String => Integer}]
+    #   Maps each matched function name to its offset within +file+.
     def function_offsets(file, functions)
       arch = architecture(file)
       objdump_bin = find_objdump(arch)

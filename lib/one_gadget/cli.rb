@@ -58,9 +58,9 @@ module OneGadget
     end
 
     # Decides how to display fetched gadgets according to options.
-    # @param [Array<OneGadget::Gadget::Gadget>] gadgets
-    # @param [String] libc_file
-    # @return [Boolean]
+    # @param [Array<OneGadget::Gadget::Gadget>] gadgets The gadgets to display.
+    # @param [String] libc_file Path to the libc file the gadgets were fetched from.
+    # @return [Boolean] Whether the gadgets were handled successfully.
     def handle_gadgets(gadgets, libc_file)
       return false if gadgets.empty? # error occurs when fetching gadgets
       return handle_script(gadgets, @options[:script]) if @options[:script]
@@ -70,7 +70,7 @@ module OneGadget
     end
 
     # Displays libc information given BuildID.
-    # @param [String] id
+    # @param [String] id The (possibly abbreviated) BuildID to look up.
     # @return [Boolean]
     #   +false+ is returned if no information found.
     # @example
@@ -153,7 +153,7 @@ module OneGadget
     end
 
     # Writes +msg+ to stdout and returns +true+.
-    # @param [String] msg
+    # @param [String] msg The message to print.
     # @return [true]
     def show(msg)
       puts msg
@@ -161,15 +161,15 @@ module OneGadget
     end
 
     # Spawns and waits until the process end.
-    # @param [String] cmd
+    # @param [String] cmd The shell command to run.
     # @return [void]
     def execute(cmd)
       Process.wait(spawn(cmd))
     end
 
     # Handles the --script feature.
-    # @param [Array<OneGadget::Gadget::Gadget>] gadgets
-    # @param [String] script
+    # @param [Array<OneGadget::Gadget::Gadget>] gadgets The gadgets whose offsets are passed to the script.
+    # @param [String] script The exploit script to run, invoked as +script $offset+ for each gadget.
     # @return [true]
     def handle_script(gadgets, script)
       gadgets.map(&:offset).each do |offset|
@@ -180,7 +180,7 @@ module OneGadget
     end
 
     # Writes gadgets to stdout.
-    # @param [Array<OneGadget::Gadget::Gadget>] gadgets
+    # @param [Array<OneGadget::Gadget::Gadget>] gadgets The gadgets to print.
     # @param [Symbol] format
     #   :raw - Only the offset of gadgets are printed.
     #   :pretty - Colorful and human-readable format.
@@ -198,7 +198,7 @@ module OneGadget
     end
 
     # Logs error.
-    # @param [String] msg
+    # @param [String] msg The error message to log.
     # @return [false]
     def error(msg)
       OneGadget::Logger.error(msg)
@@ -206,12 +206,13 @@ module OneGadget
     end
 
     # Implements the --near feature.
-    # @param [String] libc_file
-    # @param [Array<OneGadget::Gadget::Gadget>] gadgets
+    # @param [String] libc_file Path to the libc file the gadgets belong to.
+    # @param [Array<OneGadget::Gadget::Gadget>] gadgets The gadgets to order by distance.
     # @param [String] near
     #   Either name of functions or path to an ELF file.
     #   - Use one comma without spaces to specify a list of functions: +printf,scanf,free+.
     #   - Path to an ELF file and take its GOT functions to process: +/bin/ls+
+    # @return [Boolean] Whether the gadgets were displayed successfully.
     def handle_near(libc_file, gadgets, near)
       return error('Libc file must be given when using --near option') unless libc_file
 

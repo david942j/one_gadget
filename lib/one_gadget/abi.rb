@@ -43,7 +43,7 @@ module OneGadget
     # Checks if the register is a stack-related pointer.
     # @param [String] reg
     #   Register's name.
-    # @return [Boolean]
+    # @return [Boolean] +true+ if +reg+ is a stack or frame pointer (e.g. +rsp+, +rbp+, +sp+).
     def stack_register?(reg)
       %w[esp ebp rsp rbp sp x29].include?(reg)
     end

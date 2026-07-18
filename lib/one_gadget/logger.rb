@@ -30,12 +30,15 @@ module OneGadget
     # Show warning message of no such build id in database.
     # @param [String] build_id
     #   Build ID.
+    # @return [Array] An empty array, so callers can use it as an empty gadget list.
     def not_found(build_id)
       warn("Cannot find BuildID [#{build_id}]\n")
       []
     end
 
     # Show the message of ask user to update gem.
+    # @param [String] msg
+    #   An extra message to show before the update instruction.
     # @return [void]
     def ask_update(msg: '')
       name = 'one_gadget'

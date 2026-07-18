@@ -102,8 +102,9 @@ module OneGadget
       class << self
         # Target: parse string like <tt>[rsp+0x50]</tt> into a {Lambda} object.
         # @param [String] argument
+        #   The instruction operand to parse, e.g. +[rsp+0x50]+ or +rax+0x30+.
         # @param [Hash{String => Lambda}] predefined
-        #   Predefined values.
+        #   Maps register/variable names to known {Lambda} values, used to resolve +argument+'s base.
         # @return [OneGadget::Emulators::Lambda, Integer]
         #   If +argument+ contains numbers only, returns the value.
         #   Otherwise, returns a {Lambda} object.

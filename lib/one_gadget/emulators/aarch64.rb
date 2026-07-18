@@ -38,8 +38,8 @@ module OneGadget
       end
 
       # Return the argument value of calling a function.
-      # @param [Integer] idx
-      # @return [Lambda, Integer]
+      # @param [Integer] idx The 0-based index of the argument.
+      # @return [Lambda, Integer] The value held in register +x<idx>+, used for the +idx+-th argument.
       def argument(idx)
         registers["x#{idx}"]
       end
