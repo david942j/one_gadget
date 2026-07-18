@@ -23,6 +23,7 @@ module OneGadget
       # Do find gadgets in glibc.
       # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
       def find
+        str_offset('/bin/sh') # ensure it's glibc-like; raises "not glibc?" if not found
         candidates.map do |cand|
           lines = cand.lines
           # use processor to find which can lead to a valid one-gadget call.
