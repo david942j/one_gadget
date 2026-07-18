@@ -192,9 +192,10 @@ module OneGadget
       end
 
       # Add a gadget, for scripts in builds/ to use.
+      #
+      # Keyword arguments are forwarded to {Gadget#initialize}.
       # @param [String] build_id The target's build id.
       # @param [Integer] offset The relative address offset of this gadget.
-      # @param [Hash] options See {Gadget::Gadget#initialize} for more information.
       # @return [void]
       def add(build_id, offset, **)
         BUILDS[build_id] << OneGadget::Gadget::Gadget.new(offset, **)
