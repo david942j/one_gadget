@@ -115,17 +115,34 @@ module OneGadget
         { constraints: cons, envp: }
       end
 
-      def check_argv(processor, arg, allow_null)
-        lmda = OneGadget::Emulators::Lambda.parse(arg)
+      # Generate the +argv+-related constraint for an +exec*+ call.
+      #
+      # Terminology shared by all the +argv+ helpers below:
+      # * +argv_ptr+ - the *pointer to* the argv array, i.e. the emulated content of the register passed
+      #   as +argv+ (the string form of +processor.argument(n)+). Examples: +"rsi"+, +"rsp+0x10"+,
+      #   +"[rbp-0x8]"+, or a global-variable reference.
+      # * +argv+ - the array *pointed to* by +argv_ptr+: its dereferenced entries
+      #   +[argv[0], argv[1], argv[2], argv[3]]+, each already converted to a string.
+      #
+      # @param [OneGadget::Emulators::Processor] processor The processor state at the call site.
+      # @param [String] argv_ptr The pointer to the argv array. See above.
+      # @param [Boolean] allow_null
+      #   Whether +argv_ptr+ itself may be +NULL+ (true for +execve+, false for +posix_spawn+).
+      # @return [String, nil] The constraint string, or +nil+ when no constraint is needed.
+      def check_argv(processor, argv_ptr, allow_null)
+        lmda = OneGadget::Emulators::Lambda.parse(argv_ptr)
 
         if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
-          return check_stack_argv(processor, lmda, allow_null)
+          return check_stack_argv(processor, argv_ptr, lmda, allow_null)
         end
 
-        check_nonstack_argv(arg, allow_null)
+        check_nonstack_argv(argv_ptr, allow_null)
       end
 
-      def check_stack_argv(processor, lmda, allow_null)
+      # Handle the case where +argv_ptr+ points into the stack, so the +argv+ entries can be read off it.
+      # @param [String] argv_ptr The pointer to the argv array. See {#check_argv}.
+      # @param [OneGadget::Emulators::Lambda] lmda The parsed +argv_ptr+ (a stack register, zero dereference).
+      def check_stack_argv(processor, argv_ptr, lmda, allow_null)
         stack = processor.get_corresponding_stack(lmda.obj)
         argv = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
 
@@ -134,7 +151,7 @@ module OneGadget
 
         return generate_argv_with_sh(argv) if global_var?(argv[0])
 
-        generate_argv_without_sh(argv, allow_null)
+        generate_argv_without_sh(argv_ptr, argv, allow_null)
       end
 
       def argv_already_valid?(argv)
@@ -158,7 +175,9 @@ module OneGadget
         end
       end
 
-      def generate_argv_without_sh(argv, allow_null)
+      # @param [String] argv_ptr The pointer to the argv array. See {#check_argv}.
+      # @param [Array<String>] argv The argv entries +argv_ptr+ points to, i.e. +[argv[0], .., argv[3]]+.
+      def generate_argv_without_sh(argv_ptr, argv, allow_null)
         argv_cons = "{#{argv[0]}"
         (1..argv.length - 1).each do |i|
           if argv[i] == '0'
@@ -175,37 +194,49 @@ module OneGadget
         argv_cons += '} is a valid argv'
 
         if allow_null && argv.all? { |a| OneGadget::ABI.stack_register?(a) }
-          # If libc writes something into the stack, arg cannot be NULL.
-          # TODO: Find a better way to check can arg be NULL
-          "#{arg} == NULL || #{argv[0]} == NULL || #{argv_cons}"
+          # If libc writes something into the stack, argv_ptr cannot be NULL.
+          # TODO: Find a better way to check can argv_ptr be NULL
+          "#{argv_ptr} == NULL || #{argv[0]} == NULL || #{argv_cons}"
         else
           "#{argv[0]} == NULL || #{argv_cons}"
         end
       end
 
-      def check_nonstack_argv(arg, allow_null)
+      # Handle the case where +argv_ptr+ is not a plain stack pointer (e.g. a register or global variable).
+      # @param [String] argv_ptr The pointer to the argv array. See {#check_argv}.
+      def check_nonstack_argv(argv_ptr, allow_null)
         if allow_null
-          "[#{arg}] == NULL || #{arg} == NULL || #{arg} is a valid argv"
+          "[#{argv_ptr}] == NULL || #{argv_ptr} == NULL || #{argv_ptr} is a valid argv"
         else
-          "[#{arg}] == NULL || #{arg} is a valid argv"
+          "[#{argv_ptr}] == NULL || #{argv_ptr} is a valid argv"
         end
       end
 
-      def check_envp(processor, arg)
+      # Generate the +envp+-related constraint for an +exec*+ call.
+      #
+      # Mirrors the +argv+ terminology from {#check_argv}: +envp_ptr+ is the *pointer to* the envp array
+      # (the string form of +processor.argument(n)+), while +envp+ is the array of dereferenced entries
+      # it points to.
+      #
+      # @param [OneGadget::Emulators::Processor] processor The processor state at the call site.
+      # @param [String] envp_ptr The pointer to the envp array.
+      # @yieldparam [String] cons The +envp+ constraint, yielded only when one is required.
+      # @return [Object, nil] Truthy when +envp+ is acceptable, +nil+ to reject the gadget.
+      def check_envp(processor, envp_ptr)
         # If str starts with [[ and is a global variable,
         # believe it is environ.
         # If it starts with [[ but not a global var, drop it.
-        return global_var?(arg) if arg.start_with?('[[')
+        return global_var?(envp_ptr) if envp_ptr.start_with?('[[')
 
-        lmda = OneGadget::Emulators::Lambda.parse(arg)
+        lmda = OneGadget::Emulators::Lambda.parse(envp_ptr)
         if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
           # I haven't see this case after some tests, but just in case :)
           stack = processor.get_corresponding_stack(lmda.obj)
           envp = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
           # TODO: Handle the case when libc will write something into envp
-          cons = global_var?(envp[0]) ? nil : "#{arg} == NULL || {#{envp.join(', ')}, ...} is a valid envp"
+          cons = global_var?(envp[0]) ? nil : "#{envp_ptr} == NULL || {#{envp.join(', ')}, ...} is a valid envp"
         else
-          cons = "[#{arg}] == NULL || #{arg} == NULL || #{arg} is a valid envp"
+          cons = "[#{envp_ptr}] == NULL || #{envp_ptr} == NULL || #{envp_ptr} is a valid envp"
         end
         return nil if cons.nil?
 
