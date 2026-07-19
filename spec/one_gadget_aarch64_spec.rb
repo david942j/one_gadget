@@ -25,6 +25,21 @@ describe 'one_gadget_aarch64' do
                                force_file: true)).to eq [0x3f160, 0x3f168, 0x3f16c,
                                                          0x3f184, 0x3f1a8, 0x63e90]
     end
+
+    # glibc 2.43 no longer exposes a straight-line execve("/bin/sh") gadget; the
+    # only one-gadgets come from do_system's posix_spawn call.
+    it 'libc-2.43' do
+      path = data_path('aarch64-libc-2.43.so')
+      expect(OneGadget.gadgets(file: path, force_file: true))
+        .to eq [0x4bc00, 0x4bc04, 0x4bc08, 0x4bc0c, 0x4bc10, 0x4bc14, 0x4bc18, 0x4bc1c]
+    end
+
+    it 'resolves posix_spawn (do_system) gadgets' do
+      path = data_path('aarch64-libc-2.43.so')
+      gadgets = OneGadget.gadgets(file: path, force_file: true, details: true)
+      expect(gadgets.map(&:effect).uniq)
+        .to eq ['posix_spawn(sp+0xc, "/bin/sh", 0, sp+0x218, sp+0x50, environ)']
+    end
   end
 
   it 'objdump not installed' do
