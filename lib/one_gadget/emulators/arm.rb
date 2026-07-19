@@ -62,9 +62,14 @@ module OneGadget
 
       # Return the argument value of calling a function.
       # @param [Integer] idx The 0-based index of the argument.
-      # @return [Lambda, Integer] The value held in register +r<idx>+ (AAPCS: r0-r3).
+      # @return [Lambda, Integer]
+      #   AAPCS passes the first four arguments in +r0+-+r3+; any further
+      #   arguments are on the stack at +[sp]+, +[sp+4]+, ... (needed for
+      #   6-argument calls such as +posix_spawn+).
       def argument(idx)
-        registers["r#{idx}"]
+        return registers["r#{idx}"] if idx < 4
+
+        sp_based_stack[(idx - 4) * size_t]
       end
 
       # @param [String, Lambda] obj A lambda object or its string.
@@ -195,7 +200,7 @@ module OneGadget
       end
 
       def inst_bl(addr)
-        return registers[pc] = addr if %w[execve execl].any? { |n| addr.include?(n) }
+        return registers[pc] = addr if %w[execve execl posix_spawn].any? { |n| addr.include?(n) }
 
         # Calls that are always safe because they merely wrap a syscall.
         checker = {
