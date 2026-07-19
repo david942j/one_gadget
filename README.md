@@ -32,6 +32,7 @@ Note: requires ruby version >= 2.1.0, you can use `ruby --version` to check.
 - [x] i386
 - [x] amd64 (x86-64)
 - [x] aarch64 (ARMv8)
+- [x] arm (ARMv7, A32/Thumb-2)
 
 ## Implementation
 

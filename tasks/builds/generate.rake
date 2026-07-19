@@ -69,7 +69,7 @@ namespace :builds do
     libc = ELFTools::ELFFile.new(file)
     build_id = libc.build_id
     arch = libc.machine
-    return nil unless ['Advanced Micro Devices X86-64', 'Intel 80386', 'AArch64'].include?(arch)
+    return nil unless ['Advanced Micro Devices X86-64', 'Intel 80386', 'AArch64', 'ARM'].include?(arch)
     # let's skip amd64 with 32bit, i.e. x32
     return nil if arch.start_with?('Advanced') && libc.elf_class == 32
 
