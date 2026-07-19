@@ -325,6 +325,7 @@ module OneGadget
       {
         aarch64: 'aarch64-linux-gnu-objdump',
         amd64: 'x86_64-linux-gnu-objdump',
+        arm: 'arm-linux-gnueabihf-objdump',
         i386: 'i686-linux-gnu-objdump'
       }[arch]
     end

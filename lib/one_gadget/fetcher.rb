@@ -3,6 +3,7 @@
 require 'one_gadget/error'
 require 'one_gadget/fetchers/aarch64'
 require 'one_gadget/fetchers/amd64'
+require 'one_gadget/fetchers/arm'
 require 'one_gadget/fetchers/i386'
 require 'one_gadget/gadget'
 require 'one_gadget/helper'
@@ -32,6 +33,7 @@ module OneGadget
         klass = {
           aarch64: OneGadget::Fetcher::AArch64,
           amd64: OneGadget::Fetcher::Amd64,
+          arm: OneGadget::Fetcher::Arm,
           i386: OneGadget::Fetcher::I386
         }[arch]
         raise Error::UnsupportedArchitectureError, arch if klass.nil?
