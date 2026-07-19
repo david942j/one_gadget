@@ -7,6 +7,9 @@ module OneGadget
   module Fetcher
     # Fetcher for 32-bit ARM (A32 / Thumb-2).
     class Arm < Base
+      # Condition codes as branch suffixes (+bne+, +bcs+, ...).
+      CONDS = %w[eq ne cs hs cc lo mi pl vs vc hi ls ge lt gt le].freeze
+
       private
 
       def emulator
@@ -63,14 +66,32 @@ module OneGadget
         [disasm_lines[ldr_at], disasm_lines[add_at]]
       end
 
-      # If str contains a branch instruction. +bl+/+blx+ are calls, not branches.
-      def branch?(str)
-        mnem = (str[/\A\s*[0-9a-f]+:\s*(\S+)/, 1] || str.split.first || '').sub(/\.(w|n)\z/, '')
-        return false if mnem.start_with?('bl')
+      def follow_branches?
+        true
+      end
 
-        mnem.match?(/\A(b|bx|cbn?z|tbb|tbh|
-                       b(eq|ne|cs|hs|cc|lo|mi|pl|vs|vc|hi|ls|ge|lt|gt|le)|
-                       bx(eq|ne|cs|hs|cc|lo|mi|pl|vs|vc|hi|ls|ge|lt|gt|le))\z/x)
+      # +bne+/+beq+/... and Thumb +cbz+/+cbnz+. +bl+/+blx+ are calls, not branches.
+      def conditional_branch?(line)
+        m = branch_mnemonic(line)
+        %w[cbz cbnz].include?(m) || (!m.start_with?('bl') && m.start_with?('b') && CONDS.include?(m[1..]))
+      end
+
+      def unconditional_branch?(line)
+        branch_mnemonic(line) == 'b'
+      end
+
+      # +bx+ (return/indirect), table branches, and returns via +pop {..,pc}+ /
+      # +ldm .. {..,pc}+ / +mov pc,..+ / +ldr pc,..+ end the path.
+      def path_ends?(line)
+        m = branch_mnemonic(line)
+        return true if m.start_with?('bx') || %w[tbb tbh].include?(m)
+        return true if %w[pop ldm ldmia ldmfd ldmdb].include?(m) && line.match?(/\bpc\b/)
+
+        line.match?(/:\s*(mov|ldr)(\.[wn])?\s+pc\b/)
+      end
+
+      def branch_mnemonic(line)
+        mnemonic(line).sub(/\.[wn]\z/, '')
       end
 
       def call_str

@@ -15,12 +15,20 @@ describe 'one_gadget_arm' do
 
     it 'libc-2.27' do
       path = data_path('arm-libc-2.27.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x2d39c, 0x73f7a]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x2d39c, 0x73f7a, 0x73f96]
     end
 
     it 'libc-2.39' do
       path = data_path('arm-libc-2.39.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x38f6c, 0x88a48, 0x9ef1a]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x38f6c, 0x88a48, 0x9ef1a, 0x9f2bc]
+    end
+
+    it 'resolves a gadget guarded by a conditional branch' do
+      path = data_path('arm-libc-2.27.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+                        .find { |g| g.offset == 0x73f2c }
+      expect(gadget.effect).to eq 'execve("/bin/sh", sp-0x10, r2)'
+      expect(gadget.constraints).to include('[r1] == 0')
     end
 
     it 'resolves environ through the GOT base register' do

@@ -13,6 +13,9 @@ module OneGadget
     class Arm < Processor
       include ArmFamily
 
+      # ARM condition codes (suffixes on branches, e.g. +bne+, +bcs+).
+      CONDS = %w[eq ne cs hs cc lo mi pl vs vc hi ls ge lt gt le].freeze
+
       # Instantiate an {Arm} object.
       # @param [String, nil] file
       #   Path to the target libc. Used to read words from the literal pool when
@@ -29,12 +32,15 @@ module OneGadget
 
       # @see OneGadget::Emulators::AArch64#process!
       def process!(cmd)
+        resolve_pending_branch(cmd)
         line = cmd.strip
         track_mode(line)
         body, @literal = split_line(line)
         body = normalize(body)
-        # push/pop take a {reg-list} whose commas would confuse the generic parser.
         mnem, rest = body.split(/\s+/, 2)
+        return handle_compare(mnem, rest) if %w[cmp cmn tst].include?(mnem)
+        return handle_branch(mnem, rest) != :fail if branch_mnem?(mnem)
+        # push/pop take a {reg-list} whose commas would confuse the generic parser.
         return __send__(:"inst_#{mnem}", rest) != :fail if %w[push pop].include?(mnem)
 
         inst, args = parse(body)
@@ -159,8 +165,7 @@ module OneGadget
         return unless src.end_with?('!') || index.nonzero?
 
         # pre-index ([reg, imm]!) or post-index ([reg], imm) write-back.
-        lmda = OneGadget::Emulators::Lambda.parse(resolve_int_regs(src.delete('!')))
-        registers[lmda.obj] += lmda.immi + index
+        writeback(src, index)
       end
 
       def inst_str(src, dst, index = 0)
@@ -177,8 +182,13 @@ module OneGadget
         index = Integer(index)
         return unless dst.end_with?('!') || index.nonzero?
 
-        lmda = OneGadget::Emulators::Lambda.parse(resolve_int_regs(dst.delete('!')))
-        registers[lmda.obj] += lmda.immi + index
+        writeback(dst, index)
+      end
+
+      # Pre-/post-index write-back of a +[reg, imm]+ memory operand to +reg+.
+      def writeback(mem, index)
+        lmda = OneGadget::Emulators::Lambda.parse(resolve_int_regs(mem.delete('!')))
+        registers[lmda.obj] += lmda.immi + index if register?(lmda.obj)
       end
 
       # push {r4, r5, lr}: registers are stored with the lowest-numbered at the
@@ -204,10 +214,40 @@ module OneGadget
 
       # Flag-only / no-effect instructions: keep emulating without changing state.
       def inst_nop(*); end
-      alias inst_cmp inst_nop
-      alias inst_cmn inst_nop
-      alias inst_tst inst_nop
       alias inst_svc inst_nop
+
+      def branch_mnem?(mnem)
+        mnem == 'b' || %w[cbz cbnz].include?(mnem) || (mnem.start_with?('b') && CONDS.include?(mnem[1..]))
+      end
+
+      def operands(rest)
+        rest.to_s.split(',').map { |o| o.strip.sub(/\s*<.*>\z/, '') }
+      end
+
+      # Render an operand for a constraint: a register becomes its current value,
+      # an immediate becomes hex.
+      def operand_str(op)
+        return registers[op].to_s if register?(op)
+
+        OneGadget::Helper.hex(Integer(op))
+      rescue ArgumentError
+        op
+      end
+
+      def handle_compare(mnem, rest)
+        ops = operands(rest)
+        record_compare(mnem.to_sym, operand_str(ops[0]), operand_str(ops[1]))
+      end
+
+      def handle_branch(mnem, rest)
+        ops = operands(rest)
+        case mnem
+        when 'b' then true # unconditional: control handled by the stitched path
+        when 'cbz' then queue_cbz(ops[1].to_i(16), operand_str(ops[0]), negate: false)
+        when 'cbnz' then queue_cbz(ops[1].to_i(16), operand_str(ops[0]), negate: true)
+        else queue_cond_branch(mnem[1..], ops[0].to_i(16))
+        end
+      end
 
       # Read the little-endian word the current PC-relative +ldr+ points at.
       def literal_value

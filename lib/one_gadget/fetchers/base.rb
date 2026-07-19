@@ -280,6 +280,10 @@ module OneGadget
       # Meet all constraints then posix_spawn eventually calls execve(path, argv, envp)
       def resolve_posix_spawn(processor)
         args = Array.new(6) { |i| processor.argument(i) }
+        # pid/file_actions/attrp are reasoned about as pointers (Lambdas); a
+        # concrete non-zero integer there is a fixed address we can't constrain.
+        return nil if [args[0], args[2], args[3]].any? { |a| a.is_a?(Integer) && !a.zero? }
+
         res = resolve_execve_args(processor, args[1].to_s, args[4].to_s, args[5].to_s, allow_null_argv: false)
         return nil if res.nil?
 
