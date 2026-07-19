@@ -23,12 +23,20 @@ module OneGadget
         cmds.each_with_object(emu) { |cmd, obj| break obj unless obj.process(cmd) }
       end
 
-      # Registers used as a base with a register offset (+[rB, rX]+) are GOT bases.
+      # Collect the registers used as a base in a register-offset load (+[rB, rX]+);
+      # in glibc's PIC these +rB+ are the GOT base holding +$base + got+.
+      # @example
+      #   got_base_registers(['88ab2: ldr r2, [r1, r2]'])
+      #   #=> ['r1']
       def got_base_registers(cmds)
         cmds.flat_map { |c| c.scan(/\[(r\d+|sl|fp|ip|lr),\s*(?:r\d+|sl|fp|ip|lr)\]/) }
             .flatten.uniq
       end
 
+      # Prime +emu+ with every GOT base register the candidate relies on, by
+      # replaying the +ldr rX, [pc]; add rX, pc+ pair (found via {#got_setup_lines})
+      # that established it earlier in the function, so +[rX, ...]+ loads inside the
+      # candidate resolve against +$base+.
       def seed_got_registers(emu, cmds)
         start = cmds.first[/\A\s*([0-9a-f]+):/, 1]&.to_i(16)
         return if start.nil?
@@ -55,10 +63,14 @@ module OneGadget
         [disasm_lines[ldr_at], disasm_lines[add_at]]
       end
 
+      # The target's full objdump disassembly as stripped +"ADDR: insn"+ lines,
+      # cached for the lifetime of the fetcher.
       def disasm_lines
         @disasm_lines ||= `#{@objdump.command}`.lines.map(&:strip).grep(/\A[0-9a-f]+:/)
       end
 
+      # Map from an instruction's address to its index in {#disasm_lines}, so a
+      # given address can be located in the disassembly in O(1).
       def disasm_index
         @disasm_index ||= disasm_lines.each_with_index.to_h { |line, i| [line[/\A([0-9a-f]+):/, 1].to_i(16), i] }
       end

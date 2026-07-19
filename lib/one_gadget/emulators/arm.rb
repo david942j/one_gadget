@@ -96,7 +96,10 @@ module OneGadget
 
       # Split an objdump line into its instruction body and the literal-pool address
       # embedded in the trailing +@+ comment (used by PC-relative +ldr+).
-      # @return [(String, Integer?)]
+      # @return [(String, Integer?)] The instruction body, and the literal address (or +nil+).
+      # @example
+      #   split_line('2c626: ldr r2, [pc, #128] @ (2c6a8 <x>)')
+      #   #=> ['ldr r2, [pc, #128]', 0x2c6a8]
       def split_line(line)
         body = line.sub(/\A[0-9a-f]+:\s*/, '')
         literal = body[/@\s*\(?([0-9a-f]+)\s/, 1]&.to_i(16)
@@ -105,9 +108,16 @@ module OneGadget
         [body.sub(/\s+[@;].*\z/, '').strip, literal]
       end
 
-      # Normalize a mnemonic: drop the +.w+/+.n+ width suffix and the +#+ on
-      # immediates. Flag-setting/conditional variants (e.g. +movs+, +moveq+) are
-      # left intact so they fall through to "unsupported" unless mapped below.
+      # Rewrite one instruction into the plain form the generic parser expects:
+      # drop the +.w+/+.n+ width suffix, map the flag-setting aliases we support
+      # (+movs+/+adds+/+subs+) back to their base mnemonic, and strip the +#+ that
+      # prefixes ARM immediates. Other conditional/flag variants (e.g. +moveq+) are
+      # left intact so they fall through to "unsupported".
+      # @example
+      #   normalize('movs r0, #0')
+      #   #=> 'mov r0, 0'
+      #   normalize('add.w r0, r4, #8')
+      #   #=> 'add r0, r4, 8'
       def normalize(body)
         mnem, rest = body.split(/\s+/, 2)
         mnem = mnem.sub(/\.(w|n)\z/, '')
@@ -240,17 +250,33 @@ module OneGadget
         a.is_a?(Integer) ? b + a : a + b
       end
 
-      # Expand a 2-operand data-processing form into its (src, op2) operands.
+      # Expand a 2-operand data-processing form into its (src, op2) operands:
+      # +add dst, op2+ is shorthand for +add dst, dst, op2+, while an explicit
+      # 3-operand form is passed through unchanged.
+      # @example
+      #   shorthand('r0', 'r4', nil) # 2-operand: add r0, r4
+      #   #=> ['r0', 'r4']
+      #   shorthand('r0', 'r4', '8') # 3-operand: add r0, r4, 8
+      #   #=> ['r4', '8']
       def shorthand(dst, src, op2)
         op2.nil? ? [dst, src] : [src, op2]
       end
 
+      # Parse an ARM register-list operand (as written by +push+/+pop+/+ldm+/+stm+)
+      # into the individual register names.
+      # @example
+      #   reglist('{r4, r5, lr}')
+      #   #=> ['r4', 'r5', 'lr']
       def reglist(list)
         list.tr('{}', '').split(',').map(&:strip)
       end
 
       # Replace register tokens that currently hold a concrete integer with that
       # integer, so memory operands like +[r8, r2]+ (r2 == 0xd8) become +[r8, 0xd8]+.
+      # @example
+      #   # with r2 currently holding 0xd8
+      #   resolve_int_regs('[r8, r2]')
+      #   #=> '[r8, 0xd8]'
       def resolve_int_regs(str)
         str.gsub(/[a-z]+\d*/) do |tok|
           v = registers[tok] if register?(tok)
