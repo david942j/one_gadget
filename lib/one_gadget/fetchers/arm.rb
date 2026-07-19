@@ -63,18 +63,6 @@ module OneGadget
         [disasm_lines[ldr_at], disasm_lines[add_at]]
       end
 
-      # The target's full objdump disassembly as stripped +"ADDR: insn"+ lines,
-      # cached for the lifetime of the fetcher.
-      def disasm_lines
-        @disasm_lines ||= `#{@objdump.command}`.lines.map(&:strip).grep(/\A[0-9a-f]+:/)
-      end
-
-      # Map from an instruction's address to its index in {#disasm_lines}, so a
-      # given address can be located in the disassembly in O(1).
-      def disasm_index
-        @disasm_index ||= disasm_lines.each_with_index.to_h { |line, i| [line[/\A([0-9a-f]+):/, 1].to_i(16), i] }
-      end
-
       # If str contains a branch instruction. +bl+/+blx+ are calls, not branches.
       def branch?(str)
         mnem = (str[/\A\s*[0-9a-f]+:\s*(\S+)/, 1] || str.split.first || '').sub(/\.(w|n)\z/, '')

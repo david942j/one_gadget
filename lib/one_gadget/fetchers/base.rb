@@ -50,7 +50,7 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&)
-        call_regexp = "#{call_str}.*<(exec[^+]*|posix_spawn[^+]*)>$"
+        call_regexp = terminal_call_regexp
         cands = []
         `#{@objdump.command}|grep -E '#{call_regexp}' -B 30`.split('--').each do |cand|
           lines = cand.lines.map(&:strip).reject(&:empty?)
@@ -331,6 +331,24 @@ module OneGadget
 
       def offset_of(assembly)
         assembly.scan(/^([\da-f]+):/)[0][0].to_i(16)
+      end
+
+      # Regexp (as a String) matching an objdump line that calls a terminal
+      # function (+exec*+ / +posix_spawn*+) we can turn into a gadget.
+      def terminal_call_regexp
+        "#{call_str}.*<(exec[^+]*|posix_spawn[^+]*)>$"
+      end
+
+      # The target's full objdump disassembly as stripped +"ADDR: insn"+ lines,
+      # cached for the lifetime of the fetcher.
+      def disasm_lines
+        @disasm_lines ||= `#{@objdump.command}`.lines.map(&:strip).grep(/\A[0-9a-f]+:/)
+      end
+
+      # Map from an instruction's address to its index in {#disasm_lines}, so a
+      # given address can be located in the disassembly in O(1).
+      def disasm_index
+        @disasm_index ||= disasm_lines.each_with_index.to_h { |line, i| [line[/\A([0-9a-f]+):/, 1].to_i(16), i] }
       end
     end
   end
