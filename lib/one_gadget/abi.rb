@@ -14,6 +14,10 @@ module OneGadget
     # Registers of AArch64.
     AARCH64 = %w[xzr wzr sp] + 0.upto(30).map { |i| ["x#{i}", "w#{i}"] }.flatten
 
+    # Registers of ARM (32-bit).
+    # +r13+/+r14+/+r15+ are always shown by objdump as +sp+/+lr+/+pc+.
+    ARM = %w[sp lr pc] + 0.upto(12).map { |i| "r#{i}" }
+
     module_function
 
     # Registers' name of amd64.
@@ -34,10 +38,16 @@ module OneGadget
       AARCH64
     end
 
+    # Registers' name of arm (32-bit).
+    # @return [Array<String>] List of registers.
+    def arm
+      ARM
+    end
+
     # Returns all names of registers.
     # @return [Array<String>] List of registers.
     def all
-      amd64 + aarch64
+      amd64 + aarch64 + arm
     end
 
     # Checks if the register is a stack-related pointer.
