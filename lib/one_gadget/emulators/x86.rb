@@ -32,13 +32,25 @@ module OneGadget
       # @return [Boolean]
       #   If successfully processed.
       def process!(cmd)
-        inst, args = parse(cmd)
-        # return registers[pc] = args[0] if inst.inst == 'call'
-        return true if inst.inst == 'jmp' # believe the fetcher has handled jmp.
+        resolve_pending_branch(cmd)
+        mnem = mnemonic(cmd)
+        return handle_compare(mnem, cmd) if %w[cmp test].include?(mnem)
+        return handle_branch(mnem, cmd) != :fail if branch_mnem?(mnem)
 
+        inst, args = parse(cmd)
         sym = :"inst_#{inst.inst}"
         __send__(sym, *args) != :fail
       end
+
+      # x86 conditional-jump mnemonics mapped to the shared condition codes.
+      JCC = {
+        'je' => 'eq', 'jz' => 'eq', 'jne' => 'ne', 'jnz' => 'ne',
+        'jb' => 'cc', 'jc' => 'cc', 'jnae' => 'cc', 'jae' => 'cs', 'jnb' => 'cs', 'jnc' => 'cs',
+        'ja' => 'hi', 'jnbe' => 'hi', 'jbe' => 'ls', 'jna' => 'ls',
+        'jl' => 'lt', 'jnge' => 'lt', 'jge' => 'ge', 'jnl' => 'ge',
+        'jg' => 'gt', 'jnle' => 'gt', 'jle' => 'le', 'jng' => 'le',
+        'js' => 'mi', 'jns' => 'pl'
+      }.freeze
 
       # Supported instruction set.
       # @return [Array<Instruction>] The supported instructions.
@@ -84,6 +96,53 @@ module OneGadget
 
       private
 
+      def mnemonic(cmd)
+        cmd[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
+      end
+
+      def branch_mnem?(mnem)
+        mnem == 'jmp' || JCC.key?(mnem) || %w[jcxz jecxz jrcxz].include?(mnem)
+      end
+
+      # Operands of +cmd+ (mnemonic dropped), size hints removed, each stripped of
+      # a trailing +<symbol>+.
+      def operands(cmd)
+        cmd.sub(/\A[0-9a-f]+:\s*\S+\s*/, '').split(',').map do |o|
+          o.gsub(/\b(XMMWORD|QWORD|DWORD|WORD|BYTE|PTR)\b/, '').strip.sub(/\s*<.*>\z/, '')
+        end
+      end
+
+      # Render an operand for a constraint: a register becomes its current value,
+      # an immediate becomes hex, anything else (memory operand) is kept literally.
+      def operand_str(op)
+        return registers[op].to_s if register?(op)
+
+        OneGadget::Helper.hex(Integer(op))
+      rescue ArgumentError
+        op
+      end
+
+      # The (direct) target address of a jump line.
+      def jump_target(cmd)
+        cmd[/\A[0-9a-f]+:\s*\S+\s+([0-9a-f]+)/, 1].to_i(16)
+      end
+
+      def handle_compare(mnem, cmd)
+        ops = operands(cmd)
+        record_compare(mnem == 'test' ? :test : :cmp, operand_str(ops[0]), operand_str(ops[1]))
+      end
+
+      def handle_branch(mnem, cmd)
+        return true if mnem == 'jmp' # unconditional: control handled by the stitched path
+        return queue_cbz(jump_target(cmd), cx_reg(mnem), negate: false) if mnem.end_with?('cxz')
+
+        queue_cond_branch(JCC[mnem], jump_target(cmd))
+      end
+
+      def cx_reg(mnem)
+        { 'jcxz' => 'cx', 'jecxz' => 'ecx', 'jrcxz' => 'rcx' }[mnem]
+      end
+
       def inst_mov(dst, src)
         src = arg_to_lambda(src)
         if register?(dst)
@@ -105,6 +164,8 @@ module OneGadget
       def inst_movaps(dst, src)
         # XXX: here we only support `movaps [sp+*], xmm*`
         src, dst = check_xmm_sp(src, dst) { raise_unsupported('movaps', dst, src) }
+        raise_unsupported('movaps', dst, src) unless src.is_a?(Array)
+
         off = dst.evaluate(eval_dict)
         @constraints << [:raw, "#{sp} & 0xf == #{0x10 - off & 0xf}"]
         (128 / self.class.bits).times do |i|
@@ -120,10 +181,14 @@ module OneGadget
         if self.class.bits == 64 && xmm_reg?(dst) && src.start_with?('r') && register?(src)
           dst = arg_to_lambda(dst)
           src = arg_to_lambda(src)
+          raise_unsupported('movq', dst, src) unless dst.is_a?(Array)
+
           dst[0] = src
           return
         end
         dst, src = check_xmm_sp(dst, src) { raise_unsupported('movq', dst, src) }
+        raise_unsupported('movq', dst, src) unless dst.is_a?(Array)
+
         off = src.evaluate(eval_dict)
         (64 / self.class.bits).times do |i|
           dst[i] = sp_based_stack[off + i * size_t]
@@ -134,6 +199,8 @@ module OneGadget
       def inst_movhps(dst, src)
         # XXX: here we only support `movhps xmm*, [sp+*]`
         dst, src = check_xmm_sp(dst, src) { raise_unsupported('movhps', dst, src) }
+        raise_unsupported('movhps', dst, src) unless dst.is_a?(Array)
+
         off = src.evaluate(eval_dict)
         (64 / self.class.bits).times do |i|
           dst[i + 64 / self.class.bits] = sp_based_stack[off + i * size_t]
@@ -162,6 +229,8 @@ module OneGadget
 
         dst = arg_to_lambda(dst)
         src = arg_to_lambda(src)
+        raise_unsupported('punpcklqdq', dst, src) unless dst.is_a?(Array) && src.is_a?(Array)
+
         (64 / self.class.bits).times do |i|
           dst[i + 64 / self.class.bits] = src[i]
         end
@@ -200,6 +269,7 @@ module OneGadget
       end
 
       def inst_sub(dst, src)
+        check_register!(dst)
         src = arg_to_lambda(src)
         raise Error::UnsupportedInstructionArgumentError, "Unhandled -= of type #{src.class}" unless src.is_a?(Integer)
 

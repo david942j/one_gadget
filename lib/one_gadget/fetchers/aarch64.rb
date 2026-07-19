@@ -16,10 +16,6 @@ module OneGadget
         OneGadget::Emulators::AArch64.new
       end
 
-      def follow_branches?
-        true
-      end
-
       def conditional_branch?(line)
         m = mnemonic(line)
         %w[cbz cbnz tbz tbnz].include?(m) || (m.start_with?('b.') && CONDS.include?(m[2..]))

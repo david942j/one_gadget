@@ -13,43 +13,16 @@ module OneGadget
         OneGadget::Emulators::Amd64.new
       end
 
+      # The branch-aware walker (see {Base#branch_aware_candidates}) already
+      # stitches +jmp+ targets, so only the filter remains.
       def candidates
-        # one basic block case
-        cands = super do |candidate|
+        super do |candidate|
           next true if candidate.include?('posix_spawn@')
           next false unless candidate.include?(bin_sh_hex) # works in x86-64
           next false unless candidate.lines.last.include?('execve') # only care execve
 
           true
         end
-        cands + jmp_case_candidates
-      end
-
-      # find gadgets in form:
-      #   lea rdi, '/bin/sh'
-      #   ...
-      #   jmp xxx
-      # xxx:
-      #   ...
-      #   call execve
-      def jmp_case_candidates
-        `#{@objdump.command}|grep -E '# #{bin_sh_hex}' -A 8`.split('--').map do |cand|
-          cand = cand.lines.map(&:strip).reject(&:empty?)
-          jmp_at = cand.index { |c| c.include?('jmp') }
-          next nil if jmp_at.nil?
-
-          cand = cand[0..jmp_at]
-          next if cand.any? { |c| c.include?(call_str) }
-
-          jmp_addr = cand.last.scan(/jmp\s+([\da-f]+)\s/)[0][0].to_i(16)
-          dump = `#{@objdump.command(start: jmp_addr, stop: jmp_addr + 100)}|grep -E '[0-9a-f]+:'`
-          remain = dump.lines.map(&:strip).reject(&:empty?)
-          call_execve = remain.index { |r| r.match(/call.*<execve[^+]*>/) }
-          next if call_execve.nil?
-
-          remain = remain[0..call_execve]
-          [cand + remain].join("\n")
-        end.compact
       end
 
       def bin_sh_hex

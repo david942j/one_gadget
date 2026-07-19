@@ -125,13 +125,20 @@ module OneGadget
           if arg[0] == '['
             ridx = arg.rindex(']')
             immi = parse(arg[(ridx + 1)..])
-            lm = parse(arg[1...ridx], predefined:).deref
+            inner = parse(arg[1...ridx], predefined:)
+            # An absolute address (e.g. lea rax, [0x1234]) parses to an Integer;
+            # model it as a based-nowhere Lambda so it can still be dereferenced.
+            inner = Lambda.new(nil).tap { |l| l.immi = inner } if inner.is_a?(Integer)
+            lm = inner.deref
             lm += immi unless immi.zero?
             return lm
           end
 
           base, disp = mem_obj(arg)
-          obj = predefined[base] || Lambda.new(base)
+          obj = predefined[base]
+          # A register may currently hold a call-target string (after a call);
+          # treat that as a fresh symbolic base. Lambda/Integer/xmm-array pass through.
+          obj = Lambda.new(base) if obj.nil? || obj.is_a?(String)
           obj += disp unless disp.zero?
           obj
         end

@@ -66,10 +66,6 @@ module OneGadget
         [disasm_lines[ldr_at], disasm_lines[add_at]]
       end
 
-      def follow_branches?
-        true
-      end
-
       # +bne+/+beq+/... and Thumb +cbz+/+cbnz+. +bl+/+blx+ are calls, not branches.
       def conditional_branch?(line)
         m = branch_mnemonic(line)

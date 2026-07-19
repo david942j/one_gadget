@@ -35,9 +35,20 @@ module OneGadget
           gadgets = []
           (lines.size - 2).downto(0) do |i|
             processor = emulate(lines[i..])
-            options = resolve(processor)
+            # resolve reads argument registers, which may not be evaluable on an
+            # exotic path; such a candidate simply isn't a gadget.
+            options = begin
+              resolve(processor)
+            rescue OneGadget::Error::Error
+              nil
+            end
             next if options.nil? # impossible to be a gadget
+            # A branch that compares a value with itself yields a trivial
+            # condition: drop the gadget if it's unsatisfiable, else strip the
+            # always-true constraint.
+            next if options[:constraints].any? { |c| contradiction?(c) }
 
+            options[:constraints] = options[:constraints].reject { |c| tautology?(c) }
             offset = offset_of(lines[i])
             gadgets << OneGadget::Gadget::Gadget.new(offset, **options)
           end
@@ -55,24 +66,7 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&)
-        return branch_aware_candidates(&) if follow_branches?
-
-        call_regexp = terminal_call_regexp
-        cands = []
-        `#{@objdump.command}|grep -E '#{call_regexp}' -B 30`.split('--').each do |cand|
-          lines = cand.lines.map(&:strip).reject(&:empty?)
-          # split with call_regexp
-          loop do
-            idx = lines.index { |l| l =~ /#{call_regexp}/ }
-            break if idx.nil?
-
-            cands << lines.shift(idx + 1).join("\n")
-          end
-        end
-        # remove all jmps
-        cands = slice_prefix(cands, &method(:branch?))
-        cands.select!(&) if block_given?
-        cands
+        branch_aware_candidates(&)
       end
 
       private
@@ -240,7 +234,10 @@ module OneGadget
         return global_var?(envp_ptr) if envp_ptr.start_with?('[[')
 
         lmda = OneGadget::Emulators::Lambda.parse(envp_ptr)
-        stack = lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj) &&
+        # A concrete integer or a stack register we don't track a stack for
+        # (e.g. the frame pointer) both fall through to the opaque-pointer case.
+        stack = lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.deref_count.zero? &&
+                OneGadget::ABI.stack_register?(lmda.obj) &&
                 processor.get_corresponding_stack(lmda.obj)
         if stack
           # I haven't see this case after some tests, but just in case :)
@@ -327,19 +324,6 @@ module OneGadget
         []
       end
 
-      def slice_prefix(cands, &block)
-        cands.map do |cand|
-          lines = cand.lines
-          to_rm = lines[0...-1].rindex(&block)
-          lines = lines[to_rm + 1..] unless to_rm.nil?
-          lines.join
-        end
-      end
-
-      # If str contains a branch instruction.
-      def branch?(_str); raise NotImplementedError
-      end
-
       def str_offset(str)
         File.binread(file).index("#{str}\x00") ||
           raise(Error::ArgumentError, "File #{file.inspect} doesn't contain string #{str.inspect}, not glibc?")
@@ -349,17 +333,29 @@ module OneGadget
         assembly.scan(/^([\da-f]+):/)[0][0].to_i(16)
       end
 
+      # A single (non-disjunctive) branch condition comparing a value with
+      # itself: +X == X+ / +X >= X+ is always true; +X != X+ / +X < X+ never is.
+      def trivial_relation(con)
+        return nil if con.include?(' || ')
+
+        m = con.match(/\A(?:\([su]\d+\))?(.+?) (==|!=|<=|>=|<|>) (.+)\z/)
+        return nil unless m && m[1] == m[3]
+
+        %w[== >= <=].include?(m[2])
+      end
+
+      def tautology?(con)
+        trivial_relation(con) == true
+      end
+
+      def contradiction?(con)
+        trivial_relation(con) == false
+      end
+
       # Regexp (as a String) matching an objdump line that calls a terminal
       # function (+exec*+ / +posix_spawn*+) we can turn into a gadget.
       def terminal_call_regexp
         "#{call_str}.*<(exec[^+]*|posix_spawn[^+]*)>$"
-      end
-
-      # Whether this architecture models comparisons/conditional branches and can
-      # therefore explore both sides of a branch (see {#branch_aware_candidates}).
-      # Off by default; each arch flips it on once its emulator handles branches.
-      def follow_branches?
-        false
       end
 
       # Enumerate gadget candidates by walking the control-flow graph *backward*

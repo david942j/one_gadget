@@ -52,7 +52,9 @@ module OneGadget
             (gadgets[j].constraints - g.constraints).empty?
           end
         end
-        res.sort_by(&:offset)
+        # The same offset can reach the call via more than one branch direction;
+        # list it once, keeping the easiest (fewest-constraint) variant.
+        res.group_by(&:offset).map { |_, gs| gs.min_by { |g| g.constraints.size } }.sort_by(&:offset)
       end
     end
     extend ClassMethods
