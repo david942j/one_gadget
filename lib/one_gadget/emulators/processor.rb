@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'one_gadget/emulators/conditional'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/error'
 
@@ -8,6 +9,8 @@ module OneGadget
   module Emulators
     # Base class of a processor.
     class Processor
+      include Conditional
+
       attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
       attr_reader :sp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on sp.
       attr_reader :sp # @return [String] Stack pointer.
@@ -22,6 +25,8 @@ module OneGadget
         @registers = registers.to_h { |reg| [reg, to_lambda(reg)] }
         @sp = sp
         @constraints = []
+        @flags = nil     # last compare, for a following conditional branch
+        @pending = nil   # a conditional branch awaiting one-line-ahead resolution
         @sp_based_stack = Hash.new do |h, k|
           h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
             lmda.immi = k

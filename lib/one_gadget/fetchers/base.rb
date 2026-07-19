@@ -11,6 +11,11 @@ module OneGadget
       # @return [String] The filename.
       attr_reader :file
 
+      # Give up on a control-flow path once it has crossed this many conditional branches.
+      MAX_FORKS = 4
+      # Hard cap on a single path's length (loop/runaway guard).
+      PATH_BUDGET = 80
+
       # Instantiate a fetcher object.
       # @param [String] file Absolute path to the target libc.
       def initialize(file)
@@ -50,6 +55,8 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&)
+        return branch_aware_candidates(&) if follow_branches?
+
         call_regexp = terminal_call_regexp
         cands = []
         `#{@objdump.command}|grep -E '#{call_regexp}' -B 30`.split('--').each do |cand|
@@ -144,6 +151,10 @@ module OneGadget
       # @param [OneGadget::Emulators::Lambda] lmda The parsed +argv_ptr+ (a stack register, zero dereference).
       def check_stack_argv(processor, argv_ptr, lmda, allow_null)
         stack = processor.get_corresponding_stack(lmda.obj)
+        # A stack register we don't track a stack for (e.g. the frame pointer):
+        # fall back to treating it as an opaque pointer.
+        return check_nonstack_argv(lmda.to_s, allow_null) if stack.nil?
+
         argv = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
 
         # if argv is already valid, no constraints are needed! (but probably won't happen :p)
@@ -229,9 +240,10 @@ module OneGadget
         return global_var?(envp_ptr) if envp_ptr.start_with?('[[')
 
         lmda = OneGadget::Emulators::Lambda.parse(envp_ptr)
-        if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
+        stack = lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj) &&
+                processor.get_corresponding_stack(lmda.obj)
+        if stack
           # I haven't see this case after some tests, but just in case :)
-          stack = processor.get_corresponding_stack(lmda.obj)
           envp = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
           # TODO: Handle the case when libc will write something into envp
           cons = global_var?(envp[0]) ? nil : "#{envp_ptr} == NULL || {#{envp.join(', ')}, ...} is a valid envp"
@@ -337,6 +349,98 @@ module OneGadget
       # function (+exec*+ / +posix_spawn*+) we can turn into a gadget.
       def terminal_call_regexp
         "#{call_str}.*<(exec[^+]*|posix_spawn[^+]*)>$"
+      end
+
+      # Whether this architecture models comparisons/conditional branches and can
+      # therefore explore both sides of a branch (see {#branch_aware_candidates}).
+      # Off by default; each arch flips it on once its emulator handles branches.
+      def follow_branches?
+        false
+      end
+
+      # Enumerate gadget candidates by walking the control-flow graph *backward*
+      # from each terminal call along its predecessors (the instruction that falls
+      # through to it, plus any branch that targets it), forking at conditional
+      # edges up to {MAX_FORKS} times. Each emitted candidate is a flat,
+      # address-preserving line-list ending at the terminal call, consumed
+      # unchanged by {#find}; the emulator turns each crossed conditional edge into
+      # a constraint (see {OneGadget::Emulators::Conditional}).
+      def branch_aware_candidates(&)
+        cands = []
+        disasm_lines.each_index do |idx|
+          next unless disasm_lines[idx] =~ /#{terminal_call_regexp}/
+
+          back_walk(idx, 0, [], []) { |lines| cands << lines.join("\n") }
+        end
+        cands.uniq!
+        cands.select!(&) if block_given?
+        cands
+      end
+
+      # Depth-first backward walk. +visited+/+path+ are copied on each step so a
+      # fork gets an independent snapshot; +path+ is built in forward order (the
+      # terminal call stays last). Emits a candidate at each leaf (no extendable
+      # predecessor) — {#find} then tries every start line within it.
+      def back_walk(idx, forks, visited, path, &blk)
+        addr = offset_of(disasm_lines[idx])
+        return if visited.include?(addr) || path.size >= PATH_BUDGET
+
+        visited += [addr]
+        path = [disasm_lines[idx]] + path
+        edges = predecessors(idx).reject do |pidx, cond|
+          visited.include?(offset_of(disasm_lines[pidx])) || (cond && forks >= MAX_FORKS)
+        end
+        return blk.call(path) if edges.empty?
+
+        edges.each { |pidx, cond| back_walk(pidx, forks + (cond ? 1 : 0), visited, path, &blk) }
+      end
+
+      # Predecessors of +disasm_lines[idx]+ as +[pred_index, conditional_edge?]+:
+      # the instruction that falls through to it, plus any branch that targets it.
+      def predecessors(idx)
+        preds = []
+        if idx.positive?
+          f = disasm_lines[idx - 1]
+          preds << [idx - 1, conditional_branch?(f)] unless unconditional_branch?(f) || path_ends?(f)
+        end
+        (branch_pred_map[offset_of(disasm_lines[idx])] || []).each do |b|
+          preds << [b, conditional_branch?(disasm_lines[b])]
+        end
+        preds
+      end
+
+      # Map of target-address => indexes of (conditional or unconditional) direct
+      # branches that jump there.
+      def branch_pred_map
+        @branch_pred_map ||= disasm_lines.each_index.with_object(Hash.new { |h, k| h[k] = [] }) do |i, map|
+          line = disasm_lines[i]
+          next unless conditional_branch?(line) || unconditional_branch?(line)
+
+          tgt = branch_target(line)
+          map[tgt] << i if tgt
+        end
+      end
+
+      # Parse the (direct) target address of a branch line, or +nil+ if indirect.
+      def branch_target(line)
+        line.sub(/\A[0-9a-f]+:\s*\S+\s*/, '')[/\b([0-9a-f]+)\b\s*(?:<|\z)/, 1]&.to_i(16)
+      end
+
+      # The mnemonic of an objdump line (e.g. +"b.ne"+, +"cbz"+).
+      def mnemonic(line)
+        line[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
+      end
+
+      # Does +line+ conditionally branch (both directions possible)?
+      def conditional_branch?(_line); raise NotImplementedError
+      end
+
+      # Does +line+ unconditionally branch to a determined target?
+      def unconditional_branch?(_line); raise NotImplementedError
+      end
+
+      # Does +line+ end the path with no determined successor (+ret+/indirect)?
+      def path_ends?(_line); raise NotImplementedError
       end
 
       # The target's full objdump disassembly as stripped +"ADDR: insn"+ lines,

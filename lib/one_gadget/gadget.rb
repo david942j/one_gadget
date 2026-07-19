@@ -105,7 +105,18 @@ module OneGadget
         when / == NULL$/ then calculate_null_score(expr.sub(' == NULL', ''))
         when / <= 0$/ then calculate_null_score(expr.sub(' <= 0', ''))
         when / is a valid (argv|envp)$/ then 0.2 # This usually means the register has to be a readable pointer.
+        when / (==|!=|<=|>=|<|>) / then calculate_relation_score(expr) # a branch condition
         end
+      end
+
+      # Score a branch-derived relational constraint such as +x2 == 0x1+ or
+      # +(u64)x0 >= 0x400+: an equality on one specific value is harder than an
+      # inequality/range, and a dereferenced left-hand side is harder still.
+      def calculate_relation_score(expr)
+        op = expr[/ (==|!=|<=|>=|<|>) /, 1]
+        lhs = expr.split(/ #{Regexp.escape(op)} /, 2).first.sub(/\A\([su]\d+\)/, '')
+        base = op == '==' ? 0.4 : 0.6
+        base * 0.9**OneGadget::Emulators::Lambda.parse(lhs).deref_count
       end
 
       def calculate_writable_score(identity)

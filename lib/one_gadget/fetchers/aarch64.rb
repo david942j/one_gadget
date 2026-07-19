@@ -7,15 +7,30 @@ module OneGadget
   module Fetcher
     # Define common methods for gadget fetchers.
     class AArch64 < Base
+      # aarch64 condition codes (used to recognise +b.<cond>+ branches).
+      CONDS = %w[eq ne cs hs cc lo mi pl vs vc hi ls ge lt gt le].freeze
+
       private
 
       def emulator
         OneGadget::Emulators::AArch64.new
       end
 
-      # If str contains a branch instruction.
-      def branch?(str)
-        %w[b b.hi b.gt b.eq b.le b.ls b.lt b.ne b.cs].any? { |f| str.include?(" #{f} ") }
+      def follow_branches?
+        true
+      end
+
+      def conditional_branch?(line)
+        m = mnemonic(line)
+        %w[cbz cbnz tbz tbnz].include?(m) || (m.start_with?('b.') && CONDS.include?(m[2..]))
+      end
+
+      def unconditional_branch?(line)
+        %w[b b.al].include?(mnemonic(line))
+      end
+
+      def path_ends?(line)
+        %w[ret br braa brab braaz brabz].include?(mnemonic(line))
       end
 
       def call_str

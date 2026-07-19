@@ -86,6 +86,13 @@ constraints:
       expect(new(['writable: x20+0x338']).score).to be_within(eps).of 0.81
     end
 
+    it 'branch conditions' do
+      expect(new(['x2 == 0x1']).score).to be_within(eps).of 0.4          # equality
+      expect(new(['(u64)x0 >= 0x400']).score).to be_within(eps).of 0.6   # inequality
+      expect(new(['[x1+0x8] != 0']).score).to be_within(eps).of 0.54     # deref penalised
+      expect(new(['(x3 & 0x10) == 0']).score).to be_within(eps).of 0.4   # bit-test (unparseable lhs)
+    end
+
     it 'level 3' do
       expect(new(['[[x4+0xad0]] == NULL']).score).to be_within(eps).of 0.9**3
       expect(new(['x4+0xad0 == NULL']).score).to be_within(eps).of 0.1

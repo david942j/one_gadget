@@ -21,7 +21,13 @@ module OneGadget
 
       # @see OneGadget::Emulators::X86#process!
       def process!(cmd)
-        inst, args = parse(cmd.gsub(/#-?(0x)?[0-9a-f]+/) { |v| v[1..] })
+        resolve_pending_branch(cmd)
+        cmd = cmd.gsub(/#-?(0x)?[0-9a-f]+/) { |v| v[1..] }
+        mnem = mnemonic(cmd)
+        return handle_compare(mnem, cmd) if %w[cmp cmn tst].include?(mnem)
+        return handle_branch(mnem, cmd) != :fail if branch_mnem?(mnem)
+
+        inst, args = parse(cmd)
         sym = :"inst_#{inst.inst}"
         __send__(sym, *args) != :fail
       end
@@ -48,6 +54,46 @@ module OneGadget
       end
 
       private
+
+      def branch_mnem?(mnem)
+        mnem == 'b' || mnem.start_with?('b.') || %w[cbz cbnz tbz tbnz].include?(mnem)
+      end
+
+      def mnemonic(cmd)
+        cmd[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
+      end
+
+      # Operands of +cmd+ (mnemonic dropped), each stripped of a trailing +<symbol>+.
+      def operands(cmd)
+        cmd.sub(/\A[0-9a-f]+:\s*\S+\s*/, '').split(',').map { |o| o.strip.sub(/\s*<.*>\z/, '') }
+      end
+
+      # Render an operand for a constraint: a register becomes its current value,
+      # an immediate becomes hex.
+      def operand_str(op)
+        return registers[op].to_s if register?(op)
+
+        OneGadget::Helper.hex(Integer(op))
+      rescue ArgumentError
+        op
+      end
+
+      def handle_compare(mnem, cmd)
+        ops = operands(cmd)
+        record_compare(mnem.to_sym, operand_str(ops[0]), operand_str(ops[1]))
+      end
+
+      def handle_branch(mnem, cmd)
+        ops = operands(cmd)
+        case mnem
+        when 'b', 'b.al' then true # unconditional: control handled by the stitched path
+        when 'cbz' then queue_cbz(ops[1].to_i(16), operand_str(ops[0]), negate: false)
+        when 'cbnz' then queue_cbz(ops[1].to_i(16), operand_str(ops[0]), negate: true)
+        when 'tbz' then queue_tbz(ops[2].to_i(16), operand_str(ops[0]), Integer(ops[1]), negate: false)
+        when 'tbnz' then queue_tbz(ops[2].to_i(16), operand_str(ops[0]), Integer(ops[1]), negate: true)
+        else queue_cond_branch(mnem[2..], ops[0].to_i(16))
+        end
+      end
 
       def inst_add(dst, src, op2, mode = 'sxtw')
         check_register!(dst)
@@ -92,11 +138,14 @@ module OneGadget
         raise_unsupported('stp', reg1, reg2, dst) unless reg64?(reg1) && reg64?(reg2)
 
         dst_l = arg_to_lambda(dst).ref!
-        raise_unsupported('stp', reg1, reg2, dst) unless dst_l.obj == sp && dst_l.deref_count.zero?
-
-        cur_top = dst_l.evaluate(eval_dict)
-        sp_based_stack[cur_top] = registers[reg1]
-        sp_based_stack[cur_top + size_t] = registers[reg2]
+        if dst_l.obj == sp && dst_l.deref_count.zero?
+          cur_top = dst_l.evaluate(eval_dict)
+          sp_based_stack[cur_top] = registers[reg1]
+          sp_based_stack[cur_top + size_t] = registers[reg2]
+        else
+          # Don't know where it points; just require it be writable (as inst_str does).
+          add_writable(dst_l)
+        end
 
         registers[sp] += arg_to_lambda(dst).immi if dst.end_with?('!')
       end
