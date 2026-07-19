@@ -30,9 +30,19 @@ module OneGadget
         str.include?('$base') && str.include?(bin_sh_offset.to_s(16))
       end
 
+      # Offset of the standalone "sh" string (\0-preceded and \0-terminated) that
+      # glibc passes as argv[0] in execl("/bin/sh", "sh", ...). Its distance from
+      # "/bin/sh" is build-specific, so locate it directly instead of guessing.
+      # +nil+ when the libc has no such string.
+      def sh_offset
+        return @sh_offset if defined?(@sh_offset)
+
+        idx = File.binread(file).index("\x00sh\x00")
+        @sh_offset = idx && idx + 1
+      end
+
       def str_sh?(str)
-        # XXX: hardcode -0x10 is bad
-        str.include?('$base') && str.include?((bin_sh_offset - 0x10).to_s(16))
+        !sh_offset.nil? && str.include?('$base') && str.include?(sh_offset.to_s(16))
       end
 
       def global_var?(str)
