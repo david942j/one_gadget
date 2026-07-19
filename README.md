@@ -513,6 +513,31 @@ $ one_gadget spec/data/aarch64-libc-2.27.so
 ```
 ![aarch64](https://github.com/david942j/one_gadget/blob/master/examples/aarch64.png?raw=true)
 
+##### ARM32
+
+```bash
+$ one_gadget spec/data/arm-libc-2.39.so
+# 0x38f6c posix_spawn(r0, "/bin/sh", r2, r8, [sp], r3)
+# constraints:
+#   [[sp]] == NULL || [sp] is a valid argv
+#   [r3] == NULL || r3 == NULL || r3 is a valid envp
+#   r0 == NULL || writable: r0
+#   r2 == NULL || (s32)[r2+0x4] <= 0
+#   r8 == NULL || (u16)[r8] == NULL
+#
+# 0x88a48 execve("/bin/sh", r4, r5)
+# constraints:
+#   [r4] == NULL || r4 == NULL || r4 is a valid argv
+#   [r5] == NULL || r5 == NULL || r5 is a valid envp
+#
+# 0x9ef1a posix_spawn([sp+0x34], "/bin/sh", [sp+0x2c], 0, [sp+0x3c], r3)
+# constraints:
+#   [[sp+0x3c]] == NULL || [sp+0x3c] is a valid argv
+#   [r3] == NULL || r3 == NULL || r3 is a valid envp
+#   [sp+0x34] == NULL || writable: [sp+0x34]
+#   [sp+0x2c] == NULL || (s32)[[sp+0x2c]+0x4] <= 0
+```
+
 #### Combine with Script
 Pass your exploit script as `one_gadget`'s arguments, it can
 try all gadgets one by one, so you don't need to try every possible gadgets manually.
