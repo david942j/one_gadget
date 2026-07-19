@@ -38,6 +38,10 @@ Note: requires ruby version >= 2.1.0, you can use `ruby --version` to check.
 
 OneGadget uses symbolic execution to find the constraints of gadgets to be successful.
 
+Gadgets are found by walking the control-flow graph backward from each `exec`/`posix_spawn`
+call, following conditional branches both ways. When a gadget is only reachable if a branch is
+(not) taken, that decision shows up as an extra constraint, e.g. `x2 == 0x1`.
+
 The article introducing how I develop this tool can be found [on my blog](https://david942j.blogspot.com/2017/02/project-one-gadget-in-glibc.html).
 
 ## Usage
