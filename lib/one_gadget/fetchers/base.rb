@@ -16,12 +16,29 @@ module OneGadget
       # Hard cap on a single path's length (loop/runaway guard).
       PATH_BUDGET = 80
 
-      # objdump on a whole libc is the single most expensive step; cache its
-      # output by command so re-analysing the same file (common in the specs and
-      # harmless for the CLI, which reads a given file once) doesn't re-run it.
-      def self.disasm_cache(command)
-        @disasm_cache ||= {}
-        @disasm_cache[command] ||= `#{command}`.lines.map(&:strip).grep(/\A[0-9a-f]+:/)
+      # How much to disassemble around each terminal call when an architecture can
+      # locate the calls cheaply (see {#terminal_call_sites} / {#windowed_disasm}).
+      #
+      # The backward walk stays within {PATH_BUDGET} instructions and {MAX_FORKS}
+      # branch hops of the call, and a branch *into* that region comes from close
+      # by. Measured across real amd64/aarch64/arm libcs, the earliest line the
+      # walk reaches is <0x98b before the call and branches into it come from
+      # <0x8bb further — 0x1246 all told. WINDOW_BACK = 0x2000 leaves ~60% margin;
+      # a gadget whose code and branch-predecessors exceed it would be missed,
+      # which is why windowing is opt-in per arch (fast disassembly arches keep
+      # the full, exhaustive scan) and falls back to full disassembly if the call
+      # scan comes up empty.
+      WINDOW_BACK = 0x2000
+      # A little past the call, enough to cover the call instruction itself.
+      WINDOW_FWD = 0x80
+
+      # Cache values that are a deterministic function of an objdump command
+      # (its output and everything derived from it), so re-analysing the same
+      # file — common in the specs, harmless for the CLI which reads a file once —
+      # doesn't redo the disassembly or the whole-binary scans.
+      def self.cached(kind, command)
+        @cached ||= Hash.new { |h, k| h[k] = {} }
+        @cached[kind][command] ||= yield
       end
 
       # Instantiate a fetcher object.
@@ -418,9 +435,9 @@ module OneGadget
         visited.delete(addr)
       end
 
-      # Address of each disassembly line, by index. Cached.
+      # Address of each disassembly line, by index. Cached (per objdump command).
       def disasm_addrs
-        @disasm_addrs ||= disasm_lines.map { |l| offset_of(l) }
+        @disasm_addrs ||= Base.cached(:addrs, @objdump.command) { disasm_lines.map { |l| offset_of(l) } }
       end
 
       # Predecessors of +disasm_lines[idx]+ as +[pred_index, conditional_edge?]+:
@@ -442,7 +459,7 @@ module OneGadget
       # branches that jump there. Scans the whole disassembly once (a branch can
       # target a call region from anywhere), so keep the per-line test cheap.
       def branch_pred_map
-        @branch_pred_map ||= begin
+        @branch_pred_map ||= Base.cached(:branch_pred, @objdump.command) do
           lead = branch_lead_regex
           disasm_lines.each_index.with_object(Hash.new { |h, k| h[k] = [] }) do |i, map|
             line = disasm_lines[i]
@@ -487,7 +504,45 @@ module OneGadget
       # The target's full objdump disassembly as stripped +"ADDR: insn"+ lines,
       # cached for the lifetime of the fetcher.
       def disasm_lines
-        @disasm_lines ||= Base.disasm_cache(@objdump.command)
+        @disasm_lines ||= Base.cached(:disasm, @objdump.command) do
+          sites = terminal_call_sites
+          sites.nil? || sites.empty? ? full_disasm : windowed_disasm(sites)
+        end
+      end
+
+      # Disassemble the whole file (the exhaustive default).
+      def full_disasm
+        objdump_lines
+      end
+
+      # Disassemble only [call-WINDOW_BACK, call+WINDOW_FWD] around each call site,
+      # merging overlaps. Used when {#terminal_call_sites} located the calls without
+      # a full disassembly (e.g. the slow-to-objdump Thumb-2 arm libcs).
+      def windowed_disasm(sites)
+        windows = sites.sort.map { |a| [[a - WINDOW_BACK, 0].max, a + WINDOW_FWD] }
+        merge_ranges(windows).flat_map { |lo, hi| objdump_lines(start: lo, stop: hi) }
+      end
+
+      # Merge a list of sorted [lo, hi] ranges, coalescing any that overlap.
+      def merge_ranges(ranges)
+        ranges.each_with_object([]) do |(lo, hi), merged|
+          if merged.last && lo <= merged.last[1]
+            merged.last[1] = hi if hi > merged.last[1]
+          else
+            merged << [lo, hi]
+          end
+        end
+      end
+
+      def objdump_lines(start: nil, stop: nil)
+        `#{@objdump.command(start:, stop:)}`.lines.map(&:strip).grep(/\A[0-9a-f]+:/)
+      end
+
+      # Addresses of `bl`/`call` sites reaching a terminal function, found without a
+      # full disassembly. +nil+ (the default) means the arch has no cheap finder,
+      # so the whole file is disassembled.
+      def terminal_call_sites
+        nil
       end
 
       # Map from an instruction's address to its index in {#disasm_lines}, so a
