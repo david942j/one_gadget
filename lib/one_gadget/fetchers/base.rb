@@ -16,6 +16,14 @@ module OneGadget
       # Hard cap on a single path's length (loop/runaway guard).
       PATH_BUDGET = 80
 
+      # objdump on a whole libc is the single most expensive step; cache its
+      # output by command so re-analysing the same file (common in the specs and
+      # harmless for the CLI, which reads a given file once) doesn't re-run it.
+      def self.disasm_cache(command)
+        @disasm_cache ||= {}
+        @disasm_cache[command] ||= `#{command}`.lines.map(&:strip).grep(/\A[0-9a-f]+:/)
+      end
+
       # Instantiate a fetcher object.
       # @param [String] file Absolute path to the target libc.
       def initialize(file)
@@ -398,7 +406,7 @@ module OneGadget
 
         visited.add(addr)
         path.unshift(disasm_lines[idx])
-        edges = predecessors_map[idx].reject do |pidx, cond|
+        edges = predecessors(idx).reject do |pidx, cond|
           visited.include?(disasm_addrs[pidx]) || (cond && forks >= MAX_FORKS)
         end
         if edges.empty?
@@ -415,36 +423,42 @@ module OneGadget
         @disasm_addrs ||= disasm_lines.map { |l| offset_of(l) }
       end
 
-      # Classify each line once (branch kind + target) so the CFG walk doesn't
-      # re-run the per-arch regexes for every visit.
-      def line_kinds
-        @line_kinds ||= disasm_lines.map do |l|
-          cond = conditional_branch?(l)
-          uncond = unconditional_branch?(l)
-          { cond: cond, uncond: uncond, ends: path_ends?(l), target: cond || uncond ? branch_target(l) : nil }
-        end
-      end
-
-      # Predecessors of every line as +[pred_index, conditional_edge?]+: the
-      # instruction that falls through to it, plus any branch that targets it.
-      def predecessors_map
-        @predecessors_map ||= disasm_lines.each_index.map do |idx|
+      # Predecessors of +disasm_lines[idx]+ as +[pred_index, conditional_edge?]+:
+      # the instruction that falls through to it, plus any branch that targets it.
+      # Computed lazily (the walk only touches lines near terminal calls) and cached.
+      def predecessors(idx)
+        (@predecessors ||= {})[idx] ||= begin
           preds = []
-          if idx.positive? && !line_kinds[idx - 1][:uncond] && !line_kinds[idx - 1][:ends]
-            preds << [idx - 1, line_kinds[idx - 1][:cond]]
+          if idx.positive?
+            f = disasm_lines[idx - 1]
+            preds << [idx - 1, conditional_branch?(f)] unless unconditional_branch?(f) || path_ends?(f)
           end
-          (branch_pred_map[disasm_addrs[idx]] || []).each { |b| preds << [b, line_kinds[b][:cond]] }
+          (branch_pred_map[disasm_addrs[idx]] || []).each { |b| preds << [b, conditional_branch?(disasm_lines[b])] }
           preds
         end
       end
 
       # Map of target-address => indexes of (conditional or unconditional) direct
-      # branches that jump there.
+      # branches that jump there. Scans the whole disassembly once (a branch can
+      # target a call region from anywhere), so keep the per-line test cheap.
       def branch_pred_map
-        @branch_pred_map ||= line_kinds.each_index.with_object(Hash.new { |h, k| h[k] = [] }) do |i, map|
-          tgt = line_kinds[i][:target]
-          map[tgt] << i if tgt
+        @branch_pred_map ||= begin
+          lead = branch_lead_regex
+          disasm_lines.each_index.with_object(Hash.new { |h, k| h[k] = [] }) do |i, map|
+            line = disasm_lines[i]
+            # Cheap precompiled reject (no per-line allocation) before the full test.
+            next unless line.match?(lead)
+            next unless conditional_branch?(line) || unconditional_branch?(line)
+
+            tgt = branch_target(line)
+            map[tgt] << i if tgt
+          end
         end
+      end
+
+      # Precompiled over-approximation of a branch line (its mnemonic's lead
+      # character), to skip the full test for the majority of non-branch lines.
+      def branch_lead_regex; raise NotImplementedError
       end
 
       # Parse the (direct) target address of a branch line, or +nil+ if indirect.
@@ -452,9 +466,10 @@ module OneGadget
         line.sub(/\A[0-9a-f]+:\s*\S+\s*/, '')[/\b([0-9a-f]+)\b\s*(?:<|\z)/, 1]&.to_i(16)
       end
 
-      # The mnemonic of an objdump line (e.g. +"b.ne"+, +"cbz"+).
+      # The mnemonic of an objdump line (e.g. +"b.ne"+, +"cbz"+), memoized because
+      # each line is tested by several branch predicates during the CFG scan.
       def mnemonic(line)
-        line[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
+        (@mnemonic ||= {})[line] ||= line[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
       end
 
       # Does +line+ conditionally branch (both directions possible)?
@@ -472,7 +487,7 @@ module OneGadget
       # The target's full objdump disassembly as stripped +"ADDR: insn"+ lines,
       # cached for the lifetime of the fetcher.
       def disasm_lines
-        @disasm_lines ||= `#{@objdump.command}`.lines.map(&:strip).grep(/\A[0-9a-f]+:/)
+        @disasm_lines ||= Base.disasm_cache(@objdump.command)
       end
 
       # Map from an instruction's address to its index in {#disasm_lines}, so a

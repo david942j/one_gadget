@@ -12,6 +12,10 @@ module OneGadget
 
       private
 
+      def branch_lead_regex
+        /\A[0-9a-f]+:\s+j/
+      end
+
       def conditional_branch?(line)
         m = mnemonic(line)
         JCC.key?(m) || %w[jcxz jecxz jrcxz].include?(m)
