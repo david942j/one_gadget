@@ -29,31 +29,41 @@ module OneGadget
       # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
       def find
         str_offset('/bin/sh') # ensure it's glibc-like; raises "not glibc?" if not found
-        candidates.map do |cand|
+        gadgets = []
+        # Overlapping candidate paths share tails, so the same suffix (a start line
+        # and everything after it) recurs across candidates; emulate each once.
+        seen = {}
+        candidates.each do |cand|
           lines = cand.lines
-          # use processor to find which can lead to a valid one-gadget call.
-          gadgets = []
           (lines.size - 2).downto(0) do |i|
-            processor = emulate(lines[i..])
-            # resolve reads argument registers, which may not be evaluable on an
-            # exotic path; such a candidate simply isn't a gadget.
-            options = begin
-              resolve(processor)
-            rescue OneGadget::Error::Error
-              nil
-            end
-            next if options.nil? # impossible to be a gadget
-            # A branch that compares a value with itself yields a trivial
-            # condition: drop the gadget if it's unsatisfiable, else strip the
-            # always-true constraint.
-            next if options[:constraints].any? { |c| contradiction?(c) }
+            suffix = lines[i..]
+            next if seen.key?(key = suffix.join)
 
-            options[:constraints] = options[:constraints].reject { |c| tautology?(c) }
-            offset = offset_of(lines[i])
-            gadgets << OneGadget::Gadget::Gadget.new(offset, **options)
+            seen[key] = true
+            gadget = resolve_suffix(suffix)
+            gadgets << gadget unless gadget.nil?
           end
-          gadgets
-        end.flatten
+        end
+        gadgets
+      end
+
+      # Emulate a candidate suffix and turn it into a gadget, or +nil+ if it isn't one.
+      def resolve_suffix(lines)
+        processor = emulate(lines)
+        # resolve reads argument registers, which may not be evaluable on an
+        # exotic path; such a candidate simply isn't a gadget.
+        options = begin
+          resolve(processor)
+        rescue OneGadget::Error::Error
+          nil
+        end
+        return if options.nil?
+        # A branch that compares a value with itself yields a trivial condition:
+        # drop the gadget if it's unsatisfiable, else strip the always-true one.
+        return if options[:constraints].any? { |c| contradiction?(c) }
+
+        options[:constraints] = options[:constraints].reject { |c| tautology?(c) }
+        OneGadget::Gadget::Gadget.new(offset_of(lines.first), **options)
       end
 
       # Fetch candidates that end with call exec*.
@@ -367,56 +377,72 @@ module OneGadget
       # a constraint (see {OneGadget::Emulators::Conditional}).
       def branch_aware_candidates(&)
         cands = []
+        re = /#{terminal_call_regexp}/
         disasm_lines.each_index do |idx|
-          next unless disasm_lines[idx] =~ /#{terminal_call_regexp}/
+          next unless disasm_lines[idx].match?(re)
 
-          back_walk(idx, 0, [], []) { |lines| cands << lines.join("\n") }
+          back_walk(idx, 0, Set.new, []) { |lines| cands << lines.join("\n") }
         end
         cands.uniq!
         cands.select!(&) if block_given?
         cands
       end
 
-      # Depth-first backward walk. +visited+/+path+ are copied on each step so a
-      # fork gets an independent snapshot; +path+ is built in forward order (the
-      # terminal call stays last). Emits a candidate at each leaf (no extendable
-      # predecessor) — {#find} then tries every start line within it.
+      # Depth-first backward walk. +visited+ (a Set) and +path+ are mutated with
+      # backtracking so a fork explores independently without per-step copies;
+      # +path+ is built in forward order (the terminal call stays last). Emits a
+      # candidate at each leaf — {#find} then tries every start line within it.
       def back_walk(idx, forks, visited, path, &blk)
-        addr = offset_of(disasm_lines[idx])
-        return if visited.include?(addr) || path.size >= PATH_BUDGET
+        addr = disasm_addrs[idx]
+        return if path.size >= PATH_BUDGET
 
-        visited += [addr]
-        path = [disasm_lines[idx]] + path
-        edges = predecessors(idx).reject do |pidx, cond|
-          visited.include?(offset_of(disasm_lines[pidx])) || (cond && forks >= MAX_FORKS)
+        visited.add(addr)
+        path.unshift(disasm_lines[idx])
+        edges = predecessors_map[idx].reject do |pidx, cond|
+          visited.include?(disasm_addrs[pidx]) || (cond && forks >= MAX_FORKS)
         end
-        return blk.call(path) if edges.empty?
-
-        edges.each { |pidx, cond| back_walk(pidx, forks + (cond ? 1 : 0), visited, path, &blk) }
+        if edges.empty?
+          blk.call(path.dup)
+        else
+          edges.each { |pidx, cond| back_walk(pidx, forks + (cond ? 1 : 0), visited, path, &blk) }
+        end
+        path.shift
+        visited.delete(addr)
       end
 
-      # Predecessors of +disasm_lines[idx]+ as +[pred_index, conditional_edge?]+:
-      # the instruction that falls through to it, plus any branch that targets it.
-      def predecessors(idx)
-        preds = []
-        if idx.positive?
-          f = disasm_lines[idx - 1]
-          preds << [idx - 1, conditional_branch?(f)] unless unconditional_branch?(f) || path_ends?(f)
+      # Address of each disassembly line, by index. Cached.
+      def disasm_addrs
+        @disasm_addrs ||= disasm_lines.map { |l| offset_of(l) }
+      end
+
+      # Classify each line once (branch kind + target) so the CFG walk doesn't
+      # re-run the per-arch regexes for every visit.
+      def line_kinds
+        @line_kinds ||= disasm_lines.map do |l|
+          cond = conditional_branch?(l)
+          uncond = unconditional_branch?(l)
+          { cond: cond, uncond: uncond, ends: path_ends?(l), target: cond || uncond ? branch_target(l) : nil }
         end
-        (branch_pred_map[offset_of(disasm_lines[idx])] || []).each do |b|
-          preds << [b, conditional_branch?(disasm_lines[b])]
+      end
+
+      # Predecessors of every line as +[pred_index, conditional_edge?]+: the
+      # instruction that falls through to it, plus any branch that targets it.
+      def predecessors_map
+        @predecessors_map ||= disasm_lines.each_index.map do |idx|
+          preds = []
+          if idx.positive? && !line_kinds[idx - 1][:uncond] && !line_kinds[idx - 1][:ends]
+            preds << [idx - 1, line_kinds[idx - 1][:cond]]
+          end
+          (branch_pred_map[disasm_addrs[idx]] || []).each { |b| preds << [b, line_kinds[b][:cond]] }
+          preds
         end
-        preds
       end
 
       # Map of target-address => indexes of (conditional or unconditional) direct
       # branches that jump there.
       def branch_pred_map
-        @branch_pred_map ||= disasm_lines.each_index.with_object(Hash.new { |h, k| h[k] = [] }) do |i, map|
-          line = disasm_lines[i]
-          next unless conditional_branch?(line) || unconditional_branch?(line)
-
-          tgt = branch_target(line)
+        @branch_pred_map ||= line_kinds.each_index.with_object(Hash.new { |h, k| h[k] = [] }) do |i, map|
+          tgt = line_kinds[i][:target]
           map[tgt] << i if tgt
         end
       end

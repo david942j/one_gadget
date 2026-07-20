@@ -40,7 +40,13 @@ module OneGadget
       # @return [(Instruction, Array<String>)]
       #   The parsing result.
       def parse(cmd)
-        inst = instructions.find { |i| i.match?(cmd) }
+        # instructions is a constant set; build the array (and a mnemonic index)
+        # once instead of re-allocating it for every line.
+        @inst_index ||= instructions.each_with_object({}) { |i, h| h[i.inst] ||= i }
+        mnem = cmd[/\A[0-9a-f]+:\s*(\S+)/, 1] || cmd[/\A\s*(\S+)/, 1]
+        inst = @inst_index[mnem]
+        # Fall back to the original scan for any mnemonic that isn't a bare word.
+        inst ||= (@inst_list ||= instructions).find { |i| i.match?(cmd) }
         raise Error::UnsupportedInstructionError, "Not implemented instruction in #{cmd}" if inst.nil?
 
         [inst, inst.fetch_args(cmd)]

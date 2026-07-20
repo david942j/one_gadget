@@ -24,10 +24,17 @@ module OneGadget
       def initialize(file = nil)
         super(OneGadget::ABI.arm, 'sp')
         @pc = 'pc'
-        @data = file && File.binread(file)
+        # find() builds a fresh emulator per candidate; cache the file's bytes so
+        # the literal pool isn't re-read from disk thousands of times.
+        @data = file && self.class.file_data(file)
         @prev_addr = nil
         # A32 until proven Thumb by a +.w+/+.n+ suffix or a 2-byte instruction stride.
         @thumb = false
+      end
+
+      # Memoized bytes of +file+ (the target libc), shared across emulator instances.
+      def self.file_data(file)
+        (@file_data ||= {})[file] ||= File.binread(file)
       end
 
       # @see OneGadget::Emulators::AArch64#process!
