@@ -7,7 +7,12 @@ require 'one_gadget/error'
 module OneGadget
   # Instruction emulator to solve the constraint of gadgets.
   module Emulators
-    # Base class of a processor.
+    # Base of the per-architecture instruction emulators, used to symbolically
+    # execute a candidate and solve its constraints. A subclass implements the
+    # arch's supported instructions, calling convention and stack model; the
+    # shared branch/compare machinery comes from {Conditional}.
+    #
+    # To add an architecture, see +docs/adding-an-architecture.md+.
     class Processor
       include Conditional
 

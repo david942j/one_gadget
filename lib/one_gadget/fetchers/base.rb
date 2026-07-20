@@ -5,7 +5,14 @@ require 'one_gadget/fetchers/objdump'
 
 module OneGadget
   module Fetcher
-    # Define common methods for gadget fetchers.
+    # Base of the per-architecture gadget fetchers. It discovers candidate
+    # instruction sequences — a backward control-flow walk from each
+    # +exec+/+posix_spawn+ call — and turns a solved candidate into a
+    # {OneGadget::Gadget::Gadget}. A subclass supplies only the arch-specific
+    # pieces (call mnemonic, string/global recognition, branch classification).
+    #
+    # To add an architecture, see +docs/adding-an-architecture.md+; +AArch64+ is
+    # the simplest example.
     class Base
       # The absolute path to glibc.
       # @return [String] The filename.
