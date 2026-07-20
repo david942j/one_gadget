@@ -16,21 +16,16 @@ module OneGadget
         OneGadget::Emulators::AArch64.new
       end
 
-      def branch_lead_regex
-        /\A[0-9a-f]+:\s+[bct]/
+      def branch_lead_chars
+        'bct'
       end
 
-      def conditional_branch?(line)
+      def branch_kind(line)
         m = mnemonic(line)
-        %w[cbz cbnz tbz tbnz].include?(m) || (m.start_with?('b.') && CONDS.include?(m[2..]))
-      end
+        return :conditional if %w[cbz cbnz tbz tbnz].include?(m) || (m.start_with?('b.') && CONDS.include?(m[2..]))
+        return :unconditional if %w[b b.al].include?(m)
 
-      def unconditional_branch?(line)
-        %w[b b.al].include?(mnemonic(line))
-      end
-
-      def path_ends?(line)
-        %w[ret br braa brab braaz brabz].include?(mnemonic(line))
+        :terminator if %w[ret br braa brab braaz brabz].include?(m)
       end
 
       def call_str

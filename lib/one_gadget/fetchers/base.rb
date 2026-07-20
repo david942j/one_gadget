@@ -447,10 +447,12 @@ module OneGadget
         (@predecessors ||= {})[idx] ||= begin
           preds = []
           if idx.positive?
-            f = disasm_lines[idx - 1]
-            preds << [idx - 1, conditional_branch?(f)] unless unconditional_branch?(f) || path_ends?(f)
+            kind = branch_kind(disasm_lines[idx - 1])
+            preds << [idx - 1, kind == :conditional] unless %i[unconditional terminator].include?(kind)
           end
-          (branch_pred_map[disasm_addrs[idx]] || []).each { |b| preds << [b, conditional_branch?(disasm_lines[b])] }
+          (branch_pred_map[disasm_addrs[idx]] || []).each do |b|
+            preds << [b, branch_kind(disasm_lines[b]) == :conditional]
+          end
           preds
         end
       end
@@ -465,7 +467,7 @@ module OneGadget
             line = disasm_lines[i]
             # Cheap precompiled reject (no per-line allocation) before the full test.
             next unless line.match?(lead)
-            next unless conditional_branch?(line) || unconditional_branch?(line)
+            next unless %i[conditional unconditional].include?(branch_kind(line))
 
             tgt = branch_target(line)
             map[tgt] << i if tgt
@@ -473,9 +475,11 @@ module OneGadget
         end
       end
 
-      # Precompiled over-approximation of a branch line (its mnemonic's lead
-      # character), to skip the full test for the majority of non-branch lines.
-      def branch_lead_regex; raise NotImplementedError
+      # Precompiled over-approximation of a branch line, built from the arch's
+      # {#branch_lead_chars}, to skip the full test for the (majority) non-branch
+      # lines during the whole-binary scan.
+      def branch_lead_regex
+        @branch_lead_regex ||= /\A[0-9a-f]+:\s+[#{branch_lead_chars}]/
       end
 
       # Parse the (direct) target address of a branch line, or +nil+ if indirect.
@@ -489,16 +493,19 @@ module OneGadget
         (@mnemonic ||= {})[line] ||= line[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
       end
 
-      # Does +line+ conditionally branch (both directions possible)?
-      def conditional_branch?(_line); raise NotImplementedError
+      # Classify a disassembly +line+ for the control-flow walk (arch-specific):
+      #   :conditional   - may or may not be taken; the walk explores both edges
+      #                    and turns the decision into a gadget constraint
+      #   :unconditional - always taken, to a determined (direct) target
+      #   :terminator    - ends the path with no determined successor (a return or
+      #                    an indirect/computed jump)
+      #   nil            - not a branch; execution falls through to the next line
+      def branch_kind(_line); raise NotImplementedError
       end
 
-      # Does +line+ unconditionally branch to a determined target?
-      def unconditional_branch?(_line); raise NotImplementedError
-      end
-
-      # Does +line+ end the path with no determined successor (+ret+/indirect)?
-      def path_ends?(_line); raise NotImplementedError
+      # The leading character(s) of this arch's branch mnemonics (e.g. +"bct"+ for
+      # b/cbz/tbz, +"j"+ for jmp/jcc), used to build {#branch_lead_regex}.
+      def branch_lead_chars; raise NotImplementedError
       end
 
       # The target's full objdump disassembly as stripped +"ADDR: insn"+ lines,

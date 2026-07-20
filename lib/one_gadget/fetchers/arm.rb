@@ -149,28 +149,28 @@ module OneGadget
         [disasm_lines[ldr_at], disasm_lines[add_at]]
       end
 
-      def branch_lead_regex
-        /\A[0-9a-f]+:\s+[bct]/
+      def branch_lead_chars
+        'bct'
       end
 
-      # +bne+/+beq+/... and Thumb +cbz+/+cbnz+. +bl+/+blx+ are calls, not branches.
-      def conditional_branch?(line)
+      # +b+ is unconditional; +bne+/+beq+/... and Thumb +cbz+/+cbnz+ are
+      # conditional (+bl+/+blx+ are calls, not branches). +bx+/table branches and
+      # returns via +pop {..,pc}+ / +ldm .. {..,pc}+ / +mov pc,..+ / +ldr pc,..+
+      # terminate the path.
+      def branch_kind(line)
         m = branch_mnemonic(line)
-        %w[cbz cbnz].include?(m) || (!m.start_with?('bl') && m.start_with?('b') && CONDS.include?(m[1..]))
+        return :conditional if conditional_mnemonic?(m)
+        return :unconditional if m == 'b'
+        return :terminator if m.start_with?('bx') || %w[tbb tbh].include?(m)
+        return :terminator if %w[pop ldm ldmia ldmfd ldmdb].include?(m) && line.match?(/\bpc\b/)
+
+        :terminator if line.match?(/:\s*(mov|ldr)(\.[wn])?\s+pc\b/)
       end
 
-      def unconditional_branch?(line)
-        branch_mnemonic(line) == 'b'
-      end
+      def conditional_mnemonic?(mnem)
+        return true if %w[cbz cbnz].include?(mnem)
 
-      # +bx+ (return/indirect), table branches, and returns via +pop {..,pc}+ /
-      # +ldm .. {..,pc}+ / +mov pc,..+ / +ldr pc,..+ end the path.
-      def path_ends?(line)
-        m = branch_mnemonic(line)
-        return true if m.start_with?('bx') || %w[tbb tbh].include?(m)
-        return true if %w[pop ldm ldmia ldmfd ldmdb].include?(m) && line.match?(/\bpc\b/)
-
-        line.match?(/:\s*(mov|ldr)(\.[wn])?\s+pc\b/)
+        !mnem.start_with?('bl') && mnem.start_with?('b') && CONDS.include?(mnem[1..])
       end
 
       def branch_mnemonic(line)

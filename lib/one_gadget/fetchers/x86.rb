@@ -12,23 +12,18 @@ module OneGadget
 
       private
 
-      def branch_lead_regex
-        /\A[0-9a-f]+:\s+j/
+      def branch_lead_chars
+        'j'
       end
 
-      def conditional_branch?(line)
+      # +jcc+/+jcxz+ are conditional; a direct +jmp+ is unconditional while an
+      # indirect one (+jmp rax+, +jmp QWORD PTR [..]+) and +ret+/+leave+ terminate.
+      def branch_kind(line)
         m = mnemonic(line)
-        JCC.key?(m) || %w[jcxz jecxz jrcxz].include?(m)
-      end
+        return :conditional if JCC.key?(m) || %w[jcxz jecxz jrcxz].include?(m)
+        return branch_target(line).nil? ? :terminator : :unconditional if m == 'jmp'
 
-      def unconditional_branch?(line)
-        mnemonic(line) == 'jmp' && !branch_target(line).nil?
-      end
-
-      # +ret+/+leave+ and indirect jumps (+jmp rax+, +jmp QWORD PTR [..]+) end the path.
-      def path_ends?(line)
-        m = mnemonic(line)
-        m.start_with?('ret') || m == 'leave' || (m == 'jmp' && branch_target(line).nil?)
+        :terminator if m.start_with?('ret') || m == 'leave'
       end
 
       def objdump_options
