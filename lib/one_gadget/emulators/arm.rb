@@ -231,21 +231,6 @@ module OneGadget
         rest.to_s.split(',').map { |o| o.strip.sub(/\s*<.*>\z/, '') }
       end
 
-      # Render an operand for a constraint: a register becomes its current value,
-      # an immediate becomes hex.
-      def operand_str(op)
-        return registers[op].to_s if register?(op)
-
-        OneGadget::Helper.hex(Integer(op))
-      rescue ArgumentError
-        op
-      end
-
-      def handle_compare(mnem, rest)
-        ops = operands(rest)
-        record_compare(mnem.to_sym, operand_str(ops[0]), operand_str(ops[1]))
-      end
-
       def handle_branch(mnem, rest)
         ops = operands(rest)
         case mnem

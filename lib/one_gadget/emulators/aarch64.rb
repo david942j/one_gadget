@@ -59,28 +59,9 @@ module OneGadget
         mnem == 'b' || mnem.start_with?('b.') || %w[cbz cbnz tbz tbnz].include?(mnem)
       end
 
-      def mnemonic(cmd)
-        cmd[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
-      end
-
       # Operands of +cmd+ (mnemonic dropped), each stripped of a trailing +<symbol>+.
       def operands(cmd)
         cmd.sub(/\A[0-9a-f]+:\s*\S+\s*/, '').split(',').map { |o| o.strip.sub(/\s*<.*>\z/, '') }
-      end
-
-      # Render an operand for a constraint: a register becomes its current value,
-      # an immediate becomes hex.
-      def operand_str(op)
-        return registers[op].to_s if register?(op)
-
-        OneGadget::Helper.hex(Integer(op))
-      rescue ArgumentError
-        op
-      end
-
-      def handle_compare(mnem, cmd)
-        ops = operands(cmd)
-        record_compare(mnem.to_sym, operand_str(ops[0]), operand_str(ops[1]))
       end
 
       def handle_branch(mnem, cmd)

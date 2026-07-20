@@ -96,10 +96,6 @@ module OneGadget
 
       private
 
-      def mnemonic(cmd)
-        cmd[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
-      end
-
       def branch_mnem?(mnem)
         mnem == 'jmp' || JCC.key?(mnem) || %w[jcxz jecxz jrcxz].include?(mnem)
       end
@@ -112,24 +108,9 @@ module OneGadget
         end
       end
 
-      # Render an operand for a constraint: a register becomes its current value,
-      # an immediate becomes hex, anything else (memory operand) is kept literally.
-      def operand_str(op)
-        return registers[op].to_s if register?(op)
-
-        OneGadget::Helper.hex(Integer(op))
-      rescue ArgumentError
-        op
-      end
-
       # The (direct) target address of a jump line.
       def jump_target(cmd)
         cmd[/\A[0-9a-f]+:\s*\S+\s+([0-9a-f]+)/, 1].to_i(16)
-      end
-
-      def handle_compare(mnem, cmd)
-        ops = operands(cmd)
-        record_compare(mnem == 'test' ? :test : :cmp, operand_str(ops[0]), operand_str(ops[1]))
       end
 
       def handle_branch(mnem, cmd)

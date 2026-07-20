@@ -35,6 +35,30 @@ module OneGadget
         true
       end
 
+      # Model a compare line (+cmp+/+test+/...): record its two operands' current
+      # values so a following conditional branch can be rendered. +operands+ is the
+      # arch's operand splitter; +cmd+ is whatever it expects (a full line or its
+      # operand part).
+      def handle_compare(mnem, cmd)
+        lhs, rhs = operands(cmd)
+        record_compare(mnem.to_sym, operand_str(lhs), operand_str(rhs))
+      end
+
+      # The mnemonic of an objdump line (e.g. +"cmp"+, +"b.ne"+, +"je"+).
+      def mnemonic(cmd)
+        cmd[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
+      end
+
+      # Render an operand for a constraint: a register becomes its current value,
+      # an immediate becomes hex, anything else (a memory operand) stays as-is.
+      def operand_str(operand)
+        return registers[operand].to_s if register?(operand)
+
+        OneGadget::Helper.hex(Integer(operand))
+      rescue ArgumentError
+        operand
+      end
+
       # Queue a cmp-based conditional branch (+b.<cond>+) for deferred resolution.
       # @return [true, :fail] +:fail+ (abort the path) when it cannot be expressed
       #   soundly, e.g. no compare was seen or a non-zero condition follows +tst+/+cmn+.
