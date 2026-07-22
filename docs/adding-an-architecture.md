@@ -4,7 +4,7 @@ Supporting an architecture means two classes plus a little wiring. The cleanest
 existing example to copy is **aarch64** (`lib/one_gadget/fetchers/aarch64.rb` and
 `lib/one_gadget/emulators/aarch64.rb`).
 
-```
+```ruby
 OneGadget::Fetcher::<Arch>  < OneGadget::Fetcher::Base       # find candidates, describe constraints
 OneGadget::Emulators::<Arch> < OneGadget::Emulators::Processor # symbolically execute a candidate
 ```
