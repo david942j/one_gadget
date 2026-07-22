@@ -13,18 +13,6 @@ module OneGadget
     class Arm < Processor
       include ArmFamily
 
-      # ARM condition-code suffix (the +<cc>+ in +b<cc>+) mapped to a shared
-      # {Conditional::RELATION} predicate. Same encoding as AArch64 (see
-      # {AArch64::COND}); +vs+/+vc+ (overflow) have no constraint form and so are
-      # absent -- a branch on them resolves to +nil+ and aborts the path.
-      COND = {
-        'eq' => :eq, 'ne' => :ne,
-        'hs' => :uge, 'cs' => :uge, 'lo' => :ult, 'cc' => :ult,
-        'hi' => :ugt, 'ls' => :ule,
-        'ge' => :sge, 'lt' => :slt, 'gt' => :sgt, 'le' => :sle,
-        'mi' => :slt, 'pl' => :sge
-      }.freeze
-
       # Instantiate an {Arm} object.
       # @param [String, nil] file
       #   Path to the target libc. Used to read words from the literal pool when

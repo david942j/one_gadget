@@ -11,18 +11,6 @@ module OneGadget
     class AArch64 < Processor
       include ArmFamily
 
-      # AArch64 condition-code suffix (the +<cc>+ in +b.<cc>+) mapped to a shared
-      # {Conditional::RELATION} predicate. This decodes the opaque ARM mnemonics:
-      # +hs+/+cs+ and +lo+/+cc+ are aliases; +mi+/+pl+ (sign bit) act as signed
-      # +</+>=+. ARM32 uses the same encoding (see {Arm::COND}); x86 has {X86::JCC}.
-      COND = {
-        'eq' => :eq, 'ne' => :ne,
-        'hs' => :uge, 'cs' => :uge, 'lo' => :ult, 'cc' => :ult,
-        'hi' => :ugt, 'ls' => :ule,
-        'ge' => :sge, 'lt' => :slt, 'gt' => :sgt, 'le' => :sle,
-        'mi' => :slt, 'pl' => :sge
-      }.freeze
-
       # Instantiate a {AArch64} object.
       def initialize
         super(OneGadget::ABI.aarch64, 'sp')
