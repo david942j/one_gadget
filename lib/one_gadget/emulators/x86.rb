@@ -42,14 +42,15 @@ module OneGadget
         __send__(sym, *args) != :fail
       end
 
-      # x86 conditional-jump mnemonics mapped to the shared condition codes.
+      # x86 conditional-jump mnemonics mapped to shared {Conditional::RELATION}
+      # predicates (x86's adapter table, as {AArch64::COND} is for arm/aarch64).
       JCC = {
-        'je' => 'eq', 'jz' => 'eq', 'jne' => 'ne', 'jnz' => 'ne',
-        'jb' => 'cc', 'jc' => 'cc', 'jnae' => 'cc', 'jae' => 'cs', 'jnb' => 'cs', 'jnc' => 'cs',
-        'ja' => 'hi', 'jnbe' => 'hi', 'jbe' => 'ls', 'jna' => 'ls',
-        'jl' => 'lt', 'jnge' => 'lt', 'jge' => 'ge', 'jnl' => 'ge',
-        'jg' => 'gt', 'jnle' => 'gt', 'jle' => 'le', 'jng' => 'le',
-        'js' => 'mi', 'jns' => 'pl'
+        'je' => :eq, 'jz' => :eq, 'jne' => :ne, 'jnz' => :ne,
+        'jb' => :ult, 'jc' => :ult, 'jnae' => :ult, 'jae' => :uge, 'jnb' => :uge, 'jnc' => :uge,
+        'ja' => :ugt, 'jnbe' => :ugt, 'jbe' => :ule, 'jna' => :ule,
+        'jl' => :slt, 'jnge' => :slt, 'jge' => :sge, 'jnl' => :sge,
+        'jg' => :sgt, 'jnle' => :sgt, 'jle' => :sle, 'jng' => :sle,
+        'js' => :slt, 'jns' => :sge
       }.freeze
 
       # Supported instruction set.

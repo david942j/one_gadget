@@ -13,8 +13,17 @@ module OneGadget
     class Arm < Processor
       include ArmFamily
 
-      # ARM condition-code suffixes that appear on branches (+bne+, +bcs+, +ble+, ...).
-      CONDS = %w[eq ne cs hs cc lo mi pl vs vc hi ls ge lt gt le].freeze
+      # ARM condition-code suffix (the +<cc>+ in +b<cc>+) mapped to a shared
+      # {Conditional::RELATION} predicate. Same encoding as AArch64 (see
+      # {AArch64::COND}); +vs+/+vc+ (overflow) have no constraint form and so are
+      # absent -- a branch on them resolves to +nil+ and aborts the path.
+      COND = {
+        'eq' => :eq, 'ne' => :ne,
+        'hs' => :uge, 'cs' => :uge, 'lo' => :ult, 'cc' => :ult,
+        'hi' => :ugt, 'ls' => :ule,
+        'ge' => :sge, 'lt' => :slt, 'gt' => :sgt, 'le' => :sle,
+        'mi' => :slt, 'pl' => :sge
+      }.freeze
 
       # Instantiate an {Arm} object.
       # @param [String, nil] file
@@ -224,7 +233,10 @@ module OneGadget
       alias inst_svc inst_nop
 
       def branch_mnem?(mnem)
-        mnem == 'b' || %w[cbz cbnz].include?(mnem) || (mnem.start_with?('b') && CONDS.include?(mnem[1..]))
+        return true if mnem == 'b' || %w[cbz cbnz].include?(mnem)
+
+        # +vs+/+vc+ aren't in COND but are still branches (they just abort the path).
+        mnem.start_with?('b') && (COND.key?(mnem[1..]) || %w[vs vc].include?(mnem[1..]))
       end
 
       def operands(rest)
@@ -237,7 +249,7 @@ module OneGadget
         when 'b' then true # unconditional: control handled by the stitched path
         when 'cbz' then queue_cbz(ops[1].to_i(16), operand_str(ops[0]), negate: false)
         when 'cbnz' then queue_cbz(ops[1].to_i(16), operand_str(ops[0]), negate: true)
-        else queue_cond_branch(mnem[1..], ops[0].to_i(16))
+        else queue_cond_branch(COND[mnem[1..]], ops[0].to_i(16))
         end
       end
 

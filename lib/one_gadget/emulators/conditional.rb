@@ -19,14 +19,19 @@ module OneGadget
     #   #   c7a50: b.ne c7a9c    # stitched path falls through (does not jump)
     #   # => emitted gadget constraint:  x2 == 0x1
     module Conditional
-      # Taken-semantics for each condition code: relation + signedness (+nil+/:u/:s).
-      COND_RELATION = {
-        'eq' => ['==', nil], 'ne' => ['!=', nil],
-        'cs' => ['>=', :u], 'hs' => ['>=', :u], 'cc' => ['<', :u], 'lo' => ['<', :u],
-        'hi' => ['>', :u], 'ls' => ['<=', :u],
-        'ge' => ['>=', :s], 'lt' => ['<', :s], 'gt' => ['>', :s], 'le' => ['<=', :s],
-        'mi' => ['<', :s], 'pl' => ['>=', :s]
+      # Taken-semantics of each supported branch condition, keyed by a predicate
+      # named after the comparison it encodes (the LLVM +icmp+ names): a leading
+      # +u+ = unsigned, +s+ = signed. Value is +[relation, signedness]+, where
+      # signedness (+nil+/+:u+/+:s+) selects the operand cast.
+      #   :eq  :ne                equality
+      #   :ult :ule :ugt :uge     unsigned  <  <=  >  >=
+      #   :slt :sle :sgt :sge     signed    <  <=  >  >=
+      RELATION = {
+        eq: ['==', nil], ne: ['!=', nil],
+        ult: ['<', :u], ule: ['<=', :u], ugt: ['>', :u], uge: ['>=', :u],
+        slt: ['<', :s], sle: ['<=', :s], sgt: ['>', :s], sge: ['>=', :s]
       }.freeze
+
       # Relation under the not-taken branch.
       NEGATE = { '==' => '!=', '!=' => '==', '>=' => '<', '<' => '>=', '>' => '<=', '<=' => '>' }.freeze
 
@@ -100,26 +105,26 @@ module OneGadget
 
       # Queue a cmp-based conditional branch (+b.<cond>+) for deferred resolution.
       # Call it from +handle_branch+ for any conditional branch that reads flags;
-      # +cond+ is the arch-independent condition code (a {COND_RELATION} key) and
-      # +target+ is the branch's direct destination address.
-      # @param [String] cond The arch-independent condition code, a {COND_RELATION}
-      #   key. aarch64 passes +b.ne+ as +'ne'+; x86 maps +jne+ through its +JCC+ table.
+      # +cond+ is the comparison predicate and +target+ is the branch's direct
+      # destination address.
+      # @param [Symbol] cond The comparison predicate, a {RELATION} key. Each arch
+      #   first maps its own branch mnemonic to it (its +COND+/+JCC+ adapter table).
       # @param [Integer] target Destination address of the branch.
       # @return [true, :fail] +:fail+ (abort the path) when it cannot be expressed
       #   soundly: no compare was seen, or a non-zero condition follows +tst+/+cmn+.
-      # @example After +cmp x2, #1+, queue the following +b.ne 4a200+
-      #   queue_cond_branch('ne', 0x4a200) #=> true
+      # @example After +cmp x2, #1+, queue the following +b.ne 4a200+ (arch maps +b.ne+ to +:ne+)
+      #   queue_cond_branch(:ne, 0x4a200) #=> true
       #   # if the stitched path FALLS THROUGH (doesn't reach 0x4a200) the not-taken
-      #   # relation of +!=+ is emitted:  x2 == 0x1 ; if it jumps there:  x2 != 0x1
+      #   # relation of +:ne+ is emitted:  x2 == 0x1 ; if it jumps there:  x2 != 0x1
       # @example No preceding compare -> the path is unsound and is aborted
-      #   queue_cond_branch('ne', 0x4a200) #=> :fail   # when @flags is nil
+      #   queue_cond_branch(:ne, 0x4a200) #=> :fail   # when @flags is nil
       def queue_cond_branch(cond, target)
         return :fail if @flags.nil?
 
-        rel = COND_RELATION[cond]
+        rel = RELATION[cond]
         return :fail if rel.nil?
         # tst/cmn only give us a reliable zero (eq/ne) result.
-        return :fail if @flags[:kind] != :cmp && !%w[eq ne].include?(cond)
+        return :fail if @flags[:kind] != :cmp && !%i[eq ne].include?(cond)
 
         lhs = @flags[:lhs]
         rhs = @flags[:rhs]
@@ -185,7 +190,7 @@ module OneGadget
 
       private
 
-      # Render a relational constraint from a {COND_RELATION} entry, flipping the
+      # Render a relational constraint from a {RELATION} entry, flipping the
       # operator via {NEGATE} on the not-taken edge and prefixing a signedness cast.
       # @example +b.ne+ that is not taken, after +cmp x2, 1+ (64-bit arch)
       #   relation(['!=', nil], false, 'x2', '0x1') #=> 'x2 == 0x1'
