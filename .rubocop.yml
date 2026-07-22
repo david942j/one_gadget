@@ -60,6 +60,9 @@ Style/AccessorGrouping:
 Style/ArrayIntersect:
   Enabled: false
 
+Style/AsciiComments:
+  Enabled: true
+
 Style/FormatStringToken:
   Enabled: false
 

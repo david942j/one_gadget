@@ -6,8 +6,8 @@ require 'one_gadget/fetchers/objdump'
 module OneGadget
   module Fetcher
     # Base of the per-architecture gadget fetchers. It discovers candidate
-    # instruction sequences — a backward control-flow walk from each
-    # +exec+/+posix_spawn+ call — and turns a solved candidate into a
+    # instruction sequences - a backward control-flow walk from each
+    # +exec+/+posix_spawn+ call - and turns a solved candidate into a
     # {OneGadget::Gadget::Gadget}. A subclass supplies only the arch-specific
     # pieces (call mnemonic, string/global recognition, branch classification).
     #
@@ -30,7 +30,7 @@ module OneGadget
       # branch hops of the call, and a branch *into* that region comes from close
       # by. Measured across real amd64/aarch64/arm libcs, the earliest line the
       # walk reaches is <0x98b before the call and branches into it come from
-      # <0x8bb further — 0x1246 all told. WINDOW_BACK = 0x2000 leaves ~60% margin;
+      # <0x8bb further - 0x1246 all told. WINDOW_BACK = 0x2000 leaves ~60% margin;
       # a gadget whose code and branch-predecessors exceed it would be missed,
       # which is why windowing is opt-in per arch (fast disassembly arches keep
       # the full, exhaustive scan) and falls back to full disassembly if the call
@@ -41,7 +41,7 @@ module OneGadget
 
       # Cache values that are a deterministic function of an objdump command
       # (its output and everything derived from it), so re-analysing the same
-      # file — common in the specs, harmless for the CLI which reads a file once —
+      # file - common in the specs, harmless for the CLI which reads a file once -
       # doesn't redo the disassembly or the whole-binary scans.
       def self.cached(kind, command)
         @cached ||= Hash.new { |h, k| h[k] = {} }
@@ -423,7 +423,7 @@ module OneGadget
       # Depth-first backward walk. +visited+ (a Set) and +path+ are mutated with
       # backtracking so a fork explores independently without per-step copies;
       # +path+ is built in forward order (the terminal call stays last). Emits a
-      # candidate at each leaf — {#find} then tries every start line within it.
+      # candidate at each leaf - {#find} then tries every start line within it.
       def back_walk(idx, forks, visited, path, &blk)
         addr = disasm_addrs[idx]
         return if path.size >= PATH_BUDGET

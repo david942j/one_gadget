@@ -15,7 +15,7 @@ module OneGadget
       private
 
       # Locate the `bl` sites that call a terminal function *without* disassembling
-      # the whole libc — a full objdump of a Thumb-2 arm libc is ~4x slower than
+      # the whole libc - a full objdump of a Thumb-2 arm libc is ~4x slower than
       # amd64/aarch64 (~1.1s vs ~0.3s), and only ~0.35% of it is ever needed.
       #
       # We take the exec*/posix_spawn* addresses from the symbol table and scan
@@ -56,7 +56,7 @@ module OneGadget
 
       # Scan +data+ (loaded at +base+) for A32/Thumb BL branches into +targets+.
       # Over-approximates (a stray word may decode to a BL into a target); that is
-      # harmless — it just adds an empty window — as long as no real BL is missed.
+      # harmless - it just adds an empty window - as long as no real BL is missed.
       def scan_bl(base, data, targets)
         halves = data.unpack('v*') # 16-bit little-endian halfwords
         sites = halves.each_index.filter_map do |i|
