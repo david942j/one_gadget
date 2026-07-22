@@ -13,7 +13,7 @@ module OneGadget
     class Arm < Processor
       include ArmFamily
 
-      # ARM condition codes (suffixes on branches, e.g. +bne+, +bcs+).
+      # ARM condition-code suffixes that appear on branches (+bne+, +bcs+, +ble+, ...).
       CONDS = %w[eq ne cs hs cc lo mi pl vs vc hi ls ge lt gt le].freeze
 
       # Instantiate an {Arm} object.
@@ -118,7 +118,7 @@ module OneGadget
       # Rewrite one instruction into the plain form the generic parser expects:
       # drop the +.w+/+.n+ width suffix, map the flag-setting aliases we support
       # (+movs+/+adds+/+subs+) back to their base mnemonic, and strip the +#+ that
-      # prefixes ARM immediates. Other conditional/flag variants (e.g. +moveq+) are
+      # prefixes ARM immediates. Other conditional/flag variants (+moveq+, +addne+, ...) are
       # left intact so they fall through to "unsupported".
       # @example
       #   normalize('movs r0, #0')

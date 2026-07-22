@@ -126,7 +126,7 @@ module OneGadget
             ridx = arg.rindex(']')
             immi = parse(arg[(ridx + 1)..])
             inner = parse(arg[1...ridx], predefined:)
-            # An absolute address (e.g. lea rax, [0x1234]) parses to an Integer;
+            # An absolute address (the +[0x1234]+ in +lea rax, [0x1234]+) parses to an Integer;
             # model it as a based-nowhere Lambda so it can still be dereferenced.
             inner = Lambda.new(nil).tap { |l| l.immi = inner } if inner.is_a?(Integer)
             lm = inner.deref

@@ -187,7 +187,7 @@ module OneGadget
       # @param [OneGadget::Emulators::Lambda] lmda The parsed +argv_ptr+ (a stack register, zero dereference).
       def check_stack_argv(processor, argv_ptr, lmda, allow_null)
         stack = processor.get_corresponding_stack(lmda.obj)
-        # A stack register we don't track a stack for (e.g. the frame pointer):
+        # A stack register we don't track a stack for (the frame pointer):
         # fall back to treating it as an opaque pointer.
         return check_nonstack_argv(lmda.to_s, allow_null) if stack.nil?
 
@@ -277,7 +277,7 @@ module OneGadget
 
         lmda = OneGadget::Emulators::Lambda.parse(envp_ptr)
         # A concrete integer or a stack register we don't track a stack for
-        # (e.g. the frame pointer) both fall through to the opaque-pointer case.
+        # (the frame pointer) both fall through to the opaque-pointer case.
         stack = lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.deref_count.zero? &&
                 OneGadget::ABI.stack_register?(lmda.obj) &&
                 processor.get_corresponding_stack(lmda.obj)
@@ -494,8 +494,11 @@ module OneGadget
         line.sub(/\A[0-9a-f]+:\s*\S+\s*/, '')[/\b([0-9a-f]+)\b\s*(?:<|\z)/, 1]&.to_i(16)
       end
 
-      # The mnemonic of an objdump line (e.g. +"b.ne"+, +"cbz"+), memoized because
-      # each line is tested by several branch predicates during the CFG scan.
+      # The mnemonic of an objdump line, memoized because each line is tested by
+      # several branch predicates during the CFG scan.
+      # @example
+      #   mnemonic('4a1d0: b.ne 4a200 <foo>') #=> 'b.ne'
+      #   mnemonic('4a1c0: cbz  x0, 4a200')   #=> 'cbz'
       def mnemonic(line)
         (@mnemonic ||= {})[line] ||= line[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
       end
@@ -510,8 +513,11 @@ module OneGadget
       def branch_kind(_line); raise NotImplementedError
       end
 
-      # The leading character(s) of this arch's branch mnemonics (e.g. +"bct"+ for
-      # b/cbz/tbz, +"j"+ for jmp/jcc), used to build {#branch_lead_regex}.
+      # The leading character(s) of this arch's branch mnemonics, used to build
+      # {#branch_lead_regex}.
+      # @example
+      #   'bct'  # aarch64/arm: b, cbz/cbnz, tbz/tbnz
+      #   'j'    # x86: jmp, jcc
       def branch_lead_chars; raise NotImplementedError
       end
 
@@ -531,7 +537,7 @@ module OneGadget
 
       # Disassemble only [call-WINDOW_BACK, call+WINDOW_FWD] around each call site,
       # merging overlaps. Used when {#terminal_call_sites} located the calls without
-      # a full disassembly (e.g. the slow-to-objdump Thumb-2 arm libcs).
+      # a full disassembly (the win on the slow-to-objdump Thumb-2 arm libcs).
       def windowed_disasm(sites)
         windows = sites.sort.map { |a| [[a - WINDOW_BACK, 0].max, a + WINDOW_FWD] }
         merge_ranges(windows).flat_map { |lo, hi| objdump_lines(start: lo, stop: hi) }
