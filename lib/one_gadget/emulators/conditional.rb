@@ -14,6 +14,11 @@ module OneGadget
     # pending decision, and on the next line we compare that line's address to the
     # branch target to learn whether the stitched path took the branch.
     #
+    # The including class (an {OneGadget::Emulators::Processor} subclass) must
+    # provide +registers+ and +register?+ (operand lookup), +operands(cmd)+ (the
+    # arch's operand splitter), +self.class.bits+ (32/64, for the signedness cast),
+    # and the +@flags+/+@pending+/+@constraints+ state {Processor#initialize} sets up.
+    #
     # @example A +b.ne+ whose branch is *not* taken becomes the constraint +x2 == 0x1+
     #   #   c7a4c: cmp  x2, 1
     #   #   c7a50: b.ne c7a9c    # stitched path falls through (does not jump)
@@ -36,26 +41,25 @@ module OneGadget
       NEGATE = { '==' => '!=', '!=' => '==', '>=' => '<', '<' => '>=', '>' => '<=', '<=' => '>' }.freeze
 
       # The flag-setting compares we model, keyed by the ALU operation the compare
-      # performs -- its flags reflect that result. +ordered+ says whether magnitude
-      # conditions (anything beyond +eq+/+ne+) are sound afterwards; the constraint
-      # text for each op is rendered by {#compare_constraint}. An arch maps its own
-      # mnemonics onto these ops (its +COMPARES+); adding an arch needs no change
-      # here. Adding a genuinely new ALU op means one entry here plus a branch in
-      # {#compare_constraint}.
-      COMPARE = {
-        sub: { ordered: true },  # cmp:      flags from  lhs - rhs
-        add: { ordered: true },  # cmn:      flags from  lhs + rhs
-        and: { ordered: false }  # tst/test: flags from  lhs & rhs  (zero flag only)
+      # performs -- its flags reflect that result. Each entry says whether magnitude
+      # conditions (anything beyond +eq+/+ne+) are sound afterwards (+ordered+) and
+      # names the method that renders its constraint text. An arch maps its own
+      # mnemonics onto these ops (its +COMPARES+), so adding an arch needs no change
+      # here; adding a genuinely new ALU op means one entry plus its +render_*+ method.
+      COMPARE_OPS = {
+        sub: { ordered: true,  render: :render_sub },  # cmp:      flags from  lhs - rhs
+        add: { ordered: true,  render: :render_add },  # cmn:      flags from  lhs + rhs
+        and: { ordered: false, render: :render_and }   # tst/test: flags from  lhs & rhs (zero flag)
       }.freeze
 
       # Record a compare so a following conditional branch can be rendered.
       # Normally reached through {#handle_compare}; call it directly only when an
       # arch models a flag-setting instruction that {#handle_compare} doesn't cover.
-      # @param [Symbol] op The ALU operation the compare performs -- a {COMPARE} key
+      # @param [Symbol] op The ALU operation the compare performs -- a {COMPARE_OPS} key
       #   (+:sub+ for +cmp+, +:add+ for +cmn+, +:and+ for +tst+/+test+). Its flags
       #   reflect this result, which decides both which branch conditions are
       #   expressible and how the constraint is rendered. Arches map their own
-      #   mnemonics to these ops (their +COMPARES+); a new arch adds a {COMPARE}
+      #   mnemonics to these ops (their +COMPARES+); a new arch adds a {COMPARE_OPS}
       #   entry only for a genuinely new operation.
       # @param [String] lhs Rendered left operand: a register's current value, or an immediate in hex.
       # @param [String] rhs Rendered right operand.
@@ -74,7 +78,7 @@ module OneGadget
       # Call this from +process!+ when the mnemonic is one of the arch's compares
       # (its +COMPARES+ maps the mnemonic to the op), *before* dispatching to the
       # +inst_*+ handlers.
-      # @param [Symbol] op The compare's ALU operation (a {COMPARE} key), which the
+      # @param [Symbol] op The compare's ALU operation (a {COMPARE_OPS} key), which the
       #   arch resolves from the mnemonic.
       # @param [String] cmd Passed to the arch's +operands+ splitter, so it is whatever
       #   that splitter expects (a full objdump line, or just its operand part).
@@ -121,8 +125,8 @@ module OneGadget
         operand
       end
 
-      # Queue a cmp-based conditional branch (+b.<cond>+) for deferred resolution.
-      # Call it from +handle_branch+ for any conditional branch that reads flags;
+      # Queue a conditional branch that reads the last recorded compare's flags
+      # (+b.<cond>+ / +jcc+) for deferred resolution. Call it from +handle_branch+;
       # +cond+ is the comparison predicate and +target+ is the branch's direct
       # destination address.
       # @param [Symbol] cond The comparison predicate, a {RELATION} key. Each arch
@@ -130,7 +134,7 @@ module OneGadget
       # @param [Integer] target Destination address of the branch.
       # @return [true, :fail] +:fail+ (abort the path) when it cannot be expressed
       #   soundly: no compare was seen, or a magnitude condition follows an
-      #   equality-only compare (a {COMPARE} op with +ordered: false+, e.g. +tst+).
+      #   equality-only compare (a {COMPARE_OPS} op with +ordered: false+, e.g. +tst+).
       # @example After +cmp x2, #1+, queue the following +b.ne 4a200+ (arch maps +b.ne+ to +:ne+)
       #   queue_cond_branch(:ne, 0x4a200) #=> true
       #   # if the stitched path FALLS THROUGH (doesn't reach 0x4a200) the not-taken
@@ -144,7 +148,7 @@ module OneGadget
         return :fail if rel.nil?
         # A magnitude condition needs a compare whose flags reflect a full ordering
         # (+:sub+/+:add+); an equality-only compare (+:and+) supports just eq/ne.
-        return :fail unless COMPARE[@flags[:op]][:ordered] || %i[eq ne].include?(cond)
+        return :fail unless COMPARE_OPS.fetch(@flags[:op])[:ordered] || %i[eq ne].include?(cond)
 
         op = @flags[:op]
         lhs = @flags[:lhs]
@@ -199,7 +203,7 @@ module OneGadget
       #     resolve_pending_branch(cmd)
       #     ...
       #   end
-      #   # if the previous line did +queue_cond_branch('ne', 0x4a200)+ and this
+      #   # if the previous line did +queue_cond_branch(:ne, 0x4a200)+ and this
       #   # +cmd+ sits at 0x4a200, the branch was taken; otherwise it fell through
       def resolve_pending_branch(cmd)
         return if @pending.nil?
@@ -213,12 +217,9 @@ module OneGadget
 
       # Render the constraint a taken/not-taken branch imposes on the recorded
       # compare: flip the operator via {NEGATE} on the not-taken edge, prefix the
-      # signedness cast, then format per the compare's {COMPARE} op:
-      #   :sub  ->  "lhs <op> rhs"            (cmp is a direct comparison)
-      #   :add  ->  "(lhs + rhs) <op> 0"      (cmn compares the sum against 0)
-      #   :and  ->  "(lhs & rhs) <op> 0", or  "lhs <op> 0" when both sides are the
-      #             same operand (the common +test reg, reg+ / +tst rN, rN+ idiom)
-      # @param [Symbol] op The compare's ALU operation (a {COMPARE} key).
+      # signedness cast, then defer to the op's +render_*+ method (see {COMPARE_OPS}).
+      # Raises +KeyError+ if +op+ isn't a known {COMPARE_OPS} entry.
+      # @param [Symbol] op The compare's ALU operation (a {COMPARE_OPS} key).
       # @param [Array(String, Symbol)] rel The +[operator, signedness]+ from {RELATION}.
       # @example +b.ne+ (not taken) after +cmp x2, 1+ -- a +:sub+ compare, 64-bit
       #   compare_constraint(:sub, 'x2', '0x1', ['!=', nil], false) #=> 'x2 == 0x1'
@@ -228,11 +229,22 @@ module OneGadget
         operator, sign = rel
         operator = NEGATE[operator] unless taken
         cast = sign ? "(#{sign}#{self.class.bits})" : ''
-        case op
-        when :sub then "#{cast}#{lhs} #{operator} #{rhs}"
-        when :add then "#{cast}(#{lhs} + #{rhs}) #{operator} 0"
-        when :and then lhs == rhs ? "#{lhs} #{operator} 0" : "(#{lhs} & #{rhs}) #{operator} 0"
-        end
+        __send__(COMPARE_OPS.fetch(op)[:render], cast, lhs, rhs, operator)
+      end
+
+      # +cmp+: a direct comparison of the two operands.
+      def render_sub(cast, lhs, rhs, op)
+        "#{cast}#{lhs} #{op} #{rhs}"
+      end
+
+      # +cmn+: the flags reflect +lhs + rhs+, i.e. that sum compared against 0.
+      def render_add(cast, lhs, rhs, op)
+        "#{cast}(#{lhs} + #{rhs}) #{op} 0"
+      end
+
+      # +tst+/+test+: a bitmask test; +reg, reg+ collapses to the plain zero test.
+      def render_and(_cast, lhs, rhs, op)
+        lhs == rhs ? "#{lhs} #{op} 0" : "(#{lhs} & #{rhs}) #{op} 0"
       end
 
       # The address of an objdump line, used to tell whether the pending branch

@@ -514,7 +514,8 @@ module OneGadget
       end
 
       # The leading character(s) of this arch's branch mnemonics, used to build
-      # {#branch_lead_regex}.
+      # {#branch_lead_regex}. Must be plain regex-safe literals: they are spliced
+      # into a character class, so no +]+, +\+, +-+ or +^+.
       # @example
       #   'bct'  # aarch64/arm: b, cbz/cbnz, tbz/tbnz
       #   'j'    # x86: jmp, jcc

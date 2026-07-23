@@ -60,9 +60,9 @@ compare/branch, otherwise parse and dispatch:
 
 ```ruby
 def process!(cmd)
-  resolve_pending_branch(cmd)                 # from Conditional
-  mnem = mnemonic(cmd)                         # from Conditional
-  return handle_compare(mnem, cmd) if %w[cmp ...].include?(mnem)  # from Conditional
+  resolve_pending_branch(cmd)                                       # from Conditional
+  mnem = mnemonic(cmd)                                              # from Conditional
+  return handle_compare(COMPARES[mnem], cmd) if COMPARES.key?(mnem) # from Conditional
   return handle_branch(mnem, cmd) != :fail if branch_mnem?(mnem)
 
   inst, args = parse(cmd)
@@ -72,9 +72,17 @@ end
 
 The **`Emulators::Conditional`** module (already included in `Processor`) provides
 the branch machinery so you don't reimplement it: `record_compare`,
-`queue_cond_branch`, `queue_cbz`, `queue_tbz`, `resolve_pending_branch`,
-`handle_compare`, `operand_str`, `mnemonic`. Your `handle_branch` just parses the
-line and calls the right `queue_*`.
+`handle_compare`, `queue_cond_branch`, `queue_cbz`, `queue_tbz`,
+`resolve_pending_branch`, `operand_str`, `mnemonic`. You supply two small adapter
+tables that map your arch's mnemonics onto the shared vocabulary (directly, or via
+a shared base — arm/aarch64 share theirs through `ArmFamily`):
+
+* **`COMPARES`** — compare mnemonic → ALU op (a `Conditional::COMPARE_OPS` key:
+  `:sub` for `cmp`, `:add` for `cmn`, `:and` for `tst`/`test`); `handle_compare`
+  reads it.
+* **`COND`** (x86 calls it `JCC`) — branch mnemonic → predicate (a
+  `Conditional::RELATION` key, e.g. `:ne`, `:uge`). Your `handle_branch` parses the
+  line and calls the right `queue_*`, passing this predicate to `queue_cond_branch`.
 
 ## Wiring
 

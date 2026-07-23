@@ -54,7 +54,7 @@ module OneGadget
       }.freeze
 
       # x86 flag-setting compare mnemonics mapped to the ALU op whose result their
-      # flags reflect (see {Conditional::COMPARE}). +test+ is a bitwise AND, +cmp+
+      # flags reflect (see {Conditional::COMPARE_OPS}). +test+ is a bitwise AND, +cmp+
       # a subtraction.
       COMPARES = { 'cmp' => :sub, 'test' => :and }.freeze
 
