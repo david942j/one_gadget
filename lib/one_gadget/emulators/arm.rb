@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'one_gadget/abi'
+require 'one_gadget/emulators/arm_family'
 require 'one_gadget/emulators/instruction'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/emulators/processor'
@@ -10,6 +11,8 @@ module OneGadget
   module Emulators
     # Emulator of 32-bit ARM (both A32 and Thumb-2 encodings).
     class Arm < Processor
+      include ArmFamily
+
       # Instantiate an {Arm} object.
       # @param [String, nil] file
       #   Path to the target libc. Used to read words from the literal pool when
@@ -72,15 +75,6 @@ module OneGadget
         sp_based_stack[(idx - 4) * size_t]
       end
 
-      # @param [String, Lambda] obj A lambda object or its string.
-      # @return [Hash{Integer => Lambda}, nil]
-      #   The sp-based stack that +obj+ uses, or +nil+ if +obj+ is not sp-relative.
-      def get_corresponding_stack(obj)
-        return nil unless obj.to_s.include?(sp)
-
-        sp_based_stack
-      end
-
       private
 
       # Update {@thumb}/{@cur_addr} from the leading +ADDR:+ of an objdump line.
@@ -129,10 +123,6 @@ module OneGadget
       # bias +4+ in Thumb and +8+ in A32.
       def pc_value
         libc_base + @cur_addr + (@thumb ? 4 : 8)
-      end
-
-      def libc_base
-        @libc_base ||= OneGadget::Emulators::Lambda.new('$base')
       end
 
       def inst_mov(dst, src)
@@ -209,19 +199,7 @@ module OneGadget
         registers[sp] += size_t * regs.size
       end
 
-      def inst_bl(addr)
-        return registers[pc] = addr if %w[execve execl posix_spawn].any? { |n| addr.include?(n) }
-
-        # Calls that are always safe because they merely wrap a syscall.
-        checker = {
-          'sigprocmask' => {},
-          '__sigaction' => { 2 => :zero? }
-        }
-        func = checker.keys.find { |n| addr.include?(n) }
-        return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }
-
-        :fail
-      end
+      # +blx+ (interworking call) is modelled exactly like +bl+ (see {ArmFamily#inst_bl}).
       alias inst_blx inst_bl
 
       # Flag-only / no-effect instructions: keep emulating without changing state.
@@ -282,12 +260,6 @@ module OneGadget
           v = registers[tok] if register?(tok)
           v.is_a?(Integer) ? OneGadget::Helper.hex(v) : tok
         end
-      end
-
-      def add_writable(lmda)
-        return if lmda.obj == libc_base.obj
-
-        @constraints << [:writable, lmda]
       end
 
       class << self

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'one_gadget/abi'
+require 'one_gadget/emulators/arm_family'
 require 'one_gadget/emulators/instruction'
 require 'one_gadget/emulators/processor'
 
@@ -8,6 +9,8 @@ module OneGadget
   module Emulators
     # Emulator of aarch64.
     class AArch64 < Processor
+      include ArmFamily
+
       # Instantiate a {AArch64} object.
       def initialize
         super(OneGadget::ABI.aarch64, 'sp')
@@ -44,24 +47,6 @@ module OneGadget
         registers["x#{idx}"]
       end
 
-      # @param [String | Lambda] obj
-      #  A lambda object or its string.
-      # @return [Hash{Integer => Lambda}, nil]
-      #  The corresponding stack (based on sp) that +obj+ used,
-      #  or nil if +obj+ doesn't use the stack.
-      # @example
-      #   get_corresponding_stack('sp+0x10')
-      #   #=> sp_based_stack
-      #   get_corresponding_stack('[sp+0x10]')
-      #   #=> sp_based_stack
-      #   get_corresponding_stack('x21')
-      #   #=> nil
-      def get_corresponding_stack(obj)
-        return nil unless obj.to_s.include?(sp)
-
-        sp_based_stack
-      end
-
       private
 
       def inst_add(dst, src, op2, mode = 'sxtw')
@@ -78,25 +63,6 @@ module OneGadget
         check_register!(dst)
 
         registers[dst] = libc_base + imm.to_i(16)
-      end
-
-      # Handle some valid calls.
-      # For example, +sigprocmask+ will always be a valid call
-      # because it just invokes syscall.
-      def inst_bl(addr)
-        # This is the last call
-        return registers[pc] = addr if %w[execve execl posix_spawn].any? { |n| addr.include?(n) }
-
-        # TODO: handle some registers would be fucked after call
-        checker = {
-          'sigprocmask' => {},
-          '__sigaction' => { 2 => :zero? }
-        }
-        func = checker.keys.find { |n| addr.include?(n) }
-        return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }
-
-        # unhandled case or checker's condition fails
-        :fail
       end
 
       def inst_ldr(dst, src, index = 0)
@@ -160,21 +126,9 @@ module OneGadget
         registers[lmda.obj] += lmda.immi + index
       end
 
-      def libc_base
-        @libc_base ||= OneGadget::Emulators::Lambda.new('$base')
-      end
-
       # Checks if +reg+ is a 64-bit register.
       def reg64?(reg)
         register?(reg) && reg.start_with?('x')
-      end
-
-      def add_writable(lmda)
-        # XXX: Better way is check LOAD segment of the libc ELF.
-        # XXX: Should also checks deref_count, but sometimes [[$base+xx]] is also writable..
-        return if lmda.obj == libc_base.obj
-
-        @constraints << [:writable, lmda]
       end
 
       class << self
