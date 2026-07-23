@@ -34,7 +34,7 @@ module OneGadget
       def process!(cmd)
         resolve_pending_branch(cmd)
         mnem = mnemonic(cmd)
-        return handle_compare(mnem, cmd) if %w[cmp test].include?(mnem)
+        return handle_compare(COMPARES[mnem], cmd) if COMPARES.key?(mnem)
         return handle_branch(mnem, cmd) != :fail if branch_mnem?(mnem)
 
         inst, args = parse(cmd)
@@ -52,6 +52,11 @@ module OneGadget
         'jg' => :sgt, 'jnle' => :sgt, 'jle' => :sle, 'jng' => :sle,
         'js' => :slt, 'jns' => :sge
       }.freeze
+
+      # x86 flag-setting compare mnemonics mapped to the ALU op whose result their
+      # flags reflect (see {Conditional::COMPARE}). +test+ is a bitwise AND, +cmp+
+      # a subtraction.
+      COMPARES = { 'cmp' => :sub, 'test' => :and }.freeze
 
       # Supported instruction set.
       # @return [Array<Instruction>] The supported instructions.

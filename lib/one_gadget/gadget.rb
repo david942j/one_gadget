@@ -116,7 +116,17 @@ module OneGadget
         op = expr[/ (==|!=|<=|>=|<|>) /, 1]
         lhs = expr.split(/ #{Regexp.escape(op)} /, 2).first.sub(/\A\([su]\d+\)/, '')
         base = op == '==' ? 0.4 : 0.6
-        base * 0.9**OneGadget::Emulators::Lambda.parse(lhs).deref_count
+        base * 0.9**lhs_deref_count(lhs)
+      end
+
+      # Dereference depth of a relation's left side, used to weight the score.
+      # A compound expression (e.g. +(a & b)+ from +tst+, +(a + b)+ from +cmn+) is
+      # not a plain lambda and has no dereference, so it scores as depth 0.
+      def lhs_deref_count(lhs)
+        lmda = OneGadget::Emulators::Lambda.parse(lhs)
+        lmda.is_a?(OneGadget::Emulators::Lambda) ? lmda.deref_count : 0
+      rescue OneGadget::Error::Error
+        0
       end
 
       def calculate_writable_score(identity)

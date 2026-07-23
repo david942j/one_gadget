@@ -35,40 +35,58 @@ module OneGadget
       # Relation under the not-taken branch.
       NEGATE = { '==' => '!=', '!=' => '==', '>=' => '<', '<' => '>=', '>' => '<=', '<=' => '>' }.freeze
 
+      # The flag-setting compares we model, keyed by the ALU operation the compare
+      # performs -- its flags reflect that result. +ordered+ says whether magnitude
+      # conditions (anything beyond +eq+/+ne+) are sound afterwards; the constraint
+      # text for each op is rendered by {#compare_constraint}. An arch maps its own
+      # mnemonics onto these ops (its +COMPARES+); adding an arch needs no change
+      # here. Adding a genuinely new ALU op means one entry here plus a branch in
+      # {#compare_constraint}.
+      COMPARE = {
+        sub: { ordered: true },  # cmp:      flags from  lhs - rhs
+        add: { ordered: true },  # cmn:      flags from  lhs + rhs
+        and: { ordered: false }  # tst/test: flags from  lhs & rhs  (zero flag only)
+      }.freeze
+
       # Record a compare so a following conditional branch can be rendered.
       # Normally reached through {#handle_compare}; call it directly only when an
       # arch models a flag-setting instruction that {#handle_compare} doesn't cover.
-      # @param [Symbol] kind +:cmp+, +:cmn+ or +:tst+.
+      # @param [Symbol] op The ALU operation the compare performs -- a {COMPARE} key
+      #   (+:sub+ for +cmp+, +:add+ for +cmn+, +:and+ for +tst+/+test+). Its flags
+      #   reflect this result, which decides both which branch conditions are
+      #   expressible and how the constraint is rendered. Arches map their own
+      #   mnemonics to these ops (their +COMPARES+); a new arch adds a {COMPARE}
+      #   entry only for a genuinely new operation.
       # @param [String] lhs Rendered left operand: a register's current value, or an immediate in hex.
       # @param [String] rhs Rendered right operand.
       # @return [true]
-      # @example Remember that +x2+ (currently holding +0x1+) was compared with +0x1+
-      #   record_compare(:cmp, '0x1', '0x1') #=> true
-      #   # a following +b.ne+ that is *not* taken now renders as  0x1 != 0x1
-      #   # (a contradiction -> the candidate is dropped as infeasible)
-      def record_compare(kind, lhs, rhs)
-        @flags = { kind:, lhs:, rhs: }
+      # @example Record +cmp x2, 0x1+ (subtraction), readying the next branch
+      #   record_compare(:sub, '0x1', '0x1') #=> true
+      #   # a following +b.ne+ not taken renders  0x1 == 0x1  (a stripped tautology)
+      def record_compare(op, lhs, rhs)
+        @flags = { op:, lhs:, rhs: }
         true
       end
 
-      # Model a compare line (+cmp+/+test+/...): record its two operands' current
-      # values so a following conditional branch can be rendered.
+      # Model a compare line: record its two operands' current values under the
+      # compare's ALU op, so a following conditional branch can be rendered.
       #
-      # Call this from +process!+ when the mnemonic is one of the arch's compares,
-      # *before* dispatching to the +inst_*+ handlers.
-      # @param [String] mnem The compare mnemonic; becomes the recorded +kind+.
+      # Call this from +process!+ when the mnemonic is one of the arch's compares
+      # (its +COMPARES+ maps the mnemonic to the op), *before* dispatching to the
+      # +inst_*+ handlers.
+      # @param [Symbol] op The compare's ALU operation (a {COMPARE} key), which the
+      #   arch resolves from the mnemonic.
       # @param [String] cmd Passed to the arch's +operands+ splitter, so it is whatever
       #   that splitter expects (a full objdump line, or just its operand part).
       # @return [true]
-      # @example Wiring in an arch's +process!+ (aarch64)
-      #   mnem = mnemonic(cmd)
-      #   return handle_compare(mnem, cmd) if %w[cmp cmn tst].include?(mnem)
-      # @example What it records for +cmp x2, #1+ (with +#1+ already normalized to +1+)
-      #   handle_compare('cmp', '4a1c0: cmp x2, 1') #=> true
-      #   # records lhs = x2's current value, rhs = 0x1, ready for the next branch
-      def handle_compare(mnem, cmd)
+      # @example Wiring in an arch's +process!+ (its +COMPARES+ holds the mnemonic map)
+      #   return handle_compare(COMPARES[mnem], cmd) if COMPARES.key?(mnem)
+      # @example What it records for +cmp x2, 1+ (x2 currently 0x30)
+      #   handle_compare(:sub, '4a1c0: cmp x2, 1') #=> true
+      #   # records op :sub, lhs = 0x30, rhs = 0x1, ready for the next branch
+      def handle_compare(op, cmd)
         lhs, rhs = operands(cmd)
-        record_compare(mnem.to_sym, operand_str(lhs), operand_str(rhs))
+        record_compare(op, operand_str(lhs), operand_str(rhs))
       end
 
       # The mnemonic of an objdump line. Use it at the top of +process!+ to decide
@@ -111,7 +129,8 @@ module OneGadget
       #   first maps its own branch mnemonic to it (its +COND+/+JCC+ adapter table).
       # @param [Integer] target Destination address of the branch.
       # @return [true, :fail] +:fail+ (abort the path) when it cannot be expressed
-      #   soundly: no compare was seen, or a non-zero condition follows +tst+/+cmn+.
+      #   soundly: no compare was seen, or a magnitude condition follows an
+      #   equality-only compare (a {COMPARE} op with +ordered: false+, e.g. +tst+).
       # @example After +cmp x2, #1+, queue the following +b.ne 4a200+ (arch maps +b.ne+ to +:ne+)
       #   queue_cond_branch(:ne, 0x4a200) #=> true
       #   # if the stitched path FALLS THROUGH (doesn't reach 0x4a200) the not-taken
@@ -123,12 +142,14 @@ module OneGadget
 
         rel = RELATION[cond]
         return :fail if rel.nil?
-        # tst/cmn only give us a reliable zero (eq/ne) result.
-        return :fail if @flags[:kind] != :cmp && !%i[eq ne].include?(cond)
+        # A magnitude condition needs a compare whose flags reflect a full ordering
+        # (+:sub+/+:add+); an equality-only compare (+:and+) supports just eq/ne.
+        return :fail unless COMPARE[@flags[:op]][:ordered] || %i[eq ne].include?(cond)
 
+        op = @flags[:op]
         lhs = @flags[:lhs]
         rhs = @flags[:rhs]
-        @pending = { target:, render: ->(taken) { relation(rel, taken, lhs, rhs) } }
+        @pending = { target:, render: ->(taken) { compare_constraint(op, lhs, rhs, rel, taken) } }
         true
       end
 
@@ -190,17 +211,28 @@ module OneGadget
 
       private
 
-      # Render a relational constraint from a {RELATION} entry, flipping the
-      # operator via {NEGATE} on the not-taken edge and prefixing a signedness cast.
-      # @example +b.ne+ that is not taken, after +cmp x2, 1+ (64-bit arch)
-      #   relation(['!=', nil], false, 'x2', '0x1') #=> 'x2 == 0x1'
-      # @example +b.cs+ (unsigned >=) that is taken
-      #   relation(['>=', :u], true, 'x0', '0x10')  #=> '(u64)x0 >= 0x10'
-      def relation(rel, taken, lhs, rhs)
-        op, sign = rel
-        op = NEGATE[op] unless taken
-        cast = { u: "(u#{self.class.bits})", s: "(s#{self.class.bits})" }[sign] || ''
-        "#{cast}#{lhs} #{op} #{rhs}"
+      # Render the constraint a taken/not-taken branch imposes on the recorded
+      # compare: flip the operator via {NEGATE} on the not-taken edge, prefix the
+      # signedness cast, then format per the compare's {COMPARE} op:
+      #   :sub  ->  "lhs <op> rhs"            (cmp is a direct comparison)
+      #   :add  ->  "(lhs + rhs) <op> 0"      (cmn compares the sum against 0)
+      #   :and  ->  "(lhs & rhs) <op> 0", or  "lhs <op> 0" when both sides are the
+      #             same operand (the common +test reg, reg+ / +tst rN, rN+ idiom)
+      # @param [Symbol] op The compare's ALU operation (a {COMPARE} key).
+      # @param [Array(String, Symbol)] rel The +[operator, signedness]+ from {RELATION}.
+      # @example +b.ne+ (not taken) after +cmp x2, 1+ -- a +:sub+ compare, 64-bit
+      #   compare_constraint(:sub, 'x2', '0x1', ['!=', nil], false) #=> 'x2 == 0x1'
+      # @example +jne+ (taken) after +test eax, eax+ -- an +:and+ compare
+      #   compare_constraint(:and, 'eax', 'eax', ['!=', nil], true) #=> 'eax != 0'
+      def compare_constraint(op, lhs, rhs, rel, taken)
+        operator, sign = rel
+        operator = NEGATE[operator] unless taken
+        cast = sign ? "(#{sign}#{self.class.bits})" : ''
+        case op
+        when :sub then "#{cast}#{lhs} #{operator} #{rhs}"
+        when :add then "#{cast}(#{lhs} + #{rhs}) #{operator} 0"
+        when :and then lhs == rhs ? "#{lhs} #{operator} 0" : "(#{lhs} & #{rhs}) #{operator} 0"
+        end
       end
 
       # The address of an objdump line, used to tell whether the pending branch

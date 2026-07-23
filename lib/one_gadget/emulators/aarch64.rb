@@ -24,7 +24,7 @@ module OneGadget
         resolve_pending_branch(cmd)
         cmd = cmd.gsub(/#-?(0x)?[0-9a-f]+/) { |v| v[1..] }
         mnem = mnemonic(cmd)
-        return handle_compare(mnem, cmd) if %w[cmp cmn tst].include?(mnem)
+        return handle_compare(COMPARES[mnem], cmd) if COMPARES.key?(mnem)
         return handle_branch(mnem, cmd) != :fail if branch_mnem?(mnem)
 
         inst, args = parse(cmd)

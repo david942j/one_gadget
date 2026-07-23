@@ -42,7 +42,7 @@ module OneGadget
         body, @literal = split_line(line)
         body = normalize(body)
         mnem, rest = body.split(/\s+/, 2)
-        return handle_compare(mnem, rest) if %w[cmp cmn tst].include?(mnem)
+        return handle_compare(COMPARES[mnem], rest) if COMPARES.key?(mnem)
         return handle_branch(mnem, rest) != :fail if branch_mnem?(mnem)
         # push/pop take a {reg-list} whose commas would confuse the generic parser.
         return __send__(:"inst_#{mnem}", rest) != :fail if %w[push pop].include?(mnem)

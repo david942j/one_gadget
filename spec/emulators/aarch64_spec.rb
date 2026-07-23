@@ -53,7 +53,11 @@ describe OneGadget::Emulators::AArch64 do
     end
 
     it 'uses eq/ne but rejects magnitude conditions after tst' do
-      expect(branch_constraint('tst x0, x0', 'b.eq', 0x2000, 0x2000)).to eq ['x0 == x0'] # taken
+      # tst x0,x0 sets ZF = (x0 == 0); b.eq taken means x0 == 0.
+      expect(branch_constraint('tst x0, x0', 'b.eq', 0x2000, 0x2000)).to eq ['x0 == 0'] # taken
+      # tst with distinct operands is a real bitmask test.
+      @processor = described_class.new
+      expect(branch_constraint('tst x0, x1', 'b.ne', 0x2000, 0x2000)).to eq ['(x0 & x1) != 0'] # taken
       @processor = described_class.new
       expect(@processor.process('1000: tst x0, x0')).to be true
       expect(@processor.process('1004: b.lt 2000 <x>')).to be false # magnitude after tst: unsound

@@ -90,7 +90,9 @@ constraints:
       expect(new(['x2 == 0x1']).score).to be_within(eps).of 0.4          # equality
       expect(new(['(u64)x0 >= 0x400']).score).to be_within(eps).of 0.6   # inequality
       expect(new(['[x1+0x8] != 0']).score).to be_within(eps).of 0.54     # deref penalised
-      expect(new(['(x3 & 0x10) == 0']).score).to be_within(eps).of 0.4   # bit-test (unparseable lhs)
+      expect(new(['(x3 & 0x10) == 0']).score).to be_within(eps).of 0.4 # bit-test, parses to x3+0x10
+      expect(new(['(x0 & x1) != 0']).score).to be_within(eps).of 0.6 # distinct regs: lhs unparseable
+      expect(new(['(s64)(x0 + 0x10) < 0']).score).to be_within(eps).of 0.6 # cmn compare: lhs unparseable
     end
 
     it 'level 3' do

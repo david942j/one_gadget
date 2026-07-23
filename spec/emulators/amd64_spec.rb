@@ -24,8 +24,8 @@ describe OneGadget::Emulators::Amd64 do
     end
 
     it 'renders test (zero flag only) and jrcxz' do
-      # a tautology is only dropped later, in the fetcher
-      expect(branch_constraint('test eax,eax', 'je', 0x2000, 0x2000)).to eq ['eax == eax']
+      # test eax,eax sets ZF = (eax == 0); je taken means eax == 0.
+      expect(branch_constraint('test eax,eax', 'je', 0x2000, 0x2000)).to eq ['eax == 0']
       @processor = described_class.new
       expect(branch_constraint(nil, 'jrcxz', 0x2000, 0x1008)).to eq ['rcx != 0'] # not taken
     end

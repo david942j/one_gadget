@@ -23,6 +23,11 @@ module OneGadget
         'mi' => :slt, 'pl' => :sge
       }.freeze
 
+      # This arch family's flag-setting compare mnemonics, mapped to the ALU op
+      # whose result their flags reflect (see {Conditional::COMPARE}). x86 has its
+      # own {X86::COMPARES}.
+      COMPARES = { 'cmp' => :sub, 'cmn' => :add, 'tst' => :and }.freeze
+
       # The sp-based stack that +obj+ addresses, or +nil+ when +obj+ isn't sp-relative.
       # @param [String, Lambda] obj A lambda object or its string.
       # @return [Hash{Integer => Lambda}, nil]
