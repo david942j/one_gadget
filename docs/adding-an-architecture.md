@@ -83,7 +83,7 @@ Reading the flow:
 
 - **`candidates`** walks the CFG backward from each `exec*`/`posix_spawn*` call to build candidate sequences.
 - **`find`** emulates every start instruction of each candidate, one instruction at a time.
-- **`Conditional`** runs first on each instruction (`resolve_pending_branch` → `handle_compare` → `handle_branch` → `queue_*`), turning a crossed branch into a constraint.
+- **`Conditional`** runs first on each instruction (`resolve_pending_branch` → `handle_compare` → `handle_branch` → `branch_on_*`), turning a crossed branch into a constraint.
 - the arch's **`inst_*`** handlers then update the register/stack state.
 - **`resolve`** reads the call's arguments (`argument`, `str_bin_sh?`, `global_var?`) and builds the argv/envp constraints.
 - finally, a contradiction drops the gadget and a tautology is stripped.
@@ -127,7 +127,7 @@ Optional hooks (sensible defaults in `Base`):
 | `self.bits` | `32` or `64` |
 | `operands(cmd)` | split an instruction into its operand strings |
 | `branch_mnem?(mnem)` | is `mnem` a branch this emulator handles? |
-| `handle_branch(mnem, cmd)` | turn a branch into a queued decision (via the helpers below) |
+| `handle_branch(mnem, cmd)` | turn a branch into a pending decision (via the `branch_on_*` helpers below) |
 | `inst_<name>(...)` | one handler per supported instruction |
 
 `process!` follows a fixed shape — resolve any pending branch, handle a
@@ -147,7 +147,7 @@ end
 
 The **`Emulators::Conditional`** module (already included in `Processor`) provides
 the branch machinery so you don't reimplement it: `record_compare`,
-`handle_compare`, `queue_cond_branch`, `queue_cbz`, `queue_tbz`,
+`handle_compare`, `branch_on_compare`, `branch_on_zero`, `branch_on_bit`,
 `resolve_pending_branch`, `operand_str`, `mnemonic`. You supply two small adapter
 tables that map your arch's mnemonics onto the shared vocabulary (directly, or via
 a shared base — arm/aarch64 share theirs through `ArmFamily`):
@@ -157,7 +157,7 @@ a shared base — arm/aarch64 share theirs through `ArmFamily`):
   reads it.
 * **`COND`** (x86 calls it `JCC`) — branch mnemonic → predicate (a
   `Conditional::RELATION` key, e.g. `:ne`, `:uge`). Your `handle_branch` parses the
-  instruction and calls the right `queue_*`, passing this predicate to `queue_cond_branch`.
+  instruction and calls the right `branch_on_*`, passing this predicate to `branch_on_compare`.
 
 ## Wiring
 

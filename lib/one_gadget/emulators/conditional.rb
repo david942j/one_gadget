@@ -10,7 +10,7 @@ module OneGadget
     # actual taken/not-taken path (see {OneGadget::Fetcher::Base#candidates}), and
     # the emulator turns the branch decision into a gadget constraint.
     #
-    # Branches are resolved with one line of look-ahead: at the branch we queue a
+    # Branches are resolved with one line of look-ahead: at the branch we record a
     # pending decision, and on the next line we compare that line's address to the
     # branch target to learn whether the stitched path took the branch.
     #
@@ -109,7 +109,7 @@ module OneGadget
       # Render an operand for a constraint: a register becomes its current value,
       # an immediate becomes hex, anything else (a memory operand) stays as-is.
       # {#handle_compare} uses it on each compare operand; call it yourself only
-      # when writing a bespoke +queue_*+ helper.
+      # when writing a bespoke +branch_on_*+ helper.
       # @param [String] operand A single operand string from a compare/branch line.
       # @return [String] The rendered operand.
       # @example (assuming register +x2+ currently holds the immediate +0x1+)
@@ -125,23 +125,22 @@ module OneGadget
         operand
       end
 
-      # Queue a conditional branch that reads the last recorded compare's flags
-      # (+b.<cond>+ / +jcc+) for deferred resolution. Call it from +handle_branch+;
-      # +cond+ is the comparison predicate and +target+ is the branch's direct
-      # destination address.
+      # Register a branch on the last recorded compare's flags (+b.<cond>+ / +jcc+),
+      # resolved on the next line. Call it from +handle_branch+; +cond+ is the
+      # comparison predicate and +target+ is the branch's direct destination address.
       # @param [Symbol] cond The comparison predicate, a {RELATION} key. Each arch
       #   first maps its own branch mnemonic to it (its +COND+/+JCC+ adapter table).
       # @param [Integer] target Destination address of the branch.
       # @return [true, :fail] +:fail+ (abort the path) when it cannot be expressed
       #   soundly: no compare was seen, or a magnitude condition follows an
       #   equality-only compare (a {COMPARE_OPS} op with +ordered: false+, e.g. +tst+).
-      # @example After +cmp x2, #1+, queue the following +b.ne 4a200+ (arch maps +b.ne+ to +:ne+)
-      #   queue_cond_branch(:ne, 0x4a200) #=> true
+      # @example After +cmp x2, #1+, a following +b.ne 4a200+ (arch maps +b.ne+ to +:ne+)
+      #   branch_on_compare(:ne, 0x4a200) #=> true
       #   # if the stitched path FALLS THROUGH (doesn't reach 0x4a200) the not-taken
       #   # relation of +:ne+ is emitted:  x2 == 0x1 ; if it jumps there:  x2 != 0x1
       # @example No preceding compare -> the path is unsound and is aborted
-      #   queue_cond_branch(:ne, 0x4a200) #=> :fail   # when @flags is nil
-      def queue_cond_branch(cond, target)
+      #   branch_on_compare(:ne, 0x4a200) #=> :fail   # when @flags is nil
+      def branch_on_compare(cond, target)
         return :fail if @flags.nil?
 
         rel = RELATION[cond]
@@ -157,34 +156,34 @@ module OneGadget
         true
       end
 
-      # Queue a compare-with-zero branch (+cbz+/+cbnz+). These carry their own
-      # compare, so no preceding +cmp+ is needed. +negate:+ distinguishes the
+      # Register a self-contained branch on +reg == 0+ (+cbz+/+cbnz+). It carries its
+      # own compare, so no preceding +cmp+ is needed. +negate:+ distinguishes the
       # branch-if-zero form (+cbz+, +false+) from branch-if-non-zero (+cbnz+, +true+).
       # @param [Integer] target Destination address of the branch.
       # @param [String] reg The tested register, already rendered (as {#operand_str} returns).
       # @param [Boolean] negate +false+ for +cbz+, +true+ for +cbnz+.
       # @example aarch64 +cbz x0, 4a200+ - branch taken when +x0 == 0+
-      #   queue_cbz(0x4a200, 'x0', negate: false) #=> true
+      #   branch_on_zero(0x4a200, 'x0', negate: false) #=> true
       #   # fall-through path emits  x0 != 0 ; taken path emits  x0 == 0
       # @example x86 reuses it for +jrcxz+/+jecxz+/+jcxz+ (always branch-if-zero)
-      #   queue_cbz(0x4a200, 'rcx', negate: false)
-      def queue_cbz(target, reg, negate:)
+      #   branch_on_zero(0x4a200, 'rcx', negate: false)
+      def branch_on_zero(target, reg, negate:)
         hit = negate ? '!=' : '==' # cbz taken => reg == 0
         miss = negate ? '==' : '!='
         @pending = { target:, render: ->(taken) { "#{reg} #{taken ? hit : miss} 0" } }
         true
       end
 
-      # Queue a test-bit branch (+tbz+/+tbnz+): also self-contained (no preceding
-      # +cmp+). Renders a bitmask test of a single bit.
+      # Register a self-contained branch on a single bit of +reg+ (+tbz+/+tbnz+):
+      # also carries its own test (no preceding +cmp+). Renders a bitmask test.
       # @param [Integer] target Destination address of the branch.
       # @param [String] reg The tested register, already rendered (as {#operand_str} returns).
       # @param [Integer] bit The bit index being tested.
       # @param [Boolean] negate +false+ for +tbz+, +true+ for +tbnz+.
       # @example aarch64 +tbz w0, #4, 4a200+ - branch taken when bit 4 of +w0+ is 0
-      #   queue_tbz(0x4a200, 'w0', 4, negate: false) #=> true
+      #   branch_on_bit(0x4a200, 'w0', 4, negate: false) #=> true
       #   # taken path emits  (w0 & 0x10) == 0 ; fall-through emits  (w0 & 0x10) != 0
-      def queue_tbz(target, reg, bit, negate:)
+      def branch_on_bit(target, reg, bit, negate:)
         mask = OneGadget::Helper.hex(1 << bit)
         hit = negate ? '!=' : '=='
         miss = negate ? '==' : '!='
@@ -192,18 +191,18 @@ module OneGadget
         true
       end
 
-      # Resolve a queued branch using +cmd+'s address: if it equals the branch
+      # Resolve the pending branch using +cmd+'s address: if it equals the branch
       # target the stitched path took the branch, else it fell through. On
       # resolution the rendered relation is appended to the gadget's constraints.
       # Must be called at the top of +process!+ for every line (a no-op when nothing
-      # is pending), so the branch queued on the previous line sees this line's address.
+      # is pending), so the branch registered on the previous line sees this line's address.
       # @param [String] cmd The current objdump line.
       # @example The fixed first line of every arch's +process!+
       #   def process!(cmd)
       #     resolve_pending_branch(cmd)
       #     ...
       #   end
-      #   # if the previous line did +queue_cond_branch(:ne, 0x4a200)+ and this
+      #   # if the previous line did +branch_on_compare(:ne, 0x4a200)+ and this
       #   # +cmd+ sits at 0x4a200, the branch was taken; otherwise it fell through
       def resolve_pending_branch(cmd)
         return if @pending.nil?

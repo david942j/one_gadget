@@ -68,11 +68,11 @@ module OneGadget
         ops = operands(cmd)
         case mnem
         when 'b', 'b.al' then true # unconditional: control handled by the stitched path
-        when 'cbz' then queue_cbz(ops[1].to_i(16), operand_str(ops[0]), negate: false)
-        when 'cbnz' then queue_cbz(ops[1].to_i(16), operand_str(ops[0]), negate: true)
-        when 'tbz' then queue_tbz(ops[2].to_i(16), operand_str(ops[0]), Integer(ops[1]), negate: false)
-        when 'tbnz' then queue_tbz(ops[2].to_i(16), operand_str(ops[0]), Integer(ops[1]), negate: true)
-        else queue_cond_branch(COND[mnem[2..]], ops[0].to_i(16))
+        when 'cbz' then branch_on_zero(ops[1].to_i(16), operand_str(ops[0]), negate: false)
+        when 'cbnz' then branch_on_zero(ops[1].to_i(16), operand_str(ops[0]), negate: true)
+        when 'tbz' then branch_on_bit(ops[2].to_i(16), operand_str(ops[0]), Integer(ops[1]), negate: false)
+        when 'tbnz' then branch_on_bit(ops[2].to_i(16), operand_str(ops[0]), Integer(ops[1]), negate: true)
+        else branch_on_compare(COND[mnem[2..]], ops[0].to_i(16))
         end
       end
 

@@ -121,9 +121,9 @@ module OneGadget
 
       def handle_branch(mnem, cmd)
         return true if mnem == 'jmp' # unconditional: control handled by the stitched path
-        return queue_cbz(jump_target(cmd), cx_reg(mnem), negate: false) if mnem.end_with?('cxz')
+        return branch_on_zero(jump_target(cmd), cx_reg(mnem), negate: false) if mnem.end_with?('cxz')
 
-        queue_cond_branch(JCC[mnem], jump_target(cmd))
+        branch_on_compare(JCC[mnem], jump_target(cmd))
       end
 
       def cx_reg(mnem)
