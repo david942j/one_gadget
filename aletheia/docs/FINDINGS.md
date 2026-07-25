@@ -18,9 +18,17 @@ libc. Two run modes:
 
 Every gadget launches a real, working `/bin/sh` under benign state (validated by the
 shell running `ls /` and reproducing the host root). The 2.43 set is also complete
-under poison. The strict failures below are candidate one_gadget bugs.
+under poison. The strict failures are candidate one_gadget bugs (Findings 1 and 2). With
+Finding 1's fix applied, strict results for 2.24/2.23 become 2 PASS, 1 FAIL (the remaining
+FAIL is Finding 2).
 
 ## Finding 1 — missing constraint: sigprocmask `set` pointer must be readable
+
+**Status: fixed** on branch `fix-sigprocmask-set-constraint` (emits `<set> == NULL` when
+`set` isn't provably mapped). Under strict mode this fully fixes `0x3c92c`/`0x3d6d4`
+(they now PASS). `0x3c934`/`0x3d6dc` gain the correct `x21 == NULL` too, but still FAIL
+strict for a second, independent reason — see Finding 2.
+
 
 **Gadgets:** `0x3c92c`, `0x3c934` (libc-2.24); `0x3d6d4`, `0x3d6dc` (libc-2.23).
 Constraint form: `execve("/bin/sh", sp+0x58, environ)` with only
@@ -64,6 +72,27 @@ pointer (or the appropriate NULL/validity condition) is emitted as a constraint,
 of treating the call as argument-agnostic. Add a regression expectation to
 `spec/one_gadget_aarch64_spec.rb` for the affected offsets. Per the batch-triage strategy,
 this is filed here for joint review before a focused fix PR.
+
+## Finding 2 — missing constraint: __sigaction `act` pointer (subtler)
+
+**Gadgets:** `0x3c934` (libc-2.24), `0x3d6dc` (libc-2.23). **Status: open, needs review.**
+
+**Symptom (strict mode, with Finding 1 fixed):** SIGSEGV at `__libc_sigaction+36`
+(`ldr x3, [x1], #8`), before `execve`.
+
+**Root cause:** these entry points sit one instruction after the `add x1, x20, #8` that
+sets up `__sigaction`'s `act` argument, so on this path `act` (x1) is an uncontrolled
+incoming register that `__sigaction` dereferences. one_gadget requires `__sigaction`'s
+`oldact` (arg 2) to be NULL but places no requirement on `act` (arg 1).
+
+**Why it's subtler than Finding 1:** the sibling `0x3c92c` reaches `__sigaction` with
+`act = x20+8`, and `x20` is already `writable`-constrained — so there `act` is valid and
+must NOT be constrained to NULL. But the emulator processes the `__sigaction` call *before*
+the later store that records `writable: x20`, so a naive "emit `act == NULL` when the base
+isn't known-mapped" check would over-constrain `0x3c92c` (a false, over-tight constraint —
+the opposite bug). A correct fix needs to consider constraints discovered later in the same
+candidate (e.g. defer the pointer-safety check to post-emulation, cross-referencing the
+final `writable` set), so it is left for a separate change.
 
 ## Reproduce
 
