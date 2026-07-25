@@ -4,7 +4,7 @@ require 'one_gadget/error'
 require 'one_gadget/fetchers/objdump'
 
 module OneGadget
-  module Fetcher
+  module Fetchers
     # Base of the per-architecture gadget fetchers. It discovers candidate
     # instruction sequences - a backward control-flow walk from each
     # +exec+/+posix_spawn+ call - and turns a solved candidate into a

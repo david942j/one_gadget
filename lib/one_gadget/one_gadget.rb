@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'one_gadget/error'
-require 'one_gadget/fetcher'
+require 'one_gadget/fetchers'
 require 'one_gadget/helper'
 require 'one_gadget/logger'
 
@@ -31,7 +31,7 @@ module OneGadget
     #   OneGadget.gadgets(build_id: '60131540dadc6796cab33388349e6e4e68692053')
     def gadgets(file: nil, build_id: nil, details: false, force_file: false, level: 0)
       ret = if build_id
-              OneGadget::Fetcher.from_build_id(build_id) || OneGadget::Logger.not_found(build_id)
+              OneGadget::Fetchers.from_build_id(build_id) || OneGadget::Logger.not_found(build_id)
             else
               from_file(OneGadget::Helper.abspath(file), force: force_file)
             end
@@ -49,14 +49,14 @@ module OneGadget
     def from_file(path, force: false)
       OneGadget::Helper.verify_elf_file!(path)
       gadgets = try_from_build(path) unless force
-      gadgets || OneGadget::Fetcher.from_file(path)
+      gadgets || OneGadget::Fetchers.from_file(path)
     end
 
     def try_from_build(file)
       build_id = OneGadget::Helper.build_id_of(file)
       return unless build_id
 
-      OneGadget::Fetcher.from_build_id(build_id, remote: false)
+      OneGadget::Fetchers.from_build_id(build_id, remote: false)
     end
 
     # Remove hard-to-reach-constraints gadgets according to level

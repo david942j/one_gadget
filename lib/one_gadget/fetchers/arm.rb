@@ -6,7 +6,7 @@ require 'one_gadget/emulators/arm'
 require 'one_gadget/fetchers/base'
 
 module OneGadget
-  module Fetcher
+  module Fetchers
     # Fetcher for 32-bit ARM (A32 / Thumb-2).
     class Arm < Base
       # Condition codes as branch suffixes (+bne+, +bcs+, ...).

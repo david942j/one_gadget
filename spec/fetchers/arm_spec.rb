@@ -2,9 +2,9 @@
 
 require 'one_gadget/fetchers/arm'
 
-describe OneGadget::Fetcher::Arm do
+describe OneGadget::Fetchers::Arm do
   def fetcher(version)
-    OneGadget::Fetcher::Arm.new(data_path("arm-libc-#{version}.so"))
+    OneGadget::Fetchers::Arm.new(data_path("arm-libc-#{version}.so"))
   end
 
   # Terminal-call sites found by disassembling the whole libc and grepping.

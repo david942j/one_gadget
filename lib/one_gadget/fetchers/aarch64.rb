@@ -4,7 +4,7 @@ require 'one_gadget/emulators/aarch64'
 require 'one_gadget/fetchers/base'
 
 module OneGadget
-  module Fetcher
+  module Fetchers
     # Define common methods for gadget fetchers.
     class AArch64 < Base
       # aarch64 condition codes (used to recognise +b.<cond>+ branches).

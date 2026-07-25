@@ -4,10 +4,10 @@ require 'one_gadget/emulators/amd64'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/fetchers/amd64'
 
-describe OneGadget::Fetcher::Base do
+describe OneGadget::Fetchers::Base do
   # Allocate without #initialize so no libc file / objdump is needed; these
   # tests only exercise the arch-independent private helpers of Base.
-  let(:fetcher) { OneGadget::Fetcher::Amd64.allocate }
+  let(:fetcher) { OneGadget::Fetchers::Amd64.allocate }
   let(:processor) { OneGadget::Emulators::Amd64.new }
 
   describe '#check_stack_argv' do

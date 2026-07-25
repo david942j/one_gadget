@@ -5,7 +5,7 @@ existing example to copy is **aarch64** (`lib/one_gadget/fetchers/aarch64.rb` an
 `lib/one_gadget/emulators/aarch64.rb`).
 
 ```ruby
-OneGadget::Fetcher::<Arch>  < OneGadget::Fetcher::Base       # find candidates, describe constraints
+OneGadget::Fetchers::<Arch>  < OneGadget::Fetchers::Base       # find candidates, describe constraints
 OneGadget::Emulators::<Arch> < OneGadget::Emulators::Processor # symbolically execute a candidate
 ```
 
@@ -28,8 +28,8 @@ flowchart LR
 
   subgraph FE["Fetcher side: find candidate sequences"]
     direction TB
-    FB["Fetcher::Base<br/>(engine)"]:::engine
-    FA["Fetcher::&lt;Arch&gt;<br/>(you implement)"]:::arch
+    FB["Fetchers::Base<br/>(engine)"]:::engine
+    FA["Fetchers::&lt;Arch&gt;<br/>(you implement)"]:::arch
     FB -->|inherits| FA
   end
   subgraph EM["Emulator side: execute one candidate"]
@@ -49,8 +49,8 @@ Legend: 🟦 engine (shared base) · 🟩 what you implement · 🟪 shared mixi
 
 What each box is for:
 
-- **`Fetcher::Base`** — the engine: walks the CFG for candidate sequences, then solves and trims gadgets.
-- **`Fetcher::<Arch>`** — the arch's disassembly, its string/branch recognition, and how to build its emulator.
+- **`Fetchers::Base`** — the engine: walks the CFG for candidate sequences, then solves and trims gadgets.
+- **`Fetchers::<Arch>`** — the arch's disassembly, its string/branch recognition, and how to build its emulator.
 - **`Emulators::Processor`** — the engine: parse an instruction, track register/stack state, collect constraints.
 - **`module Conditional`** — shared compare/branch machinery; a crossed branch becomes a gadget constraint.
 - **`module ArmFamily`** — logic shared by arm and aarch64 (calling convention, memory model, condition codes).
@@ -67,7 +67,7 @@ flowchart TD
   classDef mixin fill:#ede9fe,stroke:#7c3aed,color:#4c1d95,font-family:monospace
   classDef out fill:#ffe4e6,stroke:#e11d48,color:#881337,font-family:monospace
 
-  A["OneGadget.gadgets(file)"]:::entry --> B["Fetcher::&lt;Arch&gt;#find"]:::arch
+  A["OneGadget.gadgets(file)"]:::entry --> B["Fetchers::&lt;Arch&gt;#find"]:::arch
   B --> C["Base#candidates<br/>(backward CFG walk)"]:::engine
   C --> D{"for each start instruction"}
   D --> E["Base#emulate<br/>(process! per instruction)"]:::engine
@@ -88,7 +88,7 @@ Reading the flow:
 - **`resolve`** reads the call's arguments (`argument`, `str_bin_sh?`, `global_var?`) and builds the argv/envp constraints.
 - finally, a contradiction drops the gadget and a tautology is stripped.
 
-## The fetcher — `Fetcher::<Arch> < Fetcher::Base`
+## The fetcher — `Fetchers::<Arch> < Fetchers::Base`
 
 | Method | What it returns |
 | --- | --- |
@@ -113,7 +113,7 @@ Optional hooks (sensible defaults in `Base`):
 | Method | Default | Purpose |
 | --- | --- | --- |
 | `objdump_options` | `[]` | extra objdump flags, e.g. x86 returns `%w[-M intel]` |
-| `terminal_call_sites` | `nil` | if the calls can be located cheaply *without* disassembling everything, return their addresses for windowed disassembly (a big win when a full objdump is slow, as on Thumb-2 arm). `nil` = disassemble the whole file. See `Fetcher::Arm`. |
+| `terminal_call_sites` | `nil` | if the calls can be located cheaply *without* disassembling everything, return their addresses for windowed disassembly (a big win when a full objdump is slow, as on Thumb-2 arm). `nil` = disassemble the whole file. See `Fetchers::Arm`. |
 
 ## The emulator — `Emulators::<Arch> < Emulators::Processor`
 
@@ -162,7 +162,7 @@ a shared base — arm/aarch64 share theirs through `ArmFamily`):
 ## Wiring
 
 * `OneGadget::Helper.architecture` — map the ELF machine string to your arch symbol.
-* `OneGadget::Fetcher.from_file` — add the arch symbol → `Fetcher::<Arch>` entry.
+* `OneGadget::Fetchers.from_file` — add the arch symbol → `Fetchers::<Arch>` entry.
 * `OneGadget::Helper.arch_specific_objdump` — the cross objdump binary name.
 
 ## Tests

@@ -10,7 +10,7 @@ require 'one_gadget/helper'
 
 module OneGadget
   # To find gadgets.
-  module Fetcher
+  module Fetchers
     # Define class methods here.
     module ClassMethods
       # Fetch one-gadget offsets of this build id.
@@ -31,10 +31,10 @@ module OneGadget
       def from_file(file)
         arch = OneGadget::Helper.architecture(file)
         klass = {
-          aarch64: OneGadget::Fetcher::AArch64,
-          amd64: OneGadget::Fetcher::Amd64,
-          arm: OneGadget::Fetcher::Arm,
-          i386: OneGadget::Fetcher::I386
+          aarch64: OneGadget::Fetchers::AArch64,
+          amd64: OneGadget::Fetchers::Amd64,
+          arm: OneGadget::Fetchers::Arm,
+          i386: OneGadget::Fetchers::I386
         }[arch]
         raise Error::UnsupportedArchitectureError, arch if klass.nil?
 
