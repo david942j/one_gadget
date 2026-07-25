@@ -7,7 +7,7 @@ module OneGadget
     # Shared modelling of compare instructions and conditional branches.
     #
     # A gadget candidate may cross a conditional branch: the fetcher stitches the
-    # actual taken/not-taken path (see {OneGadget::Fetcher::Base#candidates}), and
+    # actual taken/not-taken path (see {OneGadget::Fetchers::Base#candidates}), and
     # the emulator turns the branch decision into a gadget constraint.
     #
     # Branches are resolved with one line of look-ahead: at the branch we record a

@@ -6,9 +6,9 @@ require 'one_gadget/emulators/i386'
 require 'one_gadget/fetchers/x86'
 
 module OneGadget
-  module Fetcher
+  module Fetchers
     # Fetcher for i386.
-    class I386 < OneGadget::Fetcher::X86
+    class I386 < OneGadget::Fetchers::X86
       private
 
       def candidates

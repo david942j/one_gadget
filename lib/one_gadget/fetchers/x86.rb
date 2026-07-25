@@ -4,7 +4,7 @@ require 'one_gadget/emulators/x86'
 require 'one_gadget/fetchers/base'
 
 module OneGadget
-  module Fetcher
+  module Fetchers
     # Define common methods for gadget fetchers.
     class X86 < Base
       # Conditional-jump mnemonics (shared with the emulator).

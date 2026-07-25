@@ -6,7 +6,7 @@ require 'one_gadget/error'
 require 'one_gadget/helper'
 
 module OneGadget
-  module Fetcher
+  module Fetchers
     # Utilities for fetching instructions from libc using objdump.
     class Objdump
       # Instantiate an {Objdump} object.

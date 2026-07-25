@@ -17,7 +17,7 @@ end
 require 'one_gadget/helper'
 require 'one_gadget/logger'
 
-module Helpers
+module Helper
   def hook_logger
     OneGadget::Logger.instance_variable_get(:@logger).reopen($stdout)
     yield
@@ -38,5 +38,5 @@ end
 
 RSpec.configure do |config|
   config.before(:suite) { OneGadget::Helper.color_off! }
-  config.include Helpers
+  config.include Helper
 end
