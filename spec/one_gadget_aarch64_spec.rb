@@ -11,18 +11,39 @@ describe 'one_gadget_aarch64' do
     it 'libc-2.23' do
       path = data_path('aarch64-libc-2.23.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
-        .to eq [0x3d6c4, 0x3d6cc, 0x3d6d0, 0x3d6d4, 0x3d6dc, 0x3d718,
+        .to eq [0x3d6c4, 0x3d6cc, 0x3d6d0, 0x3d6d4, 0x3d6d8, 0x3d718,
                 0x60c1c, 0x60c20, 0x9b9e0, 0x9b9e4, 0x9bc5c]
     end
 
     it 'libc-2.24' do
       path = data_path('aarch64-libc-2.24.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3c92c, 0x3c934, 0x3c970]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3c92c, 0x3c930, 0x3c970]
     end
 
     it 'libc-2.27' do
       path = data_path('aarch64-libc-2.27.so')
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f160, 0x63e90, 0xa32e8]
+    end
+
+    # do_system reaches execve via a sigprocmask(set) call that dereferences its
+    # `set` argument; a gadget landing before that call must keep `set` NULL.
+    it 'constrains the sigprocmask set argument to NULL' do
+      path = data_path('aarch64-libc-2.24.so')
+      gadgets = OneGadget.gadgets(file: path, force_file: true, details: true)
+      before_call = gadgets.find { |g| g.offset == 0x3c92c }
+      after_call = gadgets.find { |g| g.offset == 0x3c970 }
+      expect(before_call.constraints).to include('x21 == NULL')
+      expect(after_call.constraints).not_to include('x21 == NULL')
+    end
+
+    # do_system's sigaction(act) also dereferences its `act` argument. The entry
+    # that skips act's setup (0x3c934) needs the extra `x1 == NULL`, so it is
+    # dominated by the entry that sets act up (0x3c930) and drops out.
+    it 'constrains the sigaction act argument, dropping the dominated entry' do
+      path = data_path('aarch64-libc-2.24.so')
+      offsets = OneGadget.gadgets(file: path, force_file: true)
+      expect(offsets).to include(0x3c930)
+      expect(offsets).not_to include(0x3c934)
     end
 
     # glibc 2.43 no longer exposes a straight-line execve("/bin/sh") gadget; the
