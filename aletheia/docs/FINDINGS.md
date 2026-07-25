@@ -29,6 +29,15 @@ FAIL is Finding 2).
 (they now PASS). `0x3c934`/`0x3d6dc` gain the correct `x21 == NULL` too, but still FAIL
 strict for a second, independent reason — see Finding 2.
 
+The same defect existed on **all four architectures** (the `sigprocmask => {}` safe-call
+entry is shared logic), so the fix is cross-arch: a shared `Processor#dispatch_safe_call`
+marks `sigprocmask`'s `set` argument `:readable` and emits `<set> == NULL` when it isn't
+provably mapped, applied via `arm_family.rb` (ARM/AArch64) and `x86.rb` (amd64/i386). On
+amd64 the `set` register is `rbp`; on i386 it is a bare register too. The change is purely
+additive at `level: 1` (no gadgets gained or lost across any fixture); at the default
+`level: 0` it re-ranks — the harder entries (now carrying `set == NULL`) correctly fall
+below the cleaner entry of the same `do_system`, which the default still shows.
+
 
 **Gadgets:** `0x3c92c`, `0x3c934` (libc-2.24); `0x3d6d4`, `0x3d6dc` (libc-2.23).
 Constraint form: `execve("/bin/sh", sp+0x58, environ)` with only
