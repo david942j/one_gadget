@@ -7,6 +7,35 @@ describe OneGadget::Emulators::Amd64 do
     @processor = described_class.new
   end
 
+  describe 'conditional branches' do
+    def branch_constraint(compare, branch, target, follow_addr)
+      @processor.process("1000: #{compare}") if compare
+      @processor.process("1004: #{branch} #{format('%x', target)} <x>")
+      @processor.process("#{format('%x', follow_addr)}: nop")
+      @processor.constraints
+    end
+
+    it 'renders cmp + jcc (Intel mnemonics)' do
+      expect(branch_constraint('cmp rax,0x1', 'jne', 0x2000, 0x1008)).to eq ['rax == 0x1'] # not taken
+      @processor = described_class.new
+      expect(branch_constraint('cmp rax,0x400', 'jb', 0x2000, 0x2000)).to eq ['(u64)rax < 0x400'] # taken
+      @processor = described_class.new
+      expect(branch_constraint('cmp rsi,rdi', 'jg', 0x2000, 0x2000)).to eq ['(s64)rsi > rdi'] # taken
+    end
+
+    it 'renders test (zero flag only) and jrcxz' do
+      # test eax,eax sets ZF = (eax == 0); je taken means eax == 0.
+      expect(branch_constraint('test eax,eax', 'je', 0x2000, 0x2000)).to eq ['eax == 0']
+      @processor = described_class.new
+      expect(branch_constraint(nil, 'jrcxz', 0x2000, 0x1008)).to eq ['rcx != 0'] # not taken
+    end
+
+    it 'aborts a magnitude branch after test' do
+      @processor.process('1000: test eax,eax')
+      expect(@processor.process('1004: jg 2000 <x>')).to be false
+    end
+  end
+
   describe 'process' do
     it 'libc-2.24 gadget' do
       gadget = <<-EOS

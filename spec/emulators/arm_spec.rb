@@ -8,6 +8,31 @@ describe OneGadget::Emulators::Arm do
     @processor = described_class.new
   end
 
+  describe 'conditional branches' do
+    def branch_constraint(compare, branch, target, follow_addr)
+      @processor.process("1000: #{compare}") if compare
+      @processor.process("1004: #{branch} #{format('%x', target)} <x>")
+      @processor.process("#{format('%x', follow_addr)}: nop")
+      @processor.constraints
+    end
+
+    it 'renders cmp + bne / beq (condition suffixes)' do
+      expect(branch_constraint('cmp r2, #1', 'bne', 0x2000, 0x1008)).to eq ['r2 == 0x1'] # not taken
+      @processor = described_class.new
+      expect(branch_constraint('cmp r0, r1', 'beq.n', 0x2000, 0x2000)).to eq ['r0 == r1'] # taken
+    end
+
+    it 'renders signed/unsigned and cbz' do
+      expect(branch_constraint('cmp r0, #0x400', 'bcs', 0x2000, 0x2000)).to eq ['(u32)r0 >= 0x400'] # taken
+      @processor = described_class.new
+      expect(branch_constraint(nil, 'cbz r0,', 0x2000, 0x1008)).to eq ['r0 != 0'] # not taken
+    end
+
+    it 'aborts a cmp-based branch with no preceding compare' do
+      expect(@processor.process('1004: bne 2000 <x>')).to be false
+    end
+  end
+
   describe 'process' do
     it 'libc-2.23 gadget (Thumb PIC /bin/sh idiom)' do
       # ldr rX, [pc, #imm] loads a literal-pool word; add rX, pc turns it into a

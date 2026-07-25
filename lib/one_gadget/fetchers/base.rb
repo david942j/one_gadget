@@ -5,11 +5,48 @@ require 'one_gadget/fetchers/objdump'
 
 module OneGadget
   module Fetcher
-    # Define common methods for gadget fetchers.
+    # Base of the per-architecture gadget fetchers. It discovers candidate
+    # instruction sequences - a backward control-flow walk from each
+    # +exec+/+posix_spawn+ call - and turns a solved candidate into a
+    # {OneGadget::Gadget::Gadget}. A subclass supplies only the arch-specific
+    # pieces (call mnemonic, string/global recognition, branch classification).
+    #
+    # To add an architecture, see +docs/adding-an-architecture.md+; +AArch64+ is
+    # the simplest example.
     class Base
       # The absolute path to glibc.
       # @return [String] The filename.
       attr_reader :file
+
+      # Give up on a control-flow path once it has crossed this many conditional branches.
+      MAX_FORKS = 4
+      # Hard cap on a single path's length (loop/runaway guard).
+      PATH_BUDGET = 80
+
+      # How much to disassemble around each terminal call when an architecture can
+      # locate the calls cheaply (see {#terminal_call_sites} / {#windowed_disasm}).
+      #
+      # The backward walk stays within {PATH_BUDGET} instructions and {MAX_FORKS}
+      # branch hops of the call, and a branch *into* that region comes from close
+      # by. Measured across real amd64/aarch64/arm libcs, the earliest line the
+      # walk reaches is <0x98b before the call and branches into it come from
+      # <0x8bb further - 0x1246 all told. WINDOW_BACK = 0x2000 leaves ~60% margin;
+      # a gadget whose code and branch-predecessors exceed it would be missed,
+      # which is why windowing is opt-in per arch (fast disassembly arches keep
+      # the full, exhaustive scan) and falls back to full disassembly if the call
+      # scan comes up empty.
+      WINDOW_BACK = 0x2000
+      # A little past the call, enough to cover the call instruction itself.
+      WINDOW_FWD = 0x80
+
+      # Cache values that are a deterministic function of an objdump command
+      # (its output and everything derived from it), so re-analysing the same
+      # file - common in the specs, harmless for the CLI which reads a file once -
+      # doesn't redo the disassembly or the whole-binary scans.
+      def self.cached(kind, command)
+        @cached ||= Hash.new { |h, k| h[k] = {} }
+        @cached[kind][command] ||= yield
+      end
 
       # Instantiate a fetcher object.
       # @param [String] file Absolute path to the target libc.
@@ -24,20 +61,41 @@ module OneGadget
       # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
       def find
         str_offset('/bin/sh') # ensure it's glibc-like; raises "not glibc?" if not found
-        candidates.map do |cand|
+        gadgets = []
+        # Overlapping candidate paths share tails, so the same suffix (a start line
+        # and everything after it) recurs across candidates; emulate each once.
+        seen = {}
+        candidates.each do |cand|
           lines = cand.lines
-          # use processor to find which can lead to a valid one-gadget call.
-          gadgets = []
           (lines.size - 2).downto(0) do |i|
-            processor = emulate(lines[i..])
-            options = resolve(processor)
-            next if options.nil? # impossible to be a gadget
+            suffix = lines[i..]
+            next if seen.key?(key = suffix.join)
 
-            offset = offset_of(lines[i])
-            gadgets << OneGadget::Gadget::Gadget.new(offset, **options)
+            seen[key] = true
+            gadget = resolve_suffix(suffix)
+            gadgets << gadget unless gadget.nil?
           end
-          gadgets
-        end.flatten
+        end
+        gadgets
+      end
+
+      # Emulate a candidate suffix and turn it into a gadget, or +nil+ if it isn't one.
+      def resolve_suffix(lines)
+        processor = emulate(lines)
+        # resolve reads argument registers, which may not be evaluable on an
+        # exotic path; such a candidate simply isn't a gadget.
+        options = begin
+          resolve(processor)
+        rescue OneGadget::Error::Error
+          nil
+        end
+        return if options.nil?
+        # A branch that compares a value with itself yields a trivial condition:
+        # drop the gadget if it's unsatisfiable, else strip the always-true one.
+        return if options[:constraints].any? { |c| contradiction?(c) }
+
+        options[:constraints] = options[:constraints].reject { |c| tautology?(c) }
+        OneGadget::Gadget::Gadget.new(offset_of(lines.first), **options)
       end
 
       # Fetch candidates that end with call exec*.
@@ -50,22 +108,7 @@ module OneGadget
       # @return [Array<String>]
       #   Each +String+ returned is multi-lines of assembly code.
       def candidates(&)
-        call_regexp = "#{call_str}.*<(exec[^+]*|posix_spawn[^+]*)>$"
-        cands = []
-        `#{@objdump.command}|grep -E '#{call_regexp}' -B 30`.split('--').each do |cand|
-          lines = cand.lines.map(&:strip).reject(&:empty?)
-          # split with call_regexp
-          loop do
-            idx = lines.index { |l| l =~ /#{call_regexp}/ }
-            break if idx.nil?
-
-            cands << lines.shift(idx + 1).join("\n")
-          end
-        end
-        # remove all jmps
-        cands = slice_prefix(cands, &method(:branch?))
-        cands.select!(&) if block_given?
-        cands
+        branch_aware_candidates(&)
       end
 
       private
@@ -144,6 +187,10 @@ module OneGadget
       # @param [OneGadget::Emulators::Lambda] lmda The parsed +argv_ptr+ (a stack register, zero dereference).
       def check_stack_argv(processor, argv_ptr, lmda, allow_null)
         stack = processor.get_corresponding_stack(lmda.obj)
+        # A stack register we don't track a stack for (the frame pointer):
+        # fall back to treating it as an opaque pointer.
+        return check_nonstack_argv(lmda.to_s, allow_null) if stack.nil?
+
         argv = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
 
         # if argv is already valid, no constraints are needed! (but probably won't happen :p)
@@ -229,9 +276,13 @@ module OneGadget
         return global_var?(envp_ptr) if envp_ptr.start_with?('[[')
 
         lmda = OneGadget::Emulators::Lambda.parse(envp_ptr)
-        if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
+        # A concrete integer or a stack register we don't track a stack for
+        # (the frame pointer) both fall through to the opaque-pointer case.
+        stack = lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.deref_count.zero? &&
+                OneGadget::ABI.stack_register?(lmda.obj) &&
+                processor.get_corresponding_stack(lmda.obj)
+        if stack
           # I haven't see this case after some tests, but just in case :)
-          stack = processor.get_corresponding_stack(lmda.obj)
           envp = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
           # TODO: Handle the case when libc will write something into envp
           cons = global_var?(envp[0]) ? nil : "#{envp_ptr} == NULL || {#{envp.join(', ')}, ...} is a valid envp"
@@ -268,6 +319,10 @@ module OneGadget
       # Meet all constraints then posix_spawn eventually calls execve(path, argv, envp)
       def resolve_posix_spawn(processor)
         args = Array.new(6) { |i| processor.argument(i) }
+        # pid/file_actions/attrp are reasoned about as pointers (Lambdas); a
+        # concrete non-zero integer there is a fixed address we can't constrain.
+        return nil if [args[0], args[2], args[3]].any? { |a| a.is_a?(Integer) && !a.zero? }
+
         res = resolve_execve_args(processor, args[1].to_s, args[4].to_s, args[5].to_s, allow_null_argv: false)
         return nil if res.nil?
 
@@ -311,19 +366,6 @@ module OneGadget
         []
       end
 
-      def slice_prefix(cands, &block)
-        cands.map do |cand|
-          lines = cand.lines
-          to_rm = lines[0...-1].rindex(&block)
-          lines = lines[to_rm + 1..] unless to_rm.nil?
-          lines.join
-        end
-      end
-
-      # If str contains a branch instruction.
-      def branch?(_str); raise NotImplementedError
-      end
-
       def str_offset(str)
         File.binread(file).index("#{str}\x00") ||
           raise(Error::ArgumentError, "File #{file.inspect} doesn't contain string #{str.inspect}, not glibc?")
@@ -331,6 +373,203 @@ module OneGadget
 
       def offset_of(assembly)
         assembly.scan(/^([\da-f]+):/)[0][0].to_i(16)
+      end
+
+      # A single (non-disjunctive) branch condition comparing a value with
+      # itself: +X == X+ / +X >= X+ is always true; +X != X+ / +X < X+ never is.
+      def trivial_relation(con)
+        return nil if con.include?(' || ')
+
+        m = con.match(/\A(?:\([su]\d+\))?(.+?) (==|!=|<=|>=|<|>) (.+)\z/)
+        return nil unless m && m[1] == m[3]
+
+        %w[== >= <=].include?(m[2])
+      end
+
+      def tautology?(con)
+        trivial_relation(con) == true
+      end
+
+      def contradiction?(con)
+        trivial_relation(con) == false
+      end
+
+      # Regexp (as a String) matching an objdump line that calls a terminal
+      # function (+exec*+ / +posix_spawn*+) we can turn into a gadget.
+      def terminal_call_regexp
+        "#{call_str}.*<(exec[^+]*|posix_spawn[^+]*)>$"
+      end
+
+      # Enumerate gadget candidates by walking the control-flow graph *backward*
+      # from each terminal call along its predecessors (the instruction that falls
+      # through to it, plus any branch that targets it), forking at conditional
+      # edges up to {MAX_FORKS} times. Each emitted candidate is a flat,
+      # address-preserving line-list ending at the terminal call, consumed
+      # unchanged by {#find}; the emulator turns each crossed conditional edge into
+      # a constraint (see {OneGadget::Emulators::Conditional}).
+      def branch_aware_candidates(&)
+        cands = []
+        re = /#{terminal_call_regexp}/
+        disasm_lines.each_index do |idx|
+          next unless disasm_lines[idx].match?(re)
+
+          back_walk(idx, 0, Set.new, []) { |lines| cands << lines.join("\n") }
+        end
+        cands.uniq!
+        cands.select!(&) if block_given?
+        cands
+      end
+
+      # Depth-first backward walk. +visited+ (a Set) and +path+ are mutated with
+      # backtracking so a fork explores independently without per-step copies;
+      # +path+ is built in forward order (the terminal call stays last). Emits a
+      # candidate at each leaf - {#find} then tries every start line within it.
+      def back_walk(idx, forks, visited, path, &blk)
+        addr = disasm_addrs[idx]
+        return if path.size >= PATH_BUDGET
+
+        visited.add(addr)
+        path.unshift(disasm_lines[idx])
+        edges = predecessors(idx).reject do |pidx, cond|
+          visited.include?(disasm_addrs[pidx]) || (cond && forks >= MAX_FORKS)
+        end
+        if edges.empty?
+          blk.call(path.dup)
+        else
+          edges.each { |pidx, cond| back_walk(pidx, forks + (cond ? 1 : 0), visited, path, &blk) }
+        end
+        path.shift
+        visited.delete(addr)
+      end
+
+      # Address of each disassembly line, by index. Cached (per objdump command).
+      def disasm_addrs
+        @disasm_addrs ||= Base.cached(:addrs, @objdump.command) { disasm_lines.map { |l| offset_of(l) } }
+      end
+
+      # Predecessors of +disasm_lines[idx]+ as +[pred_index, conditional_edge?]+:
+      # the instruction that falls through to it, plus any branch that targets it.
+      # Computed lazily (the walk only touches lines near terminal calls) and cached.
+      def predecessors(idx)
+        (@predecessors ||= {})[idx] ||= begin
+          preds = []
+          if idx.positive?
+            kind = branch_kind(disasm_lines[idx - 1])
+            preds << [idx - 1, kind == :conditional] unless %i[unconditional terminator].include?(kind)
+          end
+          (branch_pred_map[disasm_addrs[idx]] || []).each do |b|
+            preds << [b, branch_kind(disasm_lines[b]) == :conditional]
+          end
+          preds
+        end
+      end
+
+      # Map of target-address => indexes of (conditional or unconditional) direct
+      # branches that jump there. Scans the whole disassembly once (a branch can
+      # target a call region from anywhere), so keep the per-line test cheap.
+      def branch_pred_map
+        @branch_pred_map ||= Base.cached(:branch_pred, @objdump.command) do
+          lead = branch_lead_regex
+          disasm_lines.each_index.with_object(Hash.new { |h, k| h[k] = [] }) do |i, map|
+            line = disasm_lines[i]
+            # Cheap precompiled reject (no per-line allocation) before the full test.
+            next unless line.match?(lead)
+            next unless %i[conditional unconditional].include?(branch_kind(line))
+
+            tgt = branch_target(line)
+            map[tgt] << i if tgt
+          end
+        end
+      end
+
+      # Precompiled over-approximation of a branch line, built from the arch's
+      # {#branch_lead_chars}, to skip the full test for the (majority) non-branch
+      # lines during the whole-binary scan.
+      def branch_lead_regex
+        @branch_lead_regex ||= /\A[0-9a-f]+:\s+[#{branch_lead_chars}]/
+      end
+
+      # Parse the (direct) target address of a branch line, or +nil+ if indirect.
+      def branch_target(line)
+        line.sub(/\A[0-9a-f]+:\s*\S+\s*/, '')[/\b([0-9a-f]+)\b\s*(?:<|\z)/, 1]&.to_i(16)
+      end
+
+      # The mnemonic of an objdump line, memoized because each line is tested by
+      # several branch predicates during the CFG scan.
+      # @example
+      #   mnemonic('4a1d0: b.ne 4a200 <foo>') #=> 'b.ne'
+      #   mnemonic('4a1c0: cbz  x0, 4a200')   #=> 'cbz'
+      def mnemonic(line)
+        (@mnemonic ||= {})[line] ||= line[/\A[0-9a-f]+:\s*(\S+)/, 1] || ''
+      end
+
+      # Classify a disassembly +line+ for the control-flow walk (arch-specific):
+      #   :conditional   - may or may not be taken; the walk explores both edges
+      #                    and turns the decision into a gadget constraint
+      #   :unconditional - always taken, to a determined (direct) target
+      #   :terminator    - ends the path with no determined successor (a return or
+      #                    an indirect/computed jump)
+      #   nil            - not a branch; execution falls through to the next line
+      def branch_kind(_line); raise NotImplementedError
+      end
+
+      # The leading character(s) of this arch's branch mnemonics, used to build
+      # {#branch_lead_regex}. Must be plain regex-safe literals: they are spliced
+      # into a character class, so no +]+, +\+, +-+ or +^+.
+      # @example
+      #   'bct'  # aarch64/arm: b, cbz/cbnz, tbz/tbnz
+      #   'j'    # x86: jmp, jcc
+      def branch_lead_chars; raise NotImplementedError
+      end
+
+      # The target's full objdump disassembly as stripped +"ADDR: insn"+ lines,
+      # cached for the lifetime of the fetcher.
+      def disasm_lines
+        @disasm_lines ||= Base.cached(:disasm, @objdump.command) do
+          sites = terminal_call_sites
+          sites.nil? || sites.empty? ? full_disasm : windowed_disasm(sites)
+        end
+      end
+
+      # Disassemble the whole file (the exhaustive default).
+      def full_disasm
+        objdump_lines
+      end
+
+      # Disassemble only [call-WINDOW_BACK, call+WINDOW_FWD] around each call site,
+      # merging overlaps. Used when {#terminal_call_sites} located the calls without
+      # a full disassembly (the win on the slow-to-objdump Thumb-2 arm libcs).
+      def windowed_disasm(sites)
+        windows = sites.sort.map { |a| [[a - WINDOW_BACK, 0].max, a + WINDOW_FWD] }
+        merge_ranges(windows).flat_map { |lo, hi| objdump_lines(start: lo, stop: hi) }
+      end
+
+      # Merge a list of sorted [lo, hi] ranges, coalescing any that overlap.
+      def merge_ranges(ranges)
+        ranges.each_with_object([]) do |(lo, hi), merged|
+          if merged.last && lo <= merged.last[1]
+            merged.last[1] = hi if hi > merged.last[1]
+          else
+            merged << [lo, hi]
+          end
+        end
+      end
+
+      def objdump_lines(start: nil, stop: nil)
+        `#{@objdump.command(start:, stop:)}`.lines.map(&:strip).grep(/\A[0-9a-f]+:/)
+      end
+
+      # Addresses of `bl`/`call` sites reaching a terminal function, found without a
+      # full disassembly. +nil+ (the default) means the arch has no cheap finder,
+      # so the whole file is disassembled.
+      def terminal_call_sites
+        nil
+      end
+
+      # Map from an instruction's address to its index in {#disasm_lines}, so a
+      # given address can be located in the disassembly in O(1).
+      def disasm_index
+        @disasm_index ||= disasm_lines.each_with_index.to_h { |line, i| [line[/\A([0-9a-f]+):/, 1].to_i(16), i] }
       end
     end
   end

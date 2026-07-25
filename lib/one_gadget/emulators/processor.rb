@@ -1,13 +1,21 @@
 # frozen_string_literal: true
 
+require 'one_gadget/emulators/conditional'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/error'
 
 module OneGadget
   # Instruction emulator to solve the constraint of gadgets.
   module Emulators
-    # Base class of a processor.
+    # Base of the per-architecture instruction emulators, used to symbolically
+    # execute a candidate and solve its constraints. A subclass implements the
+    # arch's supported instructions, calling convention and stack model; the
+    # shared branch/compare machinery comes from {Conditional}.
+    #
+    # To add an architecture, see +docs/adding-an-architecture.md+.
     class Processor
+      include Conditional
+
       attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
       attr_reader :sp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on sp.
       attr_reader :sp # @return [String] Stack pointer.
@@ -22,6 +30,8 @@ module OneGadget
         @registers = registers.to_h { |reg| [reg, to_lambda(reg)] }
         @sp = sp
         @constraints = []
+        @flags = nil     # last compare, for a following conditional branch
+        @pending = nil   # a conditional branch awaiting one-line-ahead resolution
         @sp_based_stack = Hash.new do |h, k|
           h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
             lmda.immi = k
@@ -35,7 +45,13 @@ module OneGadget
       # @return [(Instruction, Array<String>)]
       #   The parsing result.
       def parse(cmd)
-        inst = instructions.find { |i| i.match?(cmd) }
+        # instructions is a constant set; build the array (and a mnemonic index)
+        # once instead of re-allocating it for every line.
+        @inst_index ||= instructions.each_with_object({}) { |i, h| h[i.inst] ||= i }
+        mnem = cmd[/\A[0-9a-f]+:\s*(\S+)/, 1] || cmd[/\A\s*(\S+)/, 1]
+        inst = @inst_index[mnem]
+        # Fall back to the original scan for any mnemonic that isn't a bare word.
+        inst ||= (@inst_list ||= instructions).find { |i| i.match?(cmd) }
         raise Error::UnsupportedInstructionError, "Not implemented instruction in #{cmd}" if inst.nil?
 
         [inst, inst.fetch_args(cmd)]

@@ -8,6 +8,62 @@ describe OneGadget::Emulators::AArch64 do
     @processor = described_class.new
   end
 
+  describe 'conditional branches' do
+    # Emit the branch decision by feeding cmp, the branch, then a follow-up line
+    # whose address decides taken (== target) vs not-taken (!= target).
+    def branch_constraint(compare, branch, target, follow_addr)
+      @processor.process("1000: #{compare}") if compare
+      @processor.process("1004: #{branch} #{format('%x', target)} <x>")
+      @processor.process("#{format('%x', follow_addr)}: nop")
+      @processor.constraints
+    end
+
+    it 'renders cmp + b.ne / b.eq' do
+      expect(branch_constraint('cmp x2, #1', 'b.ne', 0x2000, 0x1008)).to eq ['x2 == 0x1'] # not taken
+      @processor = described_class.new
+      expect(branch_constraint('cmp x2, #1', 'b.ne', 0x2000, 0x2000)).to eq ['x2 != 0x1'] # taken
+      @processor = described_class.new
+      expect(branch_constraint('cmp x0, x1', 'b.eq', 0x2000, 0x2000)).to eq ['x0 == x1'] # taken
+    end
+
+    it 'falls back for an unparseable compare operand' do
+      expect(@processor.send(:operand_str, 'somelabel')).to eq 'somelabel'
+    end
+
+    it 'renders signed and unsigned comparisons' do
+      expect(branch_constraint('cmp x0, #0x400', 'b.cs', 0x2000, 0x2000)).to eq ['(u64)x0 >= 0x400'] # taken
+      @processor = described_class.new
+      expect(branch_constraint('cmp x0, #0x400', 'b.lt', 0x2000, 0x1008)).to eq ['(s64)x0 >= 0x400'] # not taken
+    end
+
+    it 'renders cbz / cbnz' do
+      expect(branch_constraint(nil, 'cbz x0,', 0x2000, 0x1008)).to eq ['x0 != 0'] # not taken
+      @processor = described_class.new
+      expect(branch_constraint(nil, 'cbnz x1,', 0x2000, 0x2000)).to eq ['x1 != 0'] # taken
+    end
+
+    it 'renders tbz / tbnz bit tests' do
+      expect(branch_constraint(nil, 'tbz w3, #4,', 0x2000, 0x2000)).to eq ['(w3 & 0x10) == 0'] # taken
+      @processor = described_class.new
+      expect(branch_constraint(nil, 'tbnz w3, #0,', 0x2000, 0x1008)).to eq ['(w3 & 0x1) == 0'] # not taken
+    end
+
+    it 'aborts a cmp-based branch with no preceding compare' do
+      expect(@processor.process('1004: b.ne 2000 <x>')).to be false
+    end
+
+    it 'uses eq/ne but rejects magnitude conditions after tst' do
+      # tst x0,x0 sets ZF = (x0 == 0); b.eq taken means x0 == 0.
+      expect(branch_constraint('tst x0, x0', 'b.eq', 0x2000, 0x2000)).to eq ['x0 == 0'] # taken
+      # tst with distinct operands is a real bitmask test.
+      @processor = described_class.new
+      expect(branch_constraint('tst x0, x1', 'b.ne', 0x2000, 0x2000)).to eq ['(x0 & x1) != 0'] # taken
+      @processor = described_class.new
+      expect(@processor.process('1000: tst x0, x0')).to be true
+      expect(@processor.process('1004: b.lt 2000 <x>')).to be false # magnitude after tst: unsound
+    end
+  end
+
   describe 'process' do
     it 'libc-2.23 gadget' do
       gadget = <<-EOS

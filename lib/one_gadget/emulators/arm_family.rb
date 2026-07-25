@@ -5,11 +5,29 @@ require 'one_gadget/emulators/lambda'
 module OneGadget
   module Emulators
     # Behaviour shared by the two ARM-architecture emulators, {Arm} (AArch32) and
-    # {AArch64}: the parts of the calling convention and memory model that are
-    # identical in 32- and 64-bit mode. Included into each; everything that
-    # genuinely differs (instruction set, register width, +pc+ handling) stays in
-    # the individual classes.
+    # {AArch64}: the condition-code table plus the parts of the calling convention
+    # and memory model that are identical in 32- and 64-bit mode. Included into
+    # each; everything that genuinely differs (instruction set, register width,
+    # +pc+ handling) stays in the individual classes.
     module ArmFamily
+      # ARM condition-code suffix (the +<cc>+ in +b<cc>+ / +b.<cc>+) mapped to a
+      # shared {Conditional::RELATION} predicate. Decodes the opaque mnemonics once:
+      # +hs+/+cs+ and +lo+/+cc+ are aliases; +mi+/+pl+ (sign bit) act as signed
+      # +</+>=+. +vs+/+vc+ (overflow) have no constraint form and are absent, so a
+      # branch on them maps to +nil+ and aborts the path. (x86 uses {X86::JCC}.)
+      COND = {
+        'eq' => :eq, 'ne' => :ne,
+        'hs' => :uge, 'cs' => :uge, 'lo' => :ult, 'cc' => :ult,
+        'hi' => :ugt, 'ls' => :ule,
+        'ge' => :sge, 'lt' => :slt, 'gt' => :sgt, 'le' => :sle,
+        'mi' => :slt, 'pl' => :sge
+      }.freeze
+
+      # This arch family's flag-setting compare mnemonics, mapped to the ALU op
+      # whose result their flags reflect (see {Conditional::COMPARE_OPS}). x86 has
+      # its own {X86::COMPARES}.
+      COMPARES = { 'cmp' => :sub, 'cmn' => :add, 'tst' => :and }.freeze
+
       # The sp-based stack that +obj+ addresses, or +nil+ when +obj+ isn't sp-relative.
       # @param [String, Lambda] obj A lambda object or its string.
       # @return [Hash{Integer => Lambda}, nil]

@@ -21,20 +21,30 @@ module OneGadget
       def initialize(file = nil)
         super(OneGadget::ABI.arm, 'sp')
         @pc = 'pc'
-        @data = file && File.binread(file)
+        # find() builds a fresh emulator per candidate; cache the file's bytes so
+        # the literal pool isn't re-read from disk thousands of times.
+        @data = file && self.class.file_data(file)
         @prev_addr = nil
         # A32 until proven Thumb by a +.w+/+.n+ suffix or a 2-byte instruction stride.
         @thumb = false
       end
 
+      # Memoized bytes of +file+ (the target libc), shared across emulator instances.
+      def self.file_data(file)
+        (@file_data ||= {})[file] ||= File.binread(file)
+      end
+
       # @see OneGadget::Emulators::AArch64#process!
       def process!(cmd)
+        resolve_pending_branch(cmd)
         line = cmd.strip
         track_mode(line)
         body, @literal = split_line(line)
         body = normalize(body)
-        # push/pop take a {reg-list} whose commas would confuse the generic parser.
         mnem, rest = body.split(/\s+/, 2)
+        return handle_compare(COMPARES[mnem], rest) if COMPARES.key?(mnem)
+        return handle_branch(mnem, rest) != :fail if branch_mnem?(mnem)
+        # push/pop take a {reg-list} whose commas would confuse the generic parser.
         return __send__(:"inst_#{mnem}", rest) != :fail if %w[push pop].include?(mnem)
 
         inst, args = parse(body)
@@ -105,7 +115,7 @@ module OneGadget
       # Rewrite one instruction into the plain form the generic parser expects:
       # drop the +.w+/+.n+ width suffix, map the flag-setting aliases we support
       # (+movs+/+adds+/+subs+) back to their base mnemonic, and strip the +#+ that
-      # prefixes ARM immediates. Other conditional/flag variants (e.g. +moveq+) are
+      # prefixes ARM immediates. Other conditional/flag variants (+moveq+, +addne+, ...) are
       # left intact so they fall through to "unsupported".
       # @example
       #   normalize('movs r0, #0')
@@ -159,8 +169,7 @@ module OneGadget
         return unless src.end_with?('!') || index.nonzero?
 
         # pre-index ([reg, imm]!) or post-index ([reg], imm) write-back.
-        lmda = OneGadget::Emulators::Lambda.parse(resolve_int_regs(src.delete('!')))
-        registers[lmda.obj] += lmda.immi + index
+        writeback(src, index)
       end
 
       def inst_str(src, dst, index = 0)
@@ -177,8 +186,13 @@ module OneGadget
         index = Integer(index)
         return unless dst.end_with?('!') || index.nonzero?
 
-        lmda = OneGadget::Emulators::Lambda.parse(resolve_int_regs(dst.delete('!')))
-        registers[lmda.obj] += lmda.immi + index
+        writeback(dst, index)
+      end
+
+      # Pre-/post-index write-back of a +[reg, imm]+ memory operand to +reg+.
+      def writeback(mem, index)
+        lmda = OneGadget::Emulators::Lambda.parse(resolve_int_regs(mem.delete('!')))
+        registers[lmda.obj] += lmda.immi + index if register?(lmda.obj)
       end
 
       # push {r4, r5, lr}: registers are stored with the lowest-numbered at the
@@ -204,10 +218,28 @@ module OneGadget
 
       # Flag-only / no-effect instructions: keep emulating without changing state.
       def inst_nop(*); end
-      alias inst_cmp inst_nop
-      alias inst_cmn inst_nop
-      alias inst_tst inst_nop
       alias inst_svc inst_nop
+
+      def branch_mnem?(mnem)
+        return true if mnem == 'b' || %w[cbz cbnz].include?(mnem)
+
+        # +vs+/+vc+ aren't in COND but are still branches (they just abort the path).
+        mnem.start_with?('b') && (COND.key?(mnem[1..]) || %w[vs vc].include?(mnem[1..]))
+      end
+
+      def operands(rest)
+        rest.to_s.split(',').map { |o| o.strip.sub(/\s*<.*>\z/, '') }
+      end
+
+      def handle_branch(mnem, rest)
+        ops = operands(rest)
+        case mnem
+        when 'b' then true # unconditional: control handled by the stitched path
+        when 'cbz' then branch_on_zero(ops[1].to_i(16), operand_str(ops[0]), negate: false)
+        when 'cbnz' then branch_on_zero(ops[1].to_i(16), operand_str(ops[0]), negate: true)
+        else branch_on_compare(COND[mnem[1..]], ops[0].to_i(16))
+        end
+      end
 
       # Read the little-endian word the current PC-relative +ldr+ points at.
       def literal_value

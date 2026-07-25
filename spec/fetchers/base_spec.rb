@@ -35,4 +35,21 @@ describe OneGadget::Fetcher::Base do
       expect(yielded).to match(/\Arsp == NULL \|\| \{.*\} is a valid envp\z/)
     end
   end
+
+  # A branch comparing a value with itself (e.g. +cmp x0, x0+): "X == X" is always
+  # true so the constraint is dropped; "X != X" never is, so the gadget is infeasible.
+  describe '#tautology? / #contradiction?' do
+    it 'classifies a self-comparison by its operator' do
+      expect(fetcher.send(:tautology?, 'rax == rax')).to be true
+      expect(fetcher.send(:tautology?, '(s64)x0 >= x0')).to be true
+      expect(fetcher.send(:contradiction?, 'rax != rax')).to be true
+      expect(fetcher.send(:contradiction?, 'x0 < x0')).to be true
+    end
+
+    it 'leaves genuine relations and disjunctions alone' do
+      expect(fetcher.send(:tautology?, 'x2 == 0x1')).to be false
+      expect(fetcher.send(:contradiction?, 'x2 == 0x1')).to be false
+      expect(fetcher.send(:trivial_relation, '[rax] == NULL || rax == rax')).to be_nil
+    end
+  end
 end
