@@ -18,14 +18,14 @@ libc. Two run modes:
 
 Every gadget launches a real, working `/bin/sh` under benign state (validated by the
 shell running `ls /` and reproducing the host root). The 2.43 set is also complete
-under poison. The strict failures were candidate one_gadget bugs (Findings 1 and 2), both now fixed on
-branch `fix-sigprocmask-set-constraint`. With the fix, strict is **all PASS** across the
+under poison. The strict failures were candidate one_gadget bugs (Findings 1 and 2), both fixed in
+PR #323. With the fix, strict is **all PASS** across the
 2.43/2.24/2.23 fixtures (one_gadget reports the reliable entry points, and the constraint
 lists are complete).
 
 ## Finding 1 — missing constraint: sigprocmask `set` pointer must be readable
 
-**Status: fixed** on branch `fix-sigprocmask-set-constraint` (emits `<set> == NULL` when
+**Status: fixed** in PR #323 (emits `<set> == NULL` when
 `set` isn't provably mapped). Under strict mode this fully fixes `0x3c92c`/`0x3d6d4`
 (they now PASS). `0x3c934`/`0x3d6dc` gain the correct `x21 == NULL` too, but still FAIL
 strict for a second, independent reason — see Finding 2.
@@ -85,8 +85,8 @@ this is filed here for joint review before a focused fix PR.
 
 ## Finding 2 — missing constraint: __sigaction `act` pointer (subtler)
 
-**Gadgets:** `0x3c934` (libc-2.24), `0x3d6dc` (libc-2.23). **Status: fixed** on branch
-`fix-sigprocmask-set-constraint` (folded in with Finding 1's fix).
+**Gadgets:** `0x3c934` (libc-2.24), `0x3d6dc` (libc-2.23). **Status: fixed** in PR #323
+(folded in with Finding 1's fix).
 
 **Symptom (strict mode, with Finding 1 fixed):** SIGSEGV at `__libc_sigaction+36`
 (`ldr x3, [x1], #8`), before `execve`.
