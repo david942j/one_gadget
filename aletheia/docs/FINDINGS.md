@@ -18,9 +18,10 @@ libc. Two run modes:
 
 Every gadget launches a real, working `/bin/sh` under benign state (validated by the
 shell running `ls /` and reproducing the host root). The 2.43 set is also complete
-under poison. The strict failures are candidate one_gadget bugs (Findings 1 and 2). With
-Finding 1's fix applied, strict results for 2.24/2.23 become 2 PASS, 1 FAIL (the remaining
-FAIL is Finding 2).
+under poison. The strict failures were candidate one_gadget bugs (Findings 1 and 2), both now fixed on
+branch `fix-sigprocmask-set-constraint`. With the fix, strict is **all PASS** across the
+2.43/2.24/2.23 fixtures (one_gadget reports the reliable entry points, and the constraint
+lists are complete).
 
 ## Finding 1 — missing constraint: sigprocmask `set` pointer must be readable
 
@@ -84,7 +85,8 @@ this is filed here for joint review before a focused fix PR.
 
 ## Finding 2 — missing constraint: __sigaction `act` pointer (subtler)
 
-**Gadgets:** `0x3c934` (libc-2.24), `0x3d6dc` (libc-2.23). **Status: open, needs review.**
+**Gadgets:** `0x3c934` (libc-2.24), `0x3d6dc` (libc-2.23). **Status: fixed** on branch
+`fix-sigprocmask-set-constraint` (folded in with Finding 1's fix).
 
 **Symptom (strict mode, with Finding 1 fixed):** SIGSEGV at `__libc_sigaction+36`
 (`ldr x3, [x1], #8`), before `execve`.
@@ -102,6 +104,14 @@ isn't known-mapped" check would over-constrain `0x3c92c` (a false, over-tight co
 the opposite bug). A correct fix needs to consider constraints discovered later in the same
 candidate (e.g. defer the pointer-safety check to post-emulation, cross-referencing the
 final `writable` set), so it is left for a separate change.
+
+**Resolution:** the `:readable` safe-call check was made *deferred* — resolved in
+`Processor#finalize_deferred_reads` after emulation, when the full `writable:` set is known.
+So `act = x20+8` (with `x20` writable) is recognised as mapped and left unconstrained, while
+`act = x1` (bare, uncontrolled) gets `x1 == NULL`. That gives `0x3c934` its true, harder
+constraint set, and `trim_gadgets` then drops it in favour of the dominating, reliable
+`0x3c930` (`act` set up via `x20+8`). Aletheia `--strict` on libc-2.24 is now **3/3 PASS** —
+the emitted set is complete. Same shape on libc-2.23 (`0x3d6dc` → `0x3d6d8`).
 
 ## Reproduce
 
