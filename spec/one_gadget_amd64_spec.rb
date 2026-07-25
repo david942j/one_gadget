@@ -18,7 +18,7 @@ describe 'one_gadget_amd64' do
 
     it 'libc-2.24' do
       path = data_path('libc-2.24-8cba3297f538691eb1875be62986993c004f3f4d.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f356, 0x3f3aa, 0xd67e5]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f3aa, 0xb8a38, 0xd67e5]
       expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
     end
 
@@ -30,7 +30,8 @@ describe 'one_gadget_amd64' do
 
     it 'libc-2.27' do
       path = data_path('libc-2.27-b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x4f2be, 0x4f2c5, 0x4f322, 0x10a38c]
+      expect(OneGadget.gadgets(file: path, force_file: true))
+        .to eq [0x4f322, 0xe569f, 0xe5858, 0xe585f, 0xe5863, 0x10a38c]
       expect(one_gadget(path)).to eq OneGadget.gadgets(file: path)
     end
 

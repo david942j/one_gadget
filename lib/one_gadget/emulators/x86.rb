@@ -12,6 +12,18 @@ module OneGadget
       attr_reader :bp # @return [String] Stack base register.
       attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp.
 
+      # Libc calls the emulator accepts without executing, each a syscall wrapper.
+      # +sigprocmask+ dereferences its +set+ argument (arg 1) unless it is NULL (which
+      # it NULL-checks), so +set+ is marked +:nullable_deref+; +__sigaction+'s
+      # dereferenced +act+ (arg 1) is required to be a libc global instead.
+      # See {Processor#dispatch_safe_call}.
+      SAFE_CALLS = {
+        'sigprocmask' => { 1 => :nullable_deref },
+        '__close' => {},
+        'unsetenv' => { 0 => :global_var? },
+        '__sigaction' => { 1 => :global_var?, 2 => :zero? }
+      }.freeze
+
       # Constructor for a x86 processor.
       def initialize(registers, sp, bp, pc)
         super(registers, sp)
@@ -266,25 +278,12 @@ module OneGadget
       # yap, nop
       def inst_nop(*); end
 
-      # Handle some valid calls.
-      # For example, +sigprocmask+ will always be a valid call
-      # because it just invokes syscall.
+      # TODO: handle some registers would be fucked after call
       def inst_call(addr)
         # This is the last call
         return registers[pc] = addr if %w[execve execl posix_spawn].any? { |n| addr.include?(n) }
 
-        # TODO: handle some registers would be fucked after call
-        checker = {
-          'sigprocmask' => {},
-          '__close' => {},
-          'unsetenv' => { 0 => :global_var? },
-          '__sigaction' => { 1 => :global_var?, 2 => :zero? }
-        }
-        func = checker.keys.find { |n| addr.include?(n) }
-        return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }
-
-        # unhandled case or checker's condition fails
-        :fail
+        dispatch_safe_call(addr, SAFE_CALLS)
       end
 
       def add_writable(dst)
