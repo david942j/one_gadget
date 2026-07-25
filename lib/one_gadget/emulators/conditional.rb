@@ -47,20 +47,19 @@ module OneGadget
       # mnemonics onto these ops (its +COMPARES+), so adding an arch needs no change
       # here; adding a genuinely new ALU op means one entry plus its +render_*+ method.
       COMPARE_OPS = {
-        sub: { ordered: true,  render: :render_sub },  # cmp:      flags from  lhs - rhs
-        add: { ordered: true,  render: :render_add },  # cmn:      flags from  lhs + rhs
-        and: { ordered: false, render: :render_and }   # tst/test: flags from  lhs & rhs (zero flag)
+        sub: { ordered: true,  render: :render_sub },  # subtraction: flags from  lhs - rhs
+        add: { ordered: true,  render: :render_add },  # addition:    flags from  lhs + rhs
+        and: { ordered: false, render: :render_and }   # bitwise AND: flags from  lhs & rhs (zero flag)
       }.freeze
 
       # Record a compare so a following conditional branch can be rendered.
       # Normally reached through {#handle_compare}; call it directly only when an
       # arch models a flag-setting instruction that {#handle_compare} doesn't cover.
-      # @param [Symbol] op The ALU operation the compare performs -- a {COMPARE_OPS} key
-      #   (+:sub+ for +cmp+, +:add+ for +cmn+, +:and+ for +tst+/+test+). Its flags
-      #   reflect this result, which decides both which branch conditions are
-      #   expressible and how the constraint is rendered. Arches map their own
-      #   mnemonics to these ops (their +COMPARES+); a new arch adds a {COMPARE_OPS}
-      #   entry only for a genuinely new operation.
+      # @param [Symbol] op The ALU operation the compare performs -- a {COMPARE_OPS}
+      #   key (+:sub+/+:add+/+:and+). Its flags reflect this result, which decides
+      #   both which branch conditions are expressible and how the constraint is
+      #   rendered. Each arch maps its own mnemonics to these ops (their +COMPARES+);
+      #   a new arch adds a {COMPARE_OPS} entry only for a genuinely new operation.
       # @param [String] lhs Rendered left operand: a register's current value, or an immediate in hex.
       # @param [String] rhs Rendered right operand.
       # @return [true]
@@ -125,15 +124,15 @@ module OneGadget
         operand
       end
 
-      # Register a branch on the last recorded compare's flags (+b.<cond>+ / +jcc+),
-      # resolved on the next line. Call it from +handle_branch+; +cond+ is the
-      # comparison predicate and +target+ is the branch's direct destination address.
+      # Register a branch on the last recorded compare's flags, resolved on the next
+      # line. Call it from +handle_branch+; +cond+ is the comparison predicate and
+      # +target+ is the branch's direct destination address.
       # @param [Symbol] cond The comparison predicate, a {RELATION} key. Each arch
-      #   first maps its own branch mnemonic to it (its +COND+/+JCC+ adapter table).
+      #   first maps its own branch mnemonic to it via its adapter table.
       # @param [Integer] target Destination address of the branch.
       # @return [true, :fail] +:fail+ (abort the path) when it cannot be expressed
       #   soundly: no compare was seen, or a magnitude condition follows an
-      #   equality-only compare (a {COMPARE_OPS} op with +ordered: false+, e.g. +tst+).
+      #   equality-only compare (a {COMPARE_OPS} op with +ordered: false+).
       # @example After +cmp x2, #1+, a following +b.ne 4a200+ (arch maps +b.ne+ to +:ne+)
       #   branch_on_compare(:ne, 0x4a200) #=> true
       #   # if the stitched path FALLS THROUGH (doesn't reach 0x4a200) the not-taken
@@ -156,30 +155,30 @@ module OneGadget
         true
       end
 
-      # Register a self-contained branch on +reg == 0+ (+cbz+/+cbnz+). It carries its
-      # own compare, so no preceding +cmp+ is needed. +negate:+ distinguishes the
-      # branch-if-zero form (+cbz+, +false+) from branch-if-non-zero (+cbnz+, +true+).
+      # Register a self-contained branch that tests a register against zero. It carries
+      # its own compare, so no preceding compare is needed. +negate:+ selects the sense:
+      # +false+ branches when the register is zero, +true+ when it isn't.
       # @param [Integer] target Destination address of the branch.
       # @param [String] reg The tested register, already rendered (as {#operand_str} returns).
-      # @param [Boolean] negate +false+ for +cbz+, +true+ for +cbnz+.
+      # @param [Boolean] negate +false+ = branch when +reg+ is zero, +true+ = when it isn't.
       # @example aarch64 +cbz x0, 4a200+ - branch taken when +x0 == 0+
       #   branch_on_zero(0x4a200, 'x0', negate: false) #=> true
       #   # fall-through path emits  x0 != 0 ; taken path emits  x0 == 0
       # @example x86 reuses it for +jrcxz+/+jecxz+/+jcxz+ (always branch-if-zero)
       #   branch_on_zero(0x4a200, 'rcx', negate: false)
       def branch_on_zero(target, reg, negate:)
-        hit = negate ? '!=' : '==' # cbz taken => reg == 0
+        hit = negate ? '!=' : '==' # taken (not negated) => reg == 0
         miss = negate ? '==' : '!='
         @pending = { target:, render: ->(taken) { "#{reg} #{taken ? hit : miss} 0" } }
         true
       end
 
-      # Register a self-contained branch on a single bit of +reg+ (+tbz+/+tbnz+):
-      # also carries its own test (no preceding +cmp+). Renders a bitmask test.
+      # Register a self-contained branch that tests a single bit of a register: also
+      # carries its own test, so no preceding compare is needed. Renders a bitmask test.
       # @param [Integer] target Destination address of the branch.
       # @param [String] reg The tested register, already rendered (as {#operand_str} returns).
       # @param [Integer] bit The bit index being tested.
-      # @param [Boolean] negate +false+ for +tbz+, +true+ for +tbnz+.
+      # @param [Boolean] negate +false+ = branch when the bit is zero, +true+ = when it's set.
       # @example aarch64 +tbz w0, #4, 4a200+ - branch taken when bit 4 of +w0+ is 0
       #   branch_on_bit(0x4a200, 'w0', 4, negate: false) #=> true
       #   # taken path emits  (w0 & 0x10) == 0 ; fall-through emits  (w0 & 0x10) != 0
@@ -231,17 +230,17 @@ module OneGadget
         __send__(COMPARE_OPS.fetch(op)[:render], cast, lhs, rhs, operator)
       end
 
-      # +cmp+: a direct comparison of the two operands.
+      # Subtraction (+:sub+): a direct comparison of the two operands.
       def render_sub(cast, lhs, rhs, op)
         "#{cast}#{lhs} #{op} #{rhs}"
       end
 
-      # +cmn+: the flags reflect +lhs + rhs+, i.e. that sum compared against 0.
+      # Addition (+:add+): the flags reflect +lhs + rhs+, i.e. that sum compared against 0.
       def render_add(cast, lhs, rhs, op)
         "#{cast}(#{lhs} + #{rhs}) #{op} 0"
       end
 
-      # +tst+/+test+: a bitmask test; +reg, reg+ collapses to the plain zero test.
+      # Bitwise AND (+:and+): a bitmask test; identical operands collapse to a plain zero test.
       def render_and(_cast, lhs, rhs, op)
         lhs == rhs ? "#{lhs} #{op} 0" : "(#{lhs} & #{rhs}) #{op} 0"
       end
