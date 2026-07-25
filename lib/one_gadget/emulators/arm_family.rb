@@ -40,24 +40,32 @@ module OneGadget
         sp_based_stack
       end
 
+      # Libc calls the emulator accepts without executing, each a syscall wrapper.
+      # +sigprocmask+ and +__sigaction+ each dereference a pointer argument unless it
+      # is NULL (both guard the read with a NULL check and still reach the call on
+      # the NULL path), so +sigprocmask+'s +set+ and +__sigaction+'s +act+ are marked
+      # +:nullable_deref+; +__sigaction+'s +oldact+ must additionally be NULL.
+      # See {Processor#dispatch_safe_call}.
+      SAFE_CALLS = {
+        'sigprocmask' => { 1 => :nullable_deref },
+        '__sigaction' => { 1 => :nullable_deref, 2 => :zero? }
+      }.freeze
+
       private
 
-      # A +bl+/+blx+ call: record the terminal +exec*+ target, silently accept a
-      # known-safe syscall wrapper, or +:fail+ to abort the candidate.
+      # A +bl+/+blx+ call: record the terminal +exec*+ target, accept a known-safe
+      # syscall wrapper, or +:fail+ to abort the candidate.
       def inst_bl(addr)
         # This is the last call.
         return registers[pc] = addr if %w[execve execl posix_spawn].any? { |n| addr.include?(n) }
 
-        # Calls that are always safe because they merely wrap a syscall.
-        checker = {
-          'sigprocmask' => {},
-          '__sigaction' => { 2 => :zero? }
-        }
-        func = checker.keys.find { |n| addr.include?(n) }
-        return if func && checker[func].all? { |idx, sym| check_argument(idx, sym) }
+        dispatch_safe_call(addr, SAFE_CALLS)
+      end
 
-        # unhandled case or checker's condition fails
-        :fail
+      # Libc-relative addresses are known-mapped too; they carry the +$base+ marker
+      # rather than a +pc+-relative one.
+      def mapped_pointer?(obj)
+        super || obj == libc_base.obj.to_s
       end
 
       # The libc load base as a symbolic +$base+ lambda.

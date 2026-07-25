@@ -30,6 +30,7 @@ module OneGadget
         @registers = registers.to_h { |reg| [reg, to_lambda(reg)] }
         @sp = sp
         @constraints = []
+        @deferred_reads = [] # pointer args of safe calls, resolved once emulation ends
         @flags = nil     # last compare, for a following conditional branch
         @pending = nil   # a conditional branch awaiting one-line-ahead resolution
         @sp_based_stack = Hash.new do |h, k|
@@ -97,6 +98,7 @@ module OneGadget
       # @return [Array<String>]
       #   Extra constraints found during execution.
       def constraints
+        finalize_deferred_reads
         return [] if @constraints.empty?
 
         # we have these types:
@@ -131,6 +133,72 @@ module OneGadget
         when :global_var? then global_var?(argument(idx))
         when :zero? then argument(idx).is_a?(Integer) && argument(idx).zero?
         end
+      end
+
+      # Accept a +call+ to a libc function the emulator treats as non-terminal
+      # (a syscall wrapper). +checker+ maps the function name to its per-argument
+      # requirements: an argument index paired with one of
+      # * +:zero?+ / +:global_var?+ - a precondition that must already hold, else
+      #   the candidate is aborted (+:fail+).
+      # * +:nullable_deref+ - the callee dereferences this argument *unless it is
+      #   NULL*, which glibc guards with an explicit NULL check. When the pointer
+      #   isn't already known to be mapped, +<arg> == NULL+ is recorded so the
+      #   callee takes the skip-the-dereference path. Only tag an argument this way
+      #   after confirming the callee both NULL-checks it and still reaches the
+      #   terminal call on the NULL path; an argument dereferenced unconditionally
+      #   cannot be made safe by forcing it NULL (gate it with +:global_var?+, or
+      #   drop the candidate, instead). The check is deferred to
+      #   {#finalize_deferred_reads} because a +<reg>+<imm>+ pointer may only become
+      #   known-mapped once a later store marks +<reg>+ writable.
+      # @return [nil, :fail] +nil+ = call accepted, +:fail+ = abort the candidate.
+      def dispatch_safe_call(addr, checker)
+        func = checker.keys.find { |n| addr.include?(n) }
+        return :fail unless func
+
+        checker[func].each do |idx, req|
+          if req == :nullable_deref
+            @deferred_reads << argument(idx)
+          elsif !check_argument(idx, req)
+            return :fail
+          end
+        end
+        nil
+      end
+
+      # Now that emulation is complete and the full writable set is known, require
+      # each deferred pointer argument to be NULL unless it is already known to
+      # reference mapped memory. Idempotent: the queue is cleared once resolved.
+      def finalize_deferred_reads
+        @deferred_reads.each do |arg|
+          next if deref_safe_pointer?(arg) || writable_pointer?(arg)
+
+          @constraints << [:raw, "#{arg} == NULL"]
+        end
+        @deferred_reads = []
+      end
+
+      # Whether dereferencing +val+ is safe: it is NULL, or a pointer already known
+      # to reference mapped memory (see {#mapped_pointer?}).
+      def deref_safe_pointer?(val)
+        return true if val.is_a?(Integer) && val.zero?
+        return false unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count.zero?
+
+        mapped_pointer?(val.obj.to_s)
+      end
+
+      # Whether +val+ points into memory a +writable+ constraint already covers, i.e.
+      # its base register was recorded as a writable store target during emulation.
+      def writable_pointer?(val)
+        return false unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count.zero?
+
+        base = val.obj.to_s
+        @constraints.any? { |type, obj| type == :writable && obj.obj.to_s == base }
+      end
+
+      # Whether an address expression names memory known to be mapped: a stack slot
+      # or a libc global. Architectures with an extra base marker override this.
+      def mapped_pointer?(obj)
+        obj.include?(sp) || global_var?(obj)
       end
 
       def register?(reg)
