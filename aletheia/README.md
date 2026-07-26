@@ -48,8 +48,10 @@ Per gadget: `PASS` / `EXEC` / `FAIL` / `SKIP`.
   strongest signal; it does not depend on one_gadget's own interpretation.
 - **EXEC** — the gadget reached `execve("/bin/sh")` with a valid argv/envp (L0), but the
   harness could not drive `ls /` through this particular shell (e.g. a fixed `-c` command
-  baked into libc, an uncontrolled `argv[1]`, or a `posix_spawn` parent/child tty race).
-  The gadget works; only the L2 drive is inconclusive. Not a failure.
+  baked into libc). The gadget works; only the L2 drive is inconclusive. Not a failure.
+- **EXEC\*** (promotable) — an EXEC gadget that becomes a full L2 PASS once the *uncontrolled*
+  register the code writes as `argv[1]` is nulled (which an attacker controls). Effectively a
+  usable gadget; the harness proves it by retrying with uncontrolled registers nulled.
 - **FAIL** — a complete, satisfied plan reached neither a shell nor any output. Under
   `--strict` this is a candidate one_gadget bug (usually a missing constraint); use
   `discover.py` to find the faulting instruction (see `docs/DESIGN.md`).

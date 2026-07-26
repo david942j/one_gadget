@@ -44,7 +44,8 @@ printer = lambda do |r|
   if options[:json]
     puts JSON.generate(r)
   else
-    puts format('%-10s %-6s %s', r[:offset], r[:result], r[:effect])
+    label = r[:result] == 'EXEC' && r[:promotable] ? 'EXEC*' : r[:result]
+    puts format('%-10s %-6s %s', r[:offset], label, r[:effect])
     puts "  reason: #{r[:reason]}" if r[:reason]
   end
 end

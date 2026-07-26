@@ -64,10 +64,23 @@ module Aletheia
       end
 
       res = @oracle.run(plan)
-      record.merge(
+      record = record.merge(
         result: res.result, reason: res.reason, base: res.base, l0: res.l0,
         seen_root_entries: res.seen, expected_root_entries: res.expected
       )
+      # An EXEC gadget reached a shell but the harness couldn't drive it. Retry with
+      # uncontrolled registers nulled: if the code writes such a register as argv[1],
+      # nulling it terminates argv and the shell becomes interactive (drivable). A
+      # promoted gadget is genuinely usable given that (attacker-controlled) input.
+      record[:promotable] = promotable?(plan) if res.result == 'EXEC'
+      record
+    end
+
+    def promotable?(plan)
+      null_plan = plan.dup
+      null_plan.benign_default = false
+      null_plan.null_default = true
+      @oracle.run(null_plan).result == 'PASS'
     end
   end
 end

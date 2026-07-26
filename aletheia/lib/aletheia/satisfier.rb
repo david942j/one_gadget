@@ -17,8 +17,8 @@ module Aletheia
   class Satisfier
     # @return [Aletheia::Plan]
     Plan = Struct.new(:offset, :effect, :constraints, :regs, :scratch_size, :sp_offset,
-                      :benign_default, :poison_default, :branches, :status, :reason,
-                      :writable_count, keyword_init: true)
+                      :benign_default, :poison_default, :null_default, :branches, :status,
+                      :reason, :writable_count, keyword_init: true)
 
     SCRATCH_SIZE    = 0x10000
     SP_OFFSET       = 0x2000

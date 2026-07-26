@@ -51,6 +51,14 @@ drive `ls /` through that shell — a fixed `-c` command from a libc global, an 
 satisfier produced no plan. EXEC exists because "reaches a shell" and "we can drive that shell"
 are different questions — conflating them would mislabel working gadgets as failures.
 
+**Promotion (EXEC\*)**: an EXEC gadget is retried with the uncontrolled registers nulled
+(`null_default`). Many EXEC results are only inconclusive because the code writes an
+uncontrolled register as `argv[1]`, and the benign fill makes it a garbage-but-readable string
+that `sh` treats as a script name and exits. Nulling that register terminates argv, so the
+shell is interactive and runs `ls /`. If the null-fill retry PASSes, the gadget is reported
+EXEC\* — genuinely usable given that (attacker-controlled) input. If it still can't drive (a
+fixed `-c` command from a libc constant), it stays EXEC.
+
 ## Independence principle (important)
 
 The tool under verification must not be its own judge. So:

@@ -60,13 +60,21 @@ gdb.selected_inferior().write_memory(scratch + 0x200, b"ls /\x00")
 #  - poison: an unmapped address, so ANY unlisted dereference faults. This tests
 #    whether the constraint list is *complete*; a fault under poison that the
 #    listed constraints don't explain is a candidate missing-constraint bug.
+#  - null: uncontrolled registers are 0. Used to promote an EXEC gadget: if a
+#    register the code writes as argv[1] is NULL, argv terminates and the shell is
+#    interactive (drivable), showing the gadget is usable given that extra control.
 POISON = 0xDEAD0000
 if plan.get("poison_default"):
-    for i in range(31):
-        gdb.execute("set $x%d = %#x" % (i, POISON))
+    fill = POISON
+elif plan.get("null_default"):
+    fill = 0
 elif plan.get("benign_default"):
+    fill = scratch + 0x100
+else:
+    fill = None
+if fill is not None:
     for i in range(31):
-        gdb.execute("set $x%d = %#x" % (i, scratch + 0x100))
+        gdb.execute("set $x%d = %#x" % (i, fill))
 
 for reg, val in plan.get("regs", {}).items():
     # Plan values may be ints or {"scratch_off": N} to resolve against scratch.
@@ -79,6 +87,7 @@ gdb.execute("set $sp = %#x" % sp)
 gdb.execute("set $pc = %#x" % gadget)
 
 gdb.execute("set follow-fork-mode child")
+gdb.execute("set detach-on-fork off")
 gdb.write("ALETHEIA_INJECTED sp=%#x scratch=%#x\n" % (sp, scratch))
 
 
@@ -103,11 +112,13 @@ def execd_shell(pid):
 
 
 # L0: the deterministic "the gadget reaches a shell" signal, independent of
-# whether L2 can then drive that shell over the tty. A straight-line execve
-# stops at the syscall entry, where we verify the "/bin/sh" path and readable
-# argv/envp. posix_spawn execs in a vforked child that runs straight through to
-# the new program, so there we confirm the exec'd image is a shell instead.
+# whether L2 can then drive that shell over the tty. A straight-line execve stops
+# at the syscall entry, where we verify the "/bin/sh" path and readable argv/envp.
+# posix_spawn execs in a vforked child that runs straight through the syscall, so
+# a `catch exec` stops at the new image (process still alive, before it runs any
+# `-c` command and exits) where we confirm it is a shell.
 gdb.execute("catch syscall execve execveat")
+gdb.execute("catch exec")
 gdb.execute("continue")
 l0 = False
 try:
