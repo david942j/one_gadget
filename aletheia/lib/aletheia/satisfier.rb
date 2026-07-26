@@ -8,10 +8,12 @@ module Aletheia
   # one_gadget's +calculate_score+ dispatch, but it *produces assignments* and
   # its constraint semantics are written independently (see {Operand_}).
   #
-  # Memory model assumed by the plan: the driver allocates one zeroed scratch
-  # region and sets +sp+ to +scratch + sp_offset+. Any +sp+-relative dereference
-  # the constraints require to be NULL is therefore already satisfied by the
-  # zero-fill; any effect argument of the form +sp+imm+ points into scratch.
+  # Memory model assumed by the plan: the driver allocates one zeroed, RW scratch
+  # region and sets +sp+ to +scratch + sp_offset+. So any +sp+-relative
+  # dereference the constraints need NULL is satisfied by the zero-fill, any
+  # +sp+imm+ effect argument points into scratch, and a register pointed at
+  # scratch is a readable+writable pointer (and, being zero-filled, a valid empty
+  # string / a NULL-terminated empty argv|envp).
   class Satisfier
     # @return [Aletheia::Plan]
     Plan = Struct.new(:offset, :effect, :constraints, :regs, :scratch_size, :sp_offset,
@@ -20,9 +22,12 @@ module Aletheia
 
     SCRATCH_SIZE    = 0x10000
     SP_OFFSET       = 0x2000
-    WRITABLE_BASE   = 0x4000  # write-areas live above the stack region (sp is at SP_OFFSET)
+    STRING_POOL     = 0x100    # readable+writable zeroed bytes: a valid "" / [NULL] array
+    COMMAND_POOL    = 0x200    # the "ls /" L2 command the driver seeds here
+    WRITABLE_BASE   = 0x4000   # write-areas live above the stack region (sp is at SP_OFFSET)
     WRITABLE_STRIDE = 0x800
     MASK64          = (1 << 64) - 1
+    IMM             = /-?(?:0x[0-9a-fA-F]+|\d+)/
 
     # @param arch an arch backend (e.g. {Arch::AArch64})
     # @param [Boolean] strict when true, uncontrolled registers are poisoned
@@ -43,16 +48,8 @@ module Aletheia
         branches: {}, status: 'ok', reason: nil, writable_count: 0
       )
       gadget.constraints.each_with_index do |constraint, i|
-        options = constraint.split(' || ').map { |d| [evaluate(d.strip), d.strip] }
-                            .select { |cost, _| cost }
-        if options.empty?
-          return skip(plan, "unsupported-or-unsat: #{constraint}")
-        end
-
-        cost, chosen = options.min_by { |c, _| c }.then { |c, d| [c, d] }
-        unless apply(plan, chosen)
-          return skip(plan, "conflict while satisfying: #{chosen}")
-        end
+        chosen = satisfy_constraint(plan, constraint)
+        return skip(plan, "unsupported-or-unsat: #{constraint}") unless chosen
 
         plan.branches["c#{i}"] = chosen
       end
@@ -61,22 +58,44 @@ module Aletheia
 
     private
 
+    # Try each disjunct of +constraint+ cheapest-first; accept the first that is
+    # already satisfied by the current plan or that applies without conflict. The
+    # register map is snapshot/restored around a failed apply so a partial
+    # assignment can't leak into the next attempt.
+    # @return [String, nil] the chosen disjunct, or nil if none worked.
+    def satisfy_constraint(plan, constraint)
+      ordered = constraint.split(' || ').map(&:strip)
+                          .map { |b| [evaluate(b), b] }.select { |c, _| c }
+                          .sort_by { |c, _| c }
+      ordered.each do |_, branch|
+        return branch if satisfied?(plan, branch)
+
+        snapshot = plan.regs.dup
+        return branch if apply(plan, branch)
+
+        plan.regs = snapshot
+      end
+      nil
+    end
+
     def skip(plan, reason)
       plan.status = 'skip'
       plan.reason = reason
       plan
     end
 
-    # Cost of satisfying a single disjunct (lower = easier). nil = not
-    # satisfiable, or a category this satisfier does not yet handle.
+    # Cost of satisfying a single disjunct (lower = easier); nil = unsatisfiable
+    # or a category this satisfier doesn't handle.
     # @return [Float, nil]
     def evaluate(disjunct)
       case disjunct
-      when /\Awritable: (.+)\z/         then writable_cost(Operand_.parse(Regexp.last_match(1)))
-      when /\A(.+?) == NULL\z/          then null_cost(Operand_.parse(Regexp.last_match(1)))
-      when /\A(.+?) <= 0\z/             then null_cost(Operand_.parse(Regexp.last_match(1)))
-      when /is a valid argv\z/          then 0.9  # requires the argv builder (see #apply)
-      when /is a valid envp\z/          then 0.9
+      when /\Awritable: (.+)\z/
+        (op = safe_parse(Regexp.last_match(1))) && writable_cost(op)
+      when /\A(.+?) == NULL\z/, /\A(.+?) <= 0\z/
+        (op = safe_parse(Regexp.last_match(1))) && null_cost(op)
+      when /\A\{.*\} is a valid (?:argv|envp)\z/ then 0.5 # array literal: element builder
+      when /is a valid (?:argv|envp)\z/         then 0.4 # pointer form: point it at scratch
+      else relational_cost(disjunct)
       end
     end
 
@@ -95,39 +114,174 @@ module Aletheia
 
         op.imm.zero? ? 0.1 : 0.3 # set reg = -imm
       else
-        # A dereferenced value must be zero in memory. If it hangs off the stack
-        # it lands in our zeroed scratch for free; otherwise we would have to
-        # point a register at zeroed scratch (handled in a later milestone).
-        stack_reg?(op.reg) ? 0.05 : nil
+        # A dereferenced value must be zero in memory. If it hangs off the stack it
+        # lands in our zeroed scratch for free; a single deref off a register can be
+        # zeroed by pointing that register at scratch; deeper derefs aren't handled.
+        return 0.05 if stack_reg?(op.reg)
+
+        op.deref == 1 && op.reg ? 0.2 : nil
       end
     end
 
-    # Mutates +plan+ to satisfy +disjunct+. Returns false on an irreconcilable
-    # register conflict.
+    # @return [Float, nil]
+    def relational_cost(disjunct)
+      parse_relation(disjunct) ? 0.4 : nil
+    end
+
+    # Whether +branch+ already holds under the current register assignment.
+    def satisfied?(plan, branch)
+      case branch
+      when /\Awritable: (.+)\z/
+        op = Operand_.parse(Regexp.last_match(1))
+        op.deref.zero? && op.reg && (stack_reg?(op.reg) || scratch?(plan, op.reg))
+      when /is a valid (?:argv|envp)\z/
+        (ptr = pointer_form(branch)) && scratch?(plan, ptr)
+      else
+        reg, value = parse_relation(branch)
+        current = reg && plan.regs[reg]
+        if current.is_a?(Hash) then scratch_satisfies_relation?(branch)
+        else reg && !current.nil? && current == (value & MASK64)
+        end
+      end
+    end
+
+    # A register pointed at scratch holds a large, nonzero, mapped address, so it
+    # already satisfies +!= <imm>+ and +>|>= <small imm>+ (but not an equality or a
+    # low bound).
+    def scratch_satisfies_relation?(branch)
+      m = branch.match(/\A(?:\([su]\d+\))?\w+ (==|!=|<=|>=|<|>) (#{IMM})\z/)
+      return false unless m
+
+      op, imm = m[1], Integer(m[2])
+      op == '!=' || ((op == '>' || op == '>=') && imm <= 0x1000)
+    end
+
+    # Mutate +plan+ to satisfy +disjunct+; false on an irreconcilable conflict.
     def apply(plan, disjunct)
       case disjunct
       when /\Awritable: (.+)\z/
-        op = Operand_.parse(Regexp.last_match(1))
-        return true if stack_reg?(op.reg) # sp/x29-relative already lands in writable scratch
-
-        slot = plan.writable_count
-        plan.writable_count += 1
-        set_reg(plan, op.reg, { 'scratch_off' => WRITABLE_BASE + slot * WRITABLE_STRIDE - op.imm })
+        (op = safe_parse(Regexp.last_match(1))) ? apply_writable(plan, op) : false
       when /\A(.+?) == NULL\z/, /\A(.+?) <= 0\z/
-        op = Operand_.parse(Regexp.last_match(1))
-        return true if op.deref.positive? # satisfied by zeroed scratch
-
-        set_reg(plan, op.reg, (-op.imm) & MASK64)
-      when /is a valid argv\z/, /is a valid envp\z/
-        # Not reached for the native-2.43 set (a NULL branch is always cheaper).
-        # The argv/envp builder lands with the older-libc milestone.
-        false
-      else
-        false
+        op = safe_parse(Regexp.last_match(1))
+        if op.nil? then false
+        elsif op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
+        elsif stack_reg?(op.reg) then true # sp-relative slot is already zeroed scratch
+        elsif op.deref == 1 && op.reg then set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm })
+        else false
+        end
+      when /\A\{(.*)\} is a valid (?:argv|envp)\z/ then apply_argv_list(plan, Regexp.last_match(1))
+      when /is a valid (?:argv|envp)\z/            then apply_pointer(plan, pointer_form(disjunct))
+      else apply_relation(plan, disjunct)
       end
     end
 
+    def apply_writable(plan, op)
+      return false unless op.deref.zero? && op.reg
+      return true if stack_reg?(op.reg)
+
+      set_reg(plan, op.reg, scratch_slot(plan, op.imm))
+    end
+
+    # +{e0, e1, ...}+ argv/envp contents: point every controllable register
+    # element at a readable scratch string so the array is fully valid. Literals,
+    # NULL, libc globals and stack slots are handled by the code or zero-fill.
+    def apply_argv_list(plan, inner)
+      elements = inner.split(',').map(&:strip).reject { |e| e == '...' }
+      elements.each_with_index do |e, i|
+        next if e.start_with?('"') || e == 'NULL'
+
+        op = safe_parse(e) or next
+        next if op.deref.positive? || op.reg.nil? || stack_reg?(op.reg) || global?(op.reg)
+
+        # The element right after "-c" is the shell command: point it at "ls /".
+        pool = i.positive? && elements[i - 1] == '"-c"' ? COMMAND_POOL : STRING_POOL
+        return false unless set_reg(plan, op.reg, { 'scratch_off' => pool - op.imm })
+      end
+      true
+    end
+
+    # +<ptr> is a valid argv/envp+: point the pointer at scratch (a zero-filled,
+    # hence NULL-terminated empty array).
+    def apply_pointer(plan, ptr)
+      return false unless ptr
+
+      set_reg(plan, ptr, { 'scratch_off' => STRING_POOL })
+    end
+
+    def apply_relation(plan, disjunct)
+      reg, value = parse_relation(disjunct)
+      return false unless reg
+
+      set_reg(plan, reg, value & MASK64)
+    end
+
+    # Parse a branch-condition disjunct into the [register, value] that satisfies
+    # it, or [nil, nil] when it isn't a settable single-register relation.
+    # @return [(String, Integer), (nil, nil)]
+    def parse_relation(disjunct)
+      if (m = disjunct.match(/\A\((\w+) & (#{IMM})\) (==|!=) (#{IMM})\z/))
+        reg, mask, op, rhs = m[1], Integer(m[2]), m[3], Integer(m[4])
+        return [nil, nil] unless rhs.zero? && settable?(reg)
+
+        return [xreg(reg), op == '==' ? 0 : mask] # (reg & mask)==0 -> 0; !=0 -> mask
+      end
+      if (m = disjunct.match(/\A(?:\([su]\d+\))?(\w+) (==|!=|<=|>=|<|>) (#{IMM})\z/))
+        reg, op, imm = m[1], m[2], Integer(m[3])
+        return [nil, nil] unless settable?(reg)
+
+        return [xreg(reg), relation_witness(op, imm)]
+      end
+      [nil, nil]
+    end
+
+    def relation_witness(op, imm)
+      case op
+      when '==', '>=', '<=' then imm
+      when '!=' then imm.zero? ? 1 : 0
+      when '>'  then imm + 1
+      when '<'  then imm - 1
+      end
+    end
+
+    # A distinct scratch write-area for a +writable: reg+imm+ target.
+    def scratch_slot(plan, imm)
+      slot = plan.writable_count
+      plan.writable_count += 1
+      { 'scratch_off' => WRITABLE_BASE + slot * WRITABLE_STRIDE - imm }
+    end
+
+    def pointer_form(branch)
+      ptr = branch[/\A(\S+) is a valid (?:argv|envp)\z/, 1]
+      ptr && !ptr.start_with?('{') ? (op = safe_parse(ptr)) && op.reg && op.deref.zero? && op.reg : nil
+    end
+
+    def safe_parse(str)
+      Operand_.parse(str)
+    rescue ArgumentError
+      nil
+    end
+
+    # A register the plan points at scratch (a readable+writable, zero-filled ptr).
+    def scratch?(plan, reg)
+      plan.regs[reg].is_a?(Hash)
+    end
+
+    def global?(reg)
+      reg.start_with?('$')
+    end
+
+    def settable?(reg)
+      @arch.gprs.include?(xreg(reg))
+    end
+
+    # Normalise a 32-bit view (+w21+) to its 64-bit register (+x21+); others as-is.
+    def xreg(reg)
+      reg.sub(/\Aw(\d+|zr)\z/, 'x\1')
+    end
+
     def set_reg(plan, reg, value)
+      return false if reg.nil?
+
       existing = plan.regs[reg]
       return false if existing && existing != value
 

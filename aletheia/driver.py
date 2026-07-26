@@ -48,6 +48,12 @@ if scratch == 0xFFFFFFFFFFFFFFFF:
     gdb.write("ALETHEIA_ERROR: inferior mmap failed\n")
     raise SystemExit(1)
 
+# Seed the L2 command at a fixed scratch offset. A gadget whose argv is forced to
+# `sh -c <cmd>` (no empty-argv escape) points its command slot here, so the shell
+# runs `ls /` itself instead of reading it from stdin. Keep in sync with the
+# satisfier's COMMAND_POOL.
+gdb.selected_inferior().write_memory(scratch + 0x200, b"ls /\x00")
+
 # Default fill for registers the plan does not set:
 #  - benign: point at readable zeroed scratch, so the only uncontrolled inputs
 #    are those the constraints govern (biases toward reproducing a stated gadget).
@@ -74,4 +80,48 @@ gdb.execute("set $pc = %#x" % gadget)
 
 gdb.execute("set follow-fork-mode child")
 gdb.write("ALETHEIA_INJECTED sp=%#x scratch=%#x\n" % (sp, scratch))
+
+
+def readable(addr):
+    if addr == 0:
+        return True  # NULL argv/envp is accepted by execve (empty)
+    try:
+        gdb.selected_inferior().read_memory(addr, 8)
+        return True
+    except gdb.MemoryError:
+        return False
+
+
+SHELLS = ("dash", "bash", "sh", "busybox", "zsh")
+
+
+def execd_shell(pid):
+    try:
+        return os.path.basename(os.readlink("/proc/%d/exe" % pid)) in SHELLS
+    except OSError:
+        return False
+
+
+# L0: the deterministic "the gadget reaches a shell" signal, independent of
+# whether L2 can then drive that shell over the tty. A straight-line execve
+# stops at the syscall entry, where we verify the "/bin/sh" path and readable
+# argv/envp. posix_spawn execs in a vforked child that runs straight through to
+# the new program, so there we confirm the exec'd image is a shell instead.
+gdb.execute("catch syscall execve execveat")
+gdb.execute("continue")
+l0 = False
+try:
+    if int(gdb.parse_and_eval("$x8")) in (221, 281):
+        path = gdb.execute("x/s $x0", to_string=True)
+        argv = int(gdb.parse_and_eval("$x1")) & 0xFFFFFFFFFFFFFFFF
+        envp = int(gdb.parse_and_eval("$x2")) & 0xFFFFFFFFFFFFFFFF
+        l0 = ('"/bin/sh"' in path) and readable(argv) and readable(envp)
+except gdb.error:
+    pass
+if not l0:
+    l0 = execd_shell(gdb.selected_inferior().pid)
+gdb.write("ALETHEIA_L0=%s\n" % ("pass" if l0 else "fail"))
+
+# Let the shell run for the L2 (`ls /`) check on the tty.
+gdb.execute("delete")
 gdb.execute("continue")

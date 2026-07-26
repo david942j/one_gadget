@@ -34,9 +34,18 @@ base = base_of(target_base) or base_of("libc.so.6")
 gadget = base + offset
 
 scratch = int(gdb.parse_and_eval("(void*)mmap(0, 0x10000, 3, 0x22, -1, 0)")) & 0xFFFFFFFFFFFFFFFF
-POISON = 0xDEAD0000
-for i in range(31):
-    gdb.execute("set $x%d = %#x" % (i, POISON))
+gdb.selected_inferior().write_memory(scratch + 0x200, b"ls /\x00")
+
+# Fill uncontrolled registers the same way the driver does for this plan.
+if plan.get("poison_default"):
+    fill = 0xDEAD0000
+elif plan.get("benign_default"):
+    fill = scratch + 0x100
+else:
+    fill = None
+if fill is not None:
+    for i in range(31):
+        gdb.execute("set $x%d = %#x" % (i, fill))
 for reg, val in plan.get("regs", {}).items():
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
@@ -45,8 +54,19 @@ gdb.execute("set $sp = %#x" % (scratch + plan.get("sp_offset", 0x2000)))
 gdb.execute("set $pc = %#x" % gadget)
 
 gdb.write("BASE=%#x GADGET=%#x SCRATCH=%#x\n" % (base, gadget, scratch))
+gdb.execute("set follow-fork-mode child")
 gdb.execute("catch syscall execve execveat")
 gdb.execute("continue")
+# On reaching execve, report its arguments before the image is replaced.
+try:
+    nr = int(gdb.parse_and_eval("$x8"))
+    if nr in (221, 281):
+        path = gdb.execute("x/s $x0", to_string=True).strip()
+        gdb.write("EXECVE path=%s argv=%#x envp=%#x\n"
+                  % (path, int(gdb.parse_and_eval("$x1")) & 0xFFFFFFFFFFFFFFFF,
+                     int(gdb.parse_and_eval("$x2")) & 0xFFFFFFFFFFFFFFFF))
+except gdb.error:
+    pass
 
 # If we get here via a signal, report the fault site.
 try:

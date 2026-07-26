@@ -13,7 +13,9 @@ $LOAD_PATH.unshift(File.expand_path('../lib', HERE))   # repo one_gadget lib
 
 require 'aletheia/runner'
 
-options = { offsets: nil, json: false, strict: false }
+$stdout.sync = true # flush per line so a killed sweep keeps its partial output
+
+options = { offsets: nil, json: false, strict: false, level: 0 }
 parser = OptionParser.new do |o|
   o.banner = 'Usage: aletheia verify <libc.so> [options]'
   o.on('--offset LIST', 'Comma-separated gadget offsets to check (default: all)') do |v|
@@ -21,6 +23,9 @@ parser = OptionParser.new do |o|
   end
   o.on('--strict', 'Poison uncontrolled registers (test constraint completeness)') do
     options[:strict] = true
+  end
+  o.on('--level N', Integer, 'one_gadget level: 0 = top gadgets (default), 1 = all') do |v|
+    options[:level] = v
   end
   o.on('--json', 'Emit JSON-lines instead of a table') { options[:json] = true }
 end
@@ -31,18 +36,27 @@ abort parser.help unless command == 'verify'
 target = ARGV.shift
 abort "target libc required\n\n#{parser.help}" unless target && File.file?(target)
 
-results = Aletheia::Runner.new(target: target, strict: options[:strict]).run(offsets: options[:offsets])
-
 require 'json'
-if options[:json]
-  results.each { |r| puts JSON.generate(r) }
-else
-  results.each do |r|
+
+# Stream each result as it is produced, so a long sweep shows progress and a
+# killed run keeps its partial output.
+printer = lambda do |r|
+  if options[:json]
+    puts JSON.generate(r)
+  else
     puts format('%-10s %-6s %s', r[:offset], r[:result], r[:effect])
     puts "  reason: #{r[:reason]}" if r[:reason]
   end
+end
+
+results = Aletheia::Runner.new(target: target, strict: options[:strict])
+                          .run(offsets: options[:offsets], level: options[:level], &printer)
+
+unless options[:json]
   tally = results.group_by { |r| r[:result] }.transform_values(&:size)
   puts "\n#{tally.map { |k, v| "#{k}=#{v}" }.join('  ')}"
 end
 
+# EXEC (reached execve("/bin/sh") but not L2-drivable) is a working gadget, not a
+# failure; only a true FAIL (no shell at all) sets a nonzero exit.
 exit(results.any? { |r| r[:result] == 'FAIL' } ? 1 : 0)

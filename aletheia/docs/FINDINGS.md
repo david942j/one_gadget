@@ -23,6 +23,25 @@ PR #323. With the fix, strict is **all PASS** across the
 2.43/2.24/2.23 fixtures (one_gadget reports the reliable entry points, and the constraint
 lists are complete).
 
+## Level-1 sweep (every gadget)
+
+With `--level 1`, one_gadget emits every gadget it finds (not just the top-scoring few). After
+the PR #323 fixes, the full aarch64 sweep is:
+
+| fixture | level-1 gadgets | PASS (drove `ls /`) | EXEC (reached shell) | FAIL |
+| --- | --- | --- | --- | --- |
+| aarch64-libc-2.43.so | 28 | 12 | 16 | 0 |
+| aarch64-libc-2.24.so | 8  | 8  | 0  | 0 |
+| aarch64-libc-2.23.so | 11 | 9  | 2  | 0 |
+
+**Zero true FAILs across all 47 gadgets.** Every gadget reaches `execve("/bin/sh")` with a
+valid argv/envp; 29 are additionally driven to run `ls /`. The EXEC results are harness
+drivability limits, not gadget defects — see the L0/L2 model in `docs/DESIGN.md`. The three
+recurring EXEC causes: the argv is `sh -c <fixed libc string>` (the command isn't ours to set
+to `ls /`); `argv[1]` is an uncontrolled register that `sh` treats as a script name and exits;
+or a `posix_spawn` parent/child race on the shared pty. This is strong empirical evidence that
+one_gadget's aarch64 level-1 output is sound.
+
 ## Finding 1 — missing constraint: sigprocmask `set` pointer must be readable
 
 **Status: fixed** in PR #323 (emits `<set> == NULL` when

@@ -55,6 +55,48 @@ RSpec.describe Aletheia::Satisfier do
     expect(plan.branches['c0']).to eq('x4 == NULL')
   end
 
+  it 'sets a register to the immediate for a "reg == imm" branch condition' do
+    plan = satisfier.satisfy(gadget(['x2 == 0x1']))
+    expect(plan.status).to eq('ok')
+    expect(plan.regs['x2']).to eq(1)
+  end
+
+  it 'normalises a 32-bit view (w21) to its 64-bit register' do
+    plan = satisfier.satisfy(gadget(['w21 == 0x1']))
+    expect(plan.regs['x21']).to eq(1)
+  end
+
+  it 'treats a scratch pointer as already satisfying "!= 0"' do
+    plan = satisfier.satisfy(gadget(['writable: x0', 'x0 != 0']))
+    expect(plan.status).to eq('ok')
+    expect(plan.regs['x0']).to be_a(Hash) # points into scratch, hence nonzero
+  end
+
+  it 'builds a valid argv by pointing register elements at scratch, -c at the command pool' do
+    plan = satisfier.satisfy(gadget(['{"sh", "-c", x23, NULL} is a valid argv']))
+    expect(plan.status).to eq('ok')
+    expect(plan.regs['x23']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
+  end
+
+  it 'zeroes memory for a single-deref "[reg] == NULL" by pointing the register at scratch' do
+    plan = satisfier.satisfy(gadget(['[x0] == NULL']))
+    expect(plan.status).to eq('ok')
+    expect(plan.regs['x0']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
+  end
+
+  it 'retries to a consistent branch when the cheapest one conflicts' do
+    # writable: x0 pins x0 to scratch; the argv disjunction must then avoid the
+    # x0 == NULL branch and accept "x0 is a valid argv" instead.
+    plan = satisfier.satisfy(gadget(['writable: x0', '[x0] == NULL || x0 == NULL || x0 is a valid argv']))
+    expect(plan.status).to eq('ok')
+    expect(plan.branches['c1']).to eq('x0 is a valid argv')
+  end
+
+  it 'SKIPs (does not crash) on an unparseable operand' do
+    plan = satisfier.satisfy(gadget(['(s32)[[sp+0x30]+0x4] <= 0']))
+    expect(plan.status).to eq('skip')
+  end
+
   it 'defaults to benign fill, and to poison fill in strict mode' do
     expect(satisfier.satisfy(gadget(['x1 == NULL'])).benign_default).to be(true)
     strict = described_class.new(Aletheia::Arch::AArch64, strict: true)

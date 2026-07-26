@@ -33,6 +33,24 @@ init means relocations/TLS are done and `environ` is populated, and we hijack a 
 whose state is disposable — we overwrite pc/sp/regs and point sp at fresh scratch, so we
 never corrupt the loader.
 
+## The oracle: layered L0 + L2
+
+`driver.py` runs the injected gadget and reports two signals:
+
+- **L0** (deterministic): the gadget reaches `execve("/bin/sh")` with a readable argv/envp.
+  A straight-line `execve`/`execl` stops at the syscall entry, where the `"/bin/sh"` path
+  and pointers are checked directly. A `posix_spawn` execs in a vforked child that runs
+  straight through to the new image, so there L0 instead confirms `/proc/pid/exe` is a shell.
+- **L2** (the golden signal): the spawned shell actually ran `ls /` over a pty and the output
+  matches the live `Dir.children('/')`.
+
+Outcomes: **PASS** = L2; **EXEC** = L0 without L2 (the gadget works, but the harness can't
+drive `ls /` through that shell — a fixed `-c` command from a libc global, an uncontrolled
+`argv[1]` that `sh` treats as a script name, or a `posix_spawn` parent/child tty race);
+**FAIL** = neither (a candidate one_gadget bug, especially under `--strict`); **SKIP** = the
+satisfier produced no plan. EXEC exists because "reaches a shell" and "we can drive that shell"
+are different questions — conflating them would mislabel working gadgets as failures.
+
 ## Independence principle (important)
 
 The tool under verification must not be its own judge. So:

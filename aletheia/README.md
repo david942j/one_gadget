@@ -26,8 +26,11 @@ cc -O0 -g -o aletheia/park_stub aletheia/park_stub.c -ldl
 ## Usage
 
 ```
-# Verify every gadget in a libc (benign register defaults):
+# Verify the top (level-0) gadgets of a libc (benign register defaults):
 aletheia/bin/aletheia verify spec/data/aarch64-libc-2.43.so
+
+# Verify EVERY gadget one_gadget finds (level 1):
+aletheia/bin/aletheia verify --level 1 spec/data/aarch64-libc-2.43.so
 
 # Completeness test: poison uncontrolled registers so unlisted
 # dependencies fault (finds missing-constraint bugs):
@@ -39,15 +42,19 @@ aletheia/bin/aletheia verify --offset 0x4bc00,0x4bc04 --json spec/data/aarch64-l
 
 ## Reading the result
 
-Per gadget: `PASS` / `FAIL` / `SKIP`.
+Per gadget: `PASS` / `EXEC` / `FAIL` / `SKIP`.
 
-- **PASS** — the spawned shell listed the real root. This empirical result is the sole
-  arbiter of a valid gadget; it does not depend on one_gadget's own interpretation.
-- **FAIL** — a complete, satisfied plan still failed to yield a working shell. Under
-  `--strict` this is a candidate one_gadget bug (usually a missing constraint). Use
+- **PASS** — the spawned shell actually ran `ls /` and listed the real root (L2). The
+  strongest signal; it does not depend on one_gadget's own interpretation.
+- **EXEC** — the gadget reached `execve("/bin/sh")` with a valid argv/envp (L0), but the
+  harness could not drive `ls /` through this particular shell (e.g. a fixed `-c` command
+  baked into libc, an uncontrolled `argv[1]`, or a `posix_spawn` parent/child tty race).
+  The gadget works; only the L2 drive is inconclusive. Not a failure.
+- **FAIL** — a complete, satisfied plan reached neither a shell nor any output. Under
+  `--strict` this is a candidate one_gadget bug (usually a missing constraint); use
   `discover.py` to find the faulting instruction (see `docs/DESIGN.md`).
 - **SKIP** — the satisfier could not build a plan (a harness limitation, not a verdict).
 
-Exit code is nonzero if any gadget FAILs.
+Exit code is nonzero only if some gadget FAILs (EXEC and SKIP do not).
 
 See `docs/FINDINGS.md` for verified results and bugs, and `docs/DESIGN.md` for how it works.

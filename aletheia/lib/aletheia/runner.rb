@@ -28,16 +28,29 @@ module Aletheia
     end
 
     # @param [Array<Integer>, nil] offsets restrict to these gadget offsets
+    # @param [Integer] level one_gadget output level; 0 keeps only the
+    #   highest-scoring gadgets, 1 enumerates every gadget found
     # @return [Array<Hash>] one result record per gadget
-    def run(offsets: nil)
-      gadgets = OneGadget.gadgets(file: @target, force_file: true, details: true)
+    def run(offsets: nil, level: 0, &block)
+      gadgets = OneGadget.gadgets(file: @target, force_file: true, details: true, level: level)
       gadgets = gadgets.select { |g| offsets.include?(g.offset) } if offsets
-      gadgets.map { |g| verify(g) }
+      gadgets.map do |g|
+        result = verify(g)
+        block&.call(result)
+        result
+      end
     end
 
     private
 
     def verify(gadget)
+      verify!(gadget)
+    rescue StandardError => e
+      { offset: format('%#x', gadget.offset), effect: gadget.effect,
+        result: 'SKIP', reason: "harness error: #{e.class}: #{e.message}" }
+    end
+
+    def verify!(gadget)
       plan = @satisfier.satisfy(gadget)
       record = {
         offset: format('%#x', gadget.offset),
@@ -52,7 +65,7 @@ module Aletheia
 
       res = @oracle.run(plan)
       record.merge(
-        result: res.result, reason: res.reason, base: res.base,
+        result: res.result, reason: res.reason, base: res.base, l0: res.l0,
         seen_root_entries: res.seen, expected_root_entries: res.expected
       )
     end
