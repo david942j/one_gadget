@@ -30,26 +30,31 @@ the PR #323 fixes, the full aarch64 sweep is:
 
 | fixture | level-1 gadgets | PASS | EXEC* (promotable) | EXEC (hard) | FAIL |
 | --- | --- | --- | --- | --- | --- |
-| aarch64-libc-2.43.so | 28 | 25 | 1 | 2 | 0 |
+| aarch64-libc-2.43.so | 28 | 27 | 1 | 0 | 0 |
 | aarch64-libc-2.24.so | 8  | 8  | 0 | 0 | 0 |
 | aarch64-libc-2.23.so | 11 | 9  | 2 | 0 | 0 |
 
-**Zero true FAILs across all 47 gadgets.** Every gadget reaches `execve("/bin/sh")` with a
-valid argv/envp. 42 are driven to run `ls /` directly (PASS); 3 more are **promotable** (EXEC*)
-— they only fail L2 because the code writes an *uncontrolled register* as `argv[1]`, which the
-benign fill sets to a garbage-but-readable string that `sh` treats as a script name; nulling
-that register (which an attacker controls) terminates argv, so the shell is interactive and
-runs `ls /`. The harness proves this automatically by retrying an EXEC gadget with uncontrolled
-registers nulled. So **45 of 47 gadgets yield a usable shell.**
+**All 47 gadgets are verified usable — 44 PASS, 3 EXEC\*, zero unpromotable EXEC, zero FAIL.**
+Every gadget reaches `execve("/bin/sh")` with a valid argv/envp; 44 are driven to run `ls /`
+directly, and the other 3 are **promotable** (EXEC*).
 
-The remaining 2 EXEC (`0x4bbf8`, `0x7667c`, libc-2.43) run `sh -c <$base+0x16b250>`, and that
-libc string is `"--"` — so the spawned shell runs `sh -c "--"`, errors, and exits. The command
-is a fixed libc constant, not register-controlled, so it can't be promoted. These pass
-one_gadget's "valid argv" check yet don't give a usable shell; worth noting as a semantic gap
-between "execve('/bin/sh', valid argv)" and "usable interactive shell", though not a hard bug.
+Two argv shapes needed care to drive:
 
-This is strong empirical evidence that one_gadget's aarch64 level-1 output is sound: every
-gadget reaches a real `/bin/sh`, and all but two yield a shell that actually runs commands.
+- **`sh -c <cmd>` (do_system / posix_spawn).** The command operand is a controllable register,
+  so the harness points it at an `"ls /"` string. When the argv is `{"sh", "-c", $base+..., x21}`
+  and that libc constant is `"--"`, the `--` merely ends `sh`'s option parsing, so the *next*
+  operand (`x21`, controllable) becomes the command — point `x21` at `"ls /"` and `sh -c -- "ls /"`
+  runs it. These now PASS directly.
+- **`execve("/bin/sh", <reg>, ...)` (execvpe / 2.43 conditional).** The code writes an
+  uncontrolled register as `argv[1]`, which the benign fill sets to a garbage-but-readable
+  string `sh` treats as a script name. Nulling that register (which an attacker controls)
+  terminates argv, so the shell is interactive and runs `ls /`. The harness proves this by
+  retrying with uncontrolled registers nulled (reported EXEC*). The satisfier can't set that
+  register itself because it isn't named in the constraints (it's argv content the code writes),
+  so these stay EXEC* rather than PASS.
+
+Strong empirical evidence that one_gadget's aarch64 level-1 output is sound: every gadget
+reaches a real `/bin/sh` and yields a shell that actually runs commands.
 
 ## Finding 1 — missing constraint: sigprocmask `set` pointer must be readable
 

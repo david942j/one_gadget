@@ -187,14 +187,20 @@ module Aletheia
     # NULL, libc globals and stack slots are handled by the code or zero-fill.
     def apply_argv_list(plan, inner)
       elements = inner.split(',').map(&:strip).reject { |e| e == '...' }
-      elements.each_with_index do |e, i|
+      seen_c = false
+      command_set = false
+      elements.each do |e|
+        seen_c ||= (e == '"-c"')
         next if e.start_with?('"') || e == 'NULL'
 
         op = safe_parse(e) or next
         next if op.deref.positive? || op.reg.nil? || stack_reg?(op.reg) || global?(op.reg)
 
-        # The element right after "-c" is the shell command: point it at "ls /".
-        pool = i.positive? && elements[i - 1] == '"-c"' ? COMMAND_POOL : STRING_POOL
+        # For `sh -c … <cmd>`, the first operand register after -c is the shell
+        # command (`--`, a libc constant, just ends option parsing) -- point it at
+        # "ls /". Every other element gets an empty readable string.
+        pool = seen_c && !command_set ? COMMAND_POOL : STRING_POOL
+        command_set ||= (pool == COMMAND_POOL)
         return false unless set_reg(plan, op.reg, { 'scratch_off' => pool - op.imm })
       end
       true

@@ -78,6 +78,14 @@ RSpec.describe Aletheia::Satisfier do
     expect(plan.regs['x23']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
   end
 
+  it 'points the first register operand after -c at the command pool, past a "--" separator' do
+    # `$base+0x100` here stands in for the libc "--" constant; the real command is
+    # the next operand register (x21), which `sh -c -- <x21>` runs.
+    plan = satisfier.satisfy(gadget(['{"sh", "-c", $base+0x100, x21, NULL} is a valid argv']))
+    expect(plan.status).to eq('ok')
+    expect(plan.regs['x21']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
+  end
+
   it 'zeroes memory for a single-deref "[reg] == NULL" by pointing the register at scratch' do
     plan = satisfier.satisfy(gadget(['[x0] == NULL']))
     expect(plan.status).to eq('ok')
