@@ -112,4 +112,31 @@ RSpec.describe Aletheia::Satisfier do
     expect(plan.poison_default).to be(true)
     expect(plan.benign_default).to be(false)
   end
+
+  context 'amd64 backend' do
+    require 'aletheia/arch/amd64'
+    subject(:satisfier) { described_class.new(Aletheia::Arch::Amd64) }
+
+    def gadget(constraints, offset: 0x1000, effect: 'execve("/bin/sh", rsi, environ)')
+      OpenStruct.new(offset: offset, effect: effect, constraints: constraints)
+    end
+
+    it 'satisfies a bare stack-alignment "rsp & 0xf == 0" by construction (no register set)' do
+      plan = satisfier.satisfy(gadget(['rsp & 0xf == 0']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs).to be_empty
+      expect(plan.branches['c0']).to eq('rsp & 0xf == 0')
+    end
+
+    it 'aligns a GPR by pointing it at an aligned scratch slot for "reg & 0xf == 0"' do
+      plan = satisfier.satisfy(gadget(['rbx & 0xf == 0']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['rbx']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
+    end
+
+    it 'normalises a 32-bit view (eax) to its 64-bit register (rax)' do
+      plan = satisfier.satisfy(gadget(['eax == 0']))
+      expect(plan.regs['rax']).to eq(0)
+    end
+  end
 end

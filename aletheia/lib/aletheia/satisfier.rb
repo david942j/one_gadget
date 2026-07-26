@@ -28,6 +28,10 @@ module Aletheia
     WRITABLE_STRIDE = 0x800
     MASK64          = (1 << 64) - 1
     IMM             = /-?(?:0x[0-9a-fA-F]+|\d+)/
+    # Bare +reg & mask == want+ (no parens): a low-bits/alignment constraint. The
+    # parenthesised +(reg & mask) == want+ is a settable-register relation instead
+    # (see {#parse_relation}).
+    ALIGN           = /\A(\w+) & (#{IMM}) == (#{IMM})\z/
 
     # @param arch an arch backend (e.g. {Arch::AArch64})
     # @param [Boolean] strict when true, uncontrolled registers are poisoned
@@ -95,8 +99,25 @@ module Aletheia
         (op = safe_parse(Regexp.last_match(1))) && null_cost(op)
       when /\A\{.*\} is a valid (?:argv|envp)\z/ then 0.5 # array literal: element builder
       when /is a valid (?:argv|envp)\z/         then 0.4 # pointer form: point it at scratch
+      when ALIGN                                then alignment_cost(disjunct)
       else relational_cost(disjunct)
       end
+    end
+
+    # +reg & mask == want+: the stack pointer is aligned by construction (the
+    # driver sets +sp+ to an aligned scratch address); a GPR can be pointed at an
+    # aligned scratch slot. Only +want == 0+ (the alignment case) is handled.
+    # @return [Float, nil]
+    def alignment_cost(disjunct)
+      reg, _mask, want = parse_alignment(disjunct)
+      return 0.05 if stack_reg?(reg) && want.zero?
+
+      settable?(reg) && want.zero? ? 0.3 : nil
+    end
+
+    def parse_alignment(disjunct)
+      m = disjunct.match(ALIGN)
+      [xreg(m[1]), Integer(m[2]), Integer(m[3])]
     end
 
     # @return [Float, nil]
@@ -136,6 +157,9 @@ module Aletheia
         op.deref.zero? && op.reg && (stack_reg?(op.reg) || scratch?(plan, op.reg))
       when /is a valid (?:argv|envp)\z/
         (ptr = pointer_form(branch)) && scratch?(plan, ptr)
+      when ALIGN
+        reg, _mask, want = parse_alignment(branch)
+        (stack_reg?(reg) && want.zero?) || (want.zero? && scratch?(plan, reg))
       else
         reg, value = parse_relation(branch)
         current = reg && plan.regs[reg]
@@ -171,8 +195,17 @@ module Aletheia
         end
       when /\A\{(.*)\} is a valid (?:argv|envp)\z/ then apply_argv_list(plan, Regexp.last_match(1))
       when /is a valid (?:argv|envp)\z/            then apply_pointer(plan, pointer_form(disjunct))
+      when ALIGN                                   then apply_alignment(plan, disjunct)
       else apply_relation(plan, disjunct)
       end
+    end
+
+    def apply_alignment(plan, disjunct)
+      reg, _mask, want = parse_alignment(disjunct)
+      return want.zero? if stack_reg?(reg) # sp is aligned by construction; nothing to set
+      return false unless want.zero? && settable?(reg)
+
+      set_reg(plan, reg, { 'scratch_off' => STRING_POOL }) # a 16-aligned readable slot
     end
 
     def apply_writable(plan, op)
@@ -280,9 +313,10 @@ module Aletheia
       @arch.gprs.include?(xreg(reg))
     end
 
-    # Normalise a 32-bit view (+w21+) to its 64-bit register (+x21+); others as-is.
+    # Normalise a sub-register view to its full-width register; the mapping is
+    # arch-specific (+w21+ -> +x21+ on aarch64, +eax+ -> +rax+ on amd64).
     def xreg(reg)
-      reg.sub(/\Aw(\d+|zr)\z/, 'x\1')
+      @arch.normalize_reg(reg)
     end
 
     def set_reg(plan, reg, value)

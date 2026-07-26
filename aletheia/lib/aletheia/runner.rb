@@ -4,6 +4,7 @@ require 'json'
 require 'one_gadget'
 
 require_relative 'arch/aarch64'
+require_relative 'arch/amd64'
 require_relative 'satisfier'
 require_relative 'oracle'
 
@@ -18,13 +19,20 @@ module Aletheia
   #   SKIP  - the satisfier could not produce a plan (a harness limitation, not
   #           a verdict on the gadget)
   class Runner
-    ARCHES = { 'aarch64' => Arch::AArch64 }.freeze
+    ARCHES = { amd64: Arch::Amd64, aarch64: Arch::AArch64 }.freeze
 
-    def initialize(target:, arch: Arch::AArch64, strict: false)
+    def initialize(target:, arch: nil, strict: false)
       @target = target
-      @arch = arch
-      @satisfier = Satisfier.new(arch, strict: strict)
-      @oracle = Oracle.new(target: target)
+      @arch = arch || arch_of(target)
+      @satisfier = Satisfier.new(@arch, strict: strict)
+      @oracle = Oracle.new(target: target, arch: @arch)
+    end
+
+    # Pick the arch backend from the target ELF's machine.
+    def arch_of(target)
+      ARCHES.fetch(OneGadget::Helper.architecture(target)) do |m|
+        raise ArgumentError, "unsupported architecture: #{m}"
+      end
     end
 
     # @param [Array<Integer>, nil] offsets restrict to these gadget offsets

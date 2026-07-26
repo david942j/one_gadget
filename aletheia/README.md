@@ -10,17 +10,21 @@ part of the published gem.
 
 ## Status
 
-Verifies aarch64 libc natively (this is the reference backend). Other architectures plug
-in behind `Aletheia::Arch` — see `docs/ADDING-AN-ARCH.md`.
+Verifies aarch64 libc natively (the reference backend) and amd64 libc under qemu-user. The
+backend is picked automatically from the target ELF's machine; other architectures plug in
+behind `Aletheia::Arch` — see `docs/ADDING-AN-ARCH.md`.
 
 ## Prerequisites
 
-- An aarch64 host with `gdb` installed (native execution; no qemu needed for aarch64).
 - Ruby (same as one_gadget: >= 3.3), run from the one_gadget repo so `../lib` is on the load path.
-- The parking stub, built once:
+- `gdb` for native verification (the host's own arch).
+- For a foreign target (e.g. amd64 libc on an aarch64 host): `qemu-user`, `gdb-multiarch`, and
+  the target's cross-compiler (`gcc-<arch>-linux-gnu`). No flag — a foreign target auto-selects
+  the qemu transport.
+- The parking stub(s), built once (native + any cross stub whose toolchain is installed):
 
 ```
-cc -O0 -g -o aletheia/park_stub aletheia/park_stub.c -ldl
+aletheia/build_stubs.sh
 ```
 
 ## Usage
@@ -28,6 +32,9 @@ cc -O0 -g -o aletheia/park_stub aletheia/park_stub.c -ldl
 ```
 # Verify the top (level-0) gadgets of a libc (benign register defaults):
 aletheia/bin/aletheia verify spec/data/aarch64-libc-2.43.so
+
+# amd64 target on an aarch64 host runs under qemu-user automatically:
+aletheia/bin/aletheia verify --level 1 spec/data/libc-2.23-*.so
 
 # Verify EVERY gadget one_gadget finds (level 1):
 aletheia/bin/aletheia verify --level 1 spec/data/aarch64-libc-2.43.so

@@ -5,6 +5,9 @@ require 'json'
 require 'timeout'
 require 'tempfile'
 
+require_relative 'transport'
+require_relative 'arch/aarch64'
+
 module Aletheia
   # The success oracle. Launches the target libc under gdb with the plan
   # injected, then drives the spawned shell over a pty and validates that it can
@@ -18,9 +21,11 @@ module Aletheia
     Result = Struct.new(:result, :reason, :base, :shell_output, :seen, :expected, :l0,
                         keyword_init: true)
 
-    def initialize(target:, quorum: %w[bin etc usr lib proc dev tmp var],
+    def initialize(target:, arch: Arch::AArch64, quorum: %w[bin etc usr lib proc dev tmp var],
                    startup_wait: 2, io_timeout: 6)
       @target = target
+      @arch = arch
+      @transport = Transport.for(arch, target)
       @startup_wait = startup_wait
       @io_timeout = io_timeout
       real_root = Dir.children('/')
@@ -30,30 +35,22 @@ module Aletheia
     # @param [Aletheia::Satisfier::Plan] plan
     # @return [Aletheia::Oracle::Result]
     def run(plan)
+      plan_hash = plan.to_h.merge(arch: @arch.driver_model)
       Tempfile.create(['aletheia-plan', '.json']) do |f|
-        f.write(JSON.generate(plan.to_h))
+        f.write(JSON.generate(plan_hash))
         f.flush
-        drive(plan, f.path)
+        drive(f.path)
       end
     end
 
     private
 
-    def drive(plan, plan_path)
+    def drive(plan_path)
       master, slave = PTY.open
-      gdb_log = Tempfile.create(['aletheia-gdb', '.log'])
-      gdb_log_path = gdb_log.path
-      gdb_log.close
-      env = { 'ALETHEIA_PLAN' => plan_path, 'ALETHEIA_TARGET' => File.expand_path(@target) }
-      cmd = [
-        'gdb', '-nx', '-q', '-batch',
-        '-ex', "set inferior-tty #{slave.path}",
-        '-x', File.join(ROOT, 'driver.py'),
-        '--args', File.join(ROOT, 'park_stub'), @target
-      ]
-      # Own process group so a wedged inferior (e.g. a gadget that neither execs
-      # nor faults) can be killed wholesale rather than blocking the sweep.
-      pid = spawn(env, *cmd, out: gdb_log_path, err: gdb_log_path, pgroup: true)
+      log_path = tempfile_path('aletheia-gdb', '.log')
+      stub_out = tempfile_path('aletheia-stub', '.txt')
+      # Own process group(s) so a wedged inferior can be killed wholesale.
+      pids = @transport.launch(plan_path: plan_path, stub_out: stub_out, slave: slave, log: log_path)
       slave.close
 
       begin
@@ -67,9 +64,9 @@ module Aletheia
       end
 
       output = read_all(master)
-      reap(pid)
-      log = File.read(gdb_log_path)
-      File.unlink(gdb_log_path)
+      reap(pids)
+      log = File.read(log_path)
+      [log_path, stub_out].each { |p| File.unlink(p) rescue nil }
       base = log[/ALETHEIA base=(0x[0-9a-f]+)/, 1]
       l0 = log.include?('ALETHEIA_L0=pass')
 
@@ -88,15 +85,25 @@ module Aletheia
       end
     end
 
-    # Wait briefly for gdb to exit; if it doesn't (a wedged inferior), kill the
-    # whole process group so we never block the sweep.
-    def reap(pid)
-      Timeout.timeout(3) { Process.wait(pid) }
-    rescue Timeout::Error
-      (Process.kill('-KILL', Process.getpgid(pid)) rescue nil)
-      (Process.wait(pid) rescue nil)
-    rescue Errno::ECHILD
-      nil
+    # A fresh temp file path (created empty, closed) for a subprocess to write.
+    def tempfile_path(prefix, suffix)
+      f = Tempfile.create([prefix, suffix])
+      path = f.path
+      f.close
+      path
+    end
+
+    # Wait briefly for each pid to exit; kill any wedged process group wholesale so
+    # we never block the sweep. Reap the driver first, then the emulator.
+    def reap(pids)
+      Array(pids).each do |pid|
+        Timeout.timeout(3) { Process.wait(pid) }
+      rescue Timeout::Error
+        (Process.kill('-KILL', Process.getpgid(pid)) rescue nil)
+        (Process.wait(pid) rescue nil)
+      rescue Errno::ECHILD
+        nil
+      end
     end
 
     def read_all(master)

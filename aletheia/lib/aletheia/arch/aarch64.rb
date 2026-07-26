@@ -26,6 +26,23 @@ module Aletheia
 
       # gdb register expression for GPR +name+ (e.g. "x0" -> "$x0").
       def gdb_reg(name) = "$#{name}"
+
+      # Normalise a 32-bit view to its 64-bit register.
+      # @example +w21+ -> +x21+, +wzr+ -> +xzr+
+      def normalize_reg(reg) = reg.sub(/\Aw(\d+|zr)\z/, 'x\1')
+
+      # park_stub binary for this arch (built by the build helper).
+      def stub_binary = 'park_stub_aarch64'
+
+      # qemu-user transport config, or nil when the arch runs natively on the host.
+      def qemu = nil
+
+      # Register/syscall model the gdb driver needs (serialized into the plan).
+      def driver_model
+        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => nil,
+          'sysno_reg' => 'x8', 'execve_syscalls' => [221, 281],
+          'path_reg' => 'x0', 'argv_reg' => 'x1', 'envp_reg' => 'x2' }
+      end
     end
   end
 end

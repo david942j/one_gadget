@@ -1,68 +1,47 @@
 # gdb-Python driver: inject a satisfier plan and let the gadget run.
 #
-# Reads a JSON plan (path in $ALETHEIA_PLAN) describing the register and scratch
-# setup, jumps pc to base+offset, and continues so the spawned shell runs on the
-# inferior tty. The Ruby oracle drives that tty and decides PASS/FAIL.
-#
-# Run under: gdb -nx -q -batch -x driver.py --args ./park_stub <target-libc.so>
+# Transport-agnostic: connects natively (`run`) or to a qemu-user gdbstub
+# (`target remote`), reads the libc base + scratch address the self-describing
+# park_stub wrote to $ALETHEIA_STUB_OUT (no inferior mmap, no /proc from gdb),
+# then injects the plan and runs. Register names / syscall numbers come from the
+# plan's "arch" block, so the same driver serves every architecture.
 import gdb
 import json
 import os
+import re
 
+MASK = 0xFFFFFFFFFFFFFFFF
 plan = json.load(open(os.environ["ALETHEIA_PLAN"]))
+arch = plan["arch"]
 offset = int(plan["offset"], 0)
 
 gdb.execute("set pagination off")
 gdb.execute("set confirm off")
-gdb.execute("break pause")
-gdb.execute("run")
+if arch.get("gdb_arch"):
+    gdb.execute("set architecture %s" % arch["gdb_arch"])
 
-pid = gdb.selected_inferior().pid
+# Park at the stub's marker, then bring the inferior to it (native runs it;
+# a remote target is already running and just needs `continue`).
+gdb.execute("break aletheia_park")
+connect = os.environ.get("ALETHEIA_CONNECT", "run")
+if connect == "run":
+    gdb.execute("run")
+else:
+    gdb.execute("target remote %s" % connect)
+    gdb.execute("continue")
 
-
-def base_of(basename):
-    # Lowest mapping whose file basename matches -> the load bias.
-    lo = None
-    for line in open("/proc/%d/maps" % pid):
-        parts = line.split()
-        if len(parts) >= 6 and parts[5].split("/")[-1] == basename:
-            start = int(parts[0].split("-")[0], 16)
-            lo = start if lo is None else min(lo, start)
-    return lo
-
-
-# The target file's own mapping if present; otherwise the host libc (which is
-# what dlopen returns when the target *is* the host libc, deduped to libc.so.6).
-target_base = os.path.basename(os.environ.get("ALETHEIA_TARGET", ""))
-base = base_of(target_base) or base_of("libc.so.6")
-if base is None:
-    gdb.write("ALETHEIA_ERROR: libc base not found\n")
-    raise SystemExit(1)
-
+info = open(os.environ["ALETHEIA_STUB_OUT"]).read()
+base = int(re.search(r"ALETHEIA_BASE=(0x[0-9a-fA-F]+)", info).group(1), 16)
+scratch = int(re.search(r"ALETHEIA_SCRATCH=(0x[0-9a-fA-F]+)", info).group(1), 16)
 gadget = base + offset
-gdb.write("ALETHEIA base=%#x gadget=%#x\n" % (base, gadget))
+gdb.write("ALETHEIA base=%#x gadget=%#x scratch=%#x\n" % (base, gadget, scratch))
 
-scratch_size = plan.get("scratch_size", 0x10000)
-scratch = int(gdb.parse_and_eval("(void*)mmap(0, %d, 3, 0x22, -1, 0)" % scratch_size)) & 0xFFFFFFFFFFFFFFFF
-if scratch == 0xFFFFFFFFFFFFFFFF:
-    gdb.write("ALETHEIA_ERROR: inferior mmap failed\n")
-    raise SystemExit(1)
-
-# Seed the L2 command at a fixed scratch offset. A gadget whose argv is forced to
-# `sh -c <cmd>` (no empty-argv escape) points its command slot here, so the shell
-# runs `ls /` itself instead of reading it from stdin. Keep in sync with the
-# satisfier's COMMAND_POOL.
+# Seed the L2 command; a `sh -c <cmd>` gadget points its command slot here so the
+# shell runs `ls /` itself. Keep in sync with the satisfier's COMMAND_POOL.
 gdb.selected_inferior().write_memory(scratch + 0x200, b"ls /\x00")
 
-# Default fill for registers the plan does not set:
-#  - benign: point at readable zeroed scratch, so the only uncontrolled inputs
-#    are those the constraints govern (biases toward reproducing a stated gadget).
-#  - poison: an unmapped address, so ANY unlisted dereference faults. This tests
-#    whether the constraint list is *complete*; a fault under poison that the
-#    listed constraints don't explain is a candidate missing-constraint bug.
-#  - null: uncontrolled registers are 0. Used to promote an EXEC gadget: if a
-#    register the code writes as argv[1] is NULL, argv terminates and the shell is
-#    interactive (drivable), showing the gadget is usable given that extra control.
+# Default fill for registers the plan doesn't set: benign (readable scratch),
+# poison (unmapped -> unlisted derefs fault), or null (0 -> argv terminates).
 POISON = 0xDEAD0000
 if plan.get("poison_default"):
     fill = POISON
@@ -73,22 +52,31 @@ elif plan.get("benign_default"):
 else:
     fill = None
 if fill is not None:
-    for i in range(31):
-        gdb.execute("set $x%d = %#x" % (i, fill))
+    for r in arch["gprs"]:
+        gdb.execute("set $%s = %#x" % (r, fill))
 
 for reg, val in plan.get("regs", {}).items():
-    # Plan values may be ints or {"scratch_off": N} to resolve against scratch.
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
-    gdb.execute("set $%s = %#x" % (reg, int(val) & 0xFFFFFFFFFFFFFFFF))
+    gdb.execute("set $%s = %#x" % (reg, int(val) & MASK))
 
 sp = scratch + plan.get("sp_offset", 0x2000)
-gdb.execute("set $sp = %#x" % sp)
-gdb.execute("set $pc = %#x" % gadget)
+gdb.execute("set $%s = %#x" % (arch["sp"], sp))
+gdb.execute("set $%s = %#x" % (arch["pc"], gadget))
 
-gdb.execute("set follow-fork-mode child")
-gdb.execute("set detach-on-fork off")
-gdb.write("ALETHEIA_INJECTED sp=%#x scratch=%#x\n" % (sp, scratch))
+# posix_spawn forks a child that execs the shell. Natively, gdb follows the child
+# and drives it directly. Over a qemu-user gdbstub, a single stub can't debug both
+# sides of a fork, so let the child run free (it inherits the guest tty) and stay
+# with the parent -- L2 on the pty is the arbiter either way.
+try:
+    if connect == "run":
+        gdb.execute("set follow-fork-mode child")
+        gdb.execute("set detach-on-fork off")
+    else:
+        gdb.execute("set follow-fork-mode parent")
+        gdb.execute("set detach-on-fork on")
+except gdb.error:
+    pass
 
 
 def readable(addr):
@@ -111,25 +99,25 @@ def execd_shell(pid):
         return False
 
 
-# L0: the deterministic "the gadget reaches a shell" signal, independent of
-# whether L2 can then drive that shell over the tty. A straight-line execve stops
-# at the syscall entry, where we verify the "/bin/sh" path and readable argv/envp.
-# posix_spawn execs in a vforked child that runs straight through the syscall, so
-# a `catch exec` stops at the new image (process still alive, before it runs any
-# `-c` command and exits) where we confirm it is a shell.
+# L0: the deterministic "reaches a shell" signal. A straight-line execve stops at
+# the syscall entry, where we verify the "/bin/sh" path and readable argv/envp;
+# posix_spawn runs through to the new image, caught by `catch exec` (native).
 gdb.execute("catch syscall execve execveat")
-gdb.execute("catch exec")
+try:
+    gdb.execute("catch exec")
+except gdb.error:
+    pass
 gdb.execute("continue")
 l0 = False
 try:
-    if int(gdb.parse_and_eval("$x8")) in (221, 281):
-        path = gdb.execute("x/s $x0", to_string=True)
-        argv = int(gdb.parse_and_eval("$x1")) & 0xFFFFFFFFFFFFFFFF
-        envp = int(gdb.parse_and_eval("$x2")) & 0xFFFFFFFFFFFFFFFF
+    if int(gdb.parse_and_eval("$" + arch["sysno_reg"])) in arch["execve_syscalls"]:
+        path = gdb.execute("x/s $" + arch["path_reg"], to_string=True)
+        argv = int(gdb.parse_and_eval("$" + arch["argv_reg"])) & MASK
+        envp = int(gdb.parse_and_eval("$" + arch["envp_reg"])) & MASK
         l0 = ('"/bin/sh"' in path) and readable(argv) and readable(envp)
 except gdb.error:
     pass
-if not l0:
+if not l0 and connect == "run":
     l0 = execd_shell(gdb.selected_inferior().pid)
 gdb.write("ALETHEIA_L0=%s\n" % ("pass" if l0 else "fail"))
 

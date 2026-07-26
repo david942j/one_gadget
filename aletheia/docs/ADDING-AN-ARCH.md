@@ -1,46 +1,74 @@
 # Adding an architecture backend
 
-Aletheia is arch-parameterized; aarch64 is the reference backend. Adding another (amd64
-shown here) is a new backend object plus small driver tweaks — the satisfier, oracle, and
-reporting are reused unchanged.
+Aletheia is arch-parameterized. aarch64 is the reference backend and amd64 is fully wired
+(driven under qemu-user on an aarch64 host). Adding another arch (i386, arm) is a new backend
+object plus a cross-built stub — the satisfier, oracle, transport, and reporting are reused
+unchanged.
 
-## 1. Backend object
+## How the pieces fit
 
-Add `lib/aletheia/arch/amd64.rb` mirroring `arch/aarch64.rb`, describing:
+- **`lib/aletheia/arch/<name>.rb`** — the only arch-specific code: register model, ABI, and the
+  `driver_model` hash serialized into the plan.
+- **Transport** (`lib/aletheia/transport.rb`) is chosen automatically from the backend's `qemu`:
+  `nil` -> run natively under `gdb`; a config hash -> run under `qemu-<arch> -g <port>` with a
+  gdbstub and attach `gdb-multiarch`. No CLI flag — `Runner` maps the target ELF's machine to a
+  backend via `ARCHES` and the backend decides the transport.
+- **`driver.py`** is arch-neutral: it reads register names, `sp`/`pc`, and syscall numbers from
+  the plan's `arch` block (`driver_model`), so the same driver serves every arch.
+- **`park_stub`** is self-describing (pre-allocates scratch, prints its own libc base), so the
+  driver needs no inferior `mmap` and no `/proc` access from a possibly-remote debugger — this is
+  what makes the qemu-user path work.
 
-- `gprs` — assignable registers (`rax, rbx, rcx, rdx, rsi, rdi, rbp, r8..r15`).
-- `stack_regs` — `%w[rsp rbp]` (an equality-to-NULL on `rsp+imm` is unsatisfiable).
-- `sp` / `pc` — `'rsp'` / `'rip'`.
-- `native_on?(machine)` — `machine == 'x86_64'`.
-- `gdb_reg(name)` — `"$#{name}"`.
+## Backend object
 
-Register it in `Runner::ARCHES` and select it by the target's ELF machine (or a CLI flag).
+Add `lib/aletheia/arch/<name>.rb` mirroring `arch/amd64.rb`, describing:
 
-## 2. Driver
+- `gprs` — assignable registers.
+- `stack_regs` — registers naming a live stack address (an equality-to-NULL on `sp+imm` is
+  unsatisfiable). Only the true stack pointer; a frame pointer the gadget lets the attacker
+  control is a normal GPR.
+- `sp` / `pc`.
+- `native_on?(machine)` — whether the target runs natively on this host's `uname -m`.
+- `normalize_reg(reg)` — fold a sub-register view onto its full register (aarch64 `w0 -> x0`,
+  amd64 `eax -> rax`, `r8d -> r8`); setting the full register sets the low bits.
+- `stub_binary` — the `park_stub_<arch>` this backend runs.
+- `qemu` — `nil` for a native arch, else `{ 'bin', 'ld_prefix', 'gdb_arch' }` (the emulator,
+  the sysroot providing the stub's own ld.so + libc, and the gdb architecture to select).
+- `driver_model` — GPR list, `sp`, `pc`, `gdb_arch`, `sysno_reg`, `execve_syscalls`, and the
+  execve arg registers (`path_reg`, `argv_reg`, `envp_reg`).
 
-`driver.py` is mostly arch-neutral (mmap, maps parsing, plan application). The
-arch-specific bits are the register names in the fill loops and `sp`/`pc`. Parameterize the
-GPR list and stack/pc names from the plan (pass them through from the backend) instead of
-hardcoding `x0..x30`/`sp`. The `catch syscall execve execveat` + `ls /` oracle is identical.
+Register it in `Runner::ARCHES` keyed by `OneGadget::Helper.architecture`'s symbol.
 
-## 3. Execution transport
+## Stub
 
-- **Native**: if the host arch matches the target (amd64 libc on an amd64 host), it runs
-  directly, exactly like aarch64 here.
-- **qemu-user** (foreign target, e.g. amd64 libc on this aarch64 box): run `park_stub` +
-  gdb under `qemu-x86_64` with a gdbstub, or `qemu-x86_64 -g <port>` and
-  `gdb -ex 'target remote'`. Select via a `--qemu` flag. The satisfier/oracle don't change.
+Cross-build the stub once (or after editing `park_stub.c`):
 
-## 4. Fixtures and expectations
+```
+./build_stubs.sh        # native stub + any cross stub whose toolchain is installed
+```
 
-amd64 fixtures already live in `spec/data/libc-*.so`. Verify against those; add results to
-`docs/FINDINGS.md`. The amd64 effect ABI (args in `rdi, rsi, rdx, rcx, r8, r9`) drives which
-registers the satisfier pins for pointer args — encode that in the backend.
+A foreign arch needs its cross-compiler (`gcc-<arch>-linux-gnu`) and, at run time, `qemu-user`
+plus `gdb-multiarch`. `QEMU_LD_PREFIX` (the backend's `ld_prefix`) must point at a sysroot whose
+`ld.so`/`libc.so.6` matches the stub's own arch — the cross toolchain's sysroot works because the
+stub `dlopen`s the *target* fixture separately.
+
+## posix_spawn note
+
+`do_system` gadgets fork a child that execs the shell. Natively, gdb follows the child and drives
+it. Over a qemu-user gdbstub a single stub can't debug both fork sides, so the driver stays with
+the parent and lets the child run free on the guest tty — the L2 `ls /` check on the pty is the
+arbiter either way. The driver picks the mode from the transport (`connect == "run"`).
+
+## Fixtures and expectations
+
+amd64/i386 fixtures already live in `spec/data/libc-*.so`. Verify against those and record results
+in `docs/FINDINGS.md`.
 
 ## Checklist
 
-- [ ] `arch/<name>.rb` with the register model.
-- [ ] `driver.py` GPR/sp/pc parameterized from the backend.
-- [ ] execution transport (native and/or qemu) wired to a flag.
-- [ ] a passing run on one simple gadget (the amd64 analogue of M1), then the full set.
+- [ ] `arch/<name>.rb` with the register/ABI model and `driver_model`.
+- [ ] `qemu` config (or `nil`) and a cross-built `park_stub_<name>`.
+- [ ] registered in `Runner::ARCHES`.
+- [ ] a passing run on one straight-line execve gadget, then the full set.
+- [ ] a negative control (a valid plan redirected to a non-shell offset) that FAILs.
 - [ ] findings recorded.
