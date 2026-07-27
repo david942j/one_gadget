@@ -133,11 +133,13 @@ describe OneGadget::Emulators::Arm do
     end
 
     it 'bl / blx to terminal and pass-through calls' do
-      expect(@processor.process('0: bl 70160 <execl@@GLIBC_2.4>')).to be true
+      # A terminal exec* call records the effect (pc) and halts emulation, so any
+      # following instruction can't clobber the call's argument registers.
+      expect(@processor.process('0: bl 70160 <execl@@GLIBC_2.4>')).to be false
       expect(@processor.registers['pc'].to_s).to include 'execl'
 
       other = described_class.new
-      expect(other.process('0: blx 88990 <execve@@GLIBC_2.4>')).to be true
+      expect(other.process('0: blx 88990 <execve@@GLIBC_2.4>')).to be false
       expect(other.registers['pc'].to_s).to include 'execve'
 
       # sigprocmask is always safe; __sigaction needs arg2 (r2) == 0.
@@ -146,8 +148,10 @@ describe OneGadget::Emulators::Arm do
       expect(@processor.process('c: bl 24754 <__sigaction@@GLIBC_2.4>')).to be true
       @processor.process('10: mov r2, r0')
       expect(@processor.process('14: bl 24754 <__sigaction@@GLIBC_2.4>')).to be false
+      # a posix_spawn setup helper is a side-effect-free pass-through (SAFE_CALLS prefix).
+      expect(@processor.process('18: bl 10c690 <posix_spawnattr_init@@GLIBC_2.4>')).to be true
       # an unhandled call aborts the candidate.
-      expect(@processor.process('18: bl 12345 <free@@GLIBC_2.4>')).to be false
+      expect(@processor.process('1c: bl 12345 <free@@GLIBC_2.4>')).to be false
     end
 
     it 'flag-only instructions have no effect' do

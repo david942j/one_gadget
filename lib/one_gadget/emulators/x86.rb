@@ -12,7 +12,9 @@ module OneGadget
       attr_reader :bp # @return [String] Stack base register.
       attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp.
 
-      # Libc calls the emulator accepts without executing, each a syscall wrapper.
+      # Libc calls the emulator accepts without executing: syscall wrappers, and
+      # +posix_spawn+'s setup helpers (matched by prefix), which precede the real
+      # call and are side-effect-free for gadget purposes.
       # +sigprocmask+ dereferences its +set+ argument (arg 1) unless it is NULL (which
       # it NULL-checks), so +set+ is marked +:nullable_deref+; +__sigaction+'s
       # dereferenced +act+ (arg 1) is required to be a libc global instead.
@@ -21,7 +23,9 @@ module OneGadget
         'sigprocmask' => { 1 => :nullable_deref },
         '__close' => {},
         'unsetenv' => { 0 => :global_var? },
-        '__sigaction' => { 1 => :global_var?, 2 => :zero? }
+        '__sigaction' => { 1 => :global_var?, 2 => :zero? },
+        'posix_spawnattr_' => {},
+        'posix_spawn_file_actions_' => {}
       }.freeze
 
       # Constructor for a x86 processor.
@@ -280,8 +284,7 @@ module OneGadget
 
       # TODO: handle some registers would be fucked after call
       def inst_call(addr)
-        # This is the last call
-        return registers[pc] = addr if %w[execve execl posix_spawn].any? { |n| addr.include?(n) }
+        return reach_terminal_call(addr) if terminal_call?(addr)
 
         dispatch_safe_call(addr, SAFE_CALLS)
       end
