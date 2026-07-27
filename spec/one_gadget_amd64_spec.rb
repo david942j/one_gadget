@@ -54,6 +54,15 @@ describe 'one_gadget_amd64' do
       expect(OneGadget.gadgets(file: path)).to eq [0xe3b2e, 0xe3b31, 0xe3b34]
     end
 
+    # rip-relative libc globals are concretized to $base+<off>, so the do_system
+    # "-c" separator resolves to its string content (like aarch64/arm).
+    it 'libc-2.31 resolves the do_system "-c" argv operand' do
+      path = data_path('libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+                        .find { |g| g.offset == 0x51df8 }
+      expect(gadget.constraints).to include('{"sh", "-c", rbx, NULL} is a valid argv')
+    end
+
     it 'not ELF' do
       expect { hook_logger { OneGadget.gadgets(file: __FILE__) } }.to output(<<-EOS).to_stdout
 [OneGadget] ArgumentError: Not an ELF file, expected glibc as input
