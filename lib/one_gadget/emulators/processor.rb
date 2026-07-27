@@ -41,6 +41,33 @@ module OneGadget
         end
       end
 
+      # Function names whose call ends a gadget: the real +exec*+ entry points.
+      # Deliberately excludes the +posix_spawn+ setup helpers
+      # (+posix_spawnattr_*+, +posix_spawn_file_actions_*+), which merely share the
+      # +posix_spawn+ prefix.
+      # @example matches +posix_spawn+, +execve+, +execveat+, +execlp+; not +posix_spawnattr_init+
+      TERMINAL_CALL_RE = /\A(?:posix_spawnp?|exec(?:ve|l|v)[a-z]*)\z/
+
+      # Whether +addr+ calls a terminal +exec*+ entry point (see
+      # {#reach_terminal_call}). Matches the resolved symbol name exactly so a
+      # setup helper isn't mistaken for the call it precedes.
+      # @param [String] addr The call target, e.g. +"10c7d0 <posix_spawn@@GLIBC_2.15>"+.
+      # @return [Boolean]
+      def terminal_call?(addr)
+        name = addr[/<([^@>]+)/, 1]
+        !name.nil? && TERMINAL_CALL_RE.match?(name)
+      end
+
+      # Record a reached terminal +exec*+ call as the gadget's effect and stop
+      # emulating: it is the gadget's goal, and any following instruction would
+      # clobber the argument registers that {#resolve} reads to describe it.
+      # @param [String] addr The call target.
+      # @return [Symbol] +:fail+, the sentinel {#process!} maps to "stop".
+      def reach_terminal_call(addr)
+        registers[pc] = addr
+        :fail
+      end
+
       # Parse one command into instruction and arguments.
       # @param [String] cmd One line of result of objdump.
       # @return [(Instruction, Array<String>)]
