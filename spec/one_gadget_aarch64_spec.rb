@@ -61,6 +61,17 @@ describe 'one_gadget_aarch64' do
         .to eq ['posix_spawn(sp+0xc, "/bin/sh", 0, sp+0x218, sp+0x50, environ)']
     end
 
+    # do_system passes {"sh", "-c", "--", <command>, NULL}; the "-c" and "--"
+    # separators are libc globals, resolved to their string content so the
+    # controllable command operand is the only unresolved argv entry.
+    it 'resolves the "--" argv separator to its string content' do
+      path = data_path('aarch64-libc-2.43.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, details: true).first
+      expect(gadget.constraints)
+        .to include('x0 == NULL || {x0, "-c", "--", x21, ...} is a valid argv')
+      expect(gadget.constraints.join).not_to include('$base') # no unresolved global
+    end
+
     # The execve("/bin/sh") gadget in 2.43's execvp is split across a
     # `cmp x2, #1; b.ne`, so it only appears once the not-taken branch is
     # expressed as the constraint `x2 == 0x1`.

@@ -215,7 +215,10 @@ module OneGadget
         else
           argv_gte3 = argv[3] == '0' ? 'NULL' : "#{argv[3]}, ..."
           if global_var?(argv[1])
-            "{\"sh\", \"-c\", #{argv[2]}, #{argv_gte3}} is a valid argv"
+            # A leading "sh -c" whose fixed elements (e.g. "-c", the "--" separator)
+            # are libc globals -- resolve them so the controllable command operand
+            # stands out (e.g. {"sh", "-c", "--", x21, ...}).
+            "{\"sh\", #{resolve_argv_element(argv[1])}, #{resolve_argv_element(argv[2])}, #{argv_gte3}} is a valid argv"
           else
             "#{argv[1]} == NULL || {\"sh\", #{argv[1]}, #{argv[2]}, #{argv_gte3}} is a valid argv"
           end
@@ -230,9 +233,9 @@ module OneGadget
           if argv[i] == '0'
             argv_cons += ', NULL'
             break
-          elsif i == 1 && global_var?(argv[i])
-            # TODO: We probably need to get the true content of the global variable for a more accurate result
-            argv_cons += ', "-c"'
+          elsif global_var?(argv[i])
+            # A fixed libc-global entry (e.g. "-c", "--") -- show its true content.
+            argv_cons += ", #{resolve_argv_element(argv[i])}"
           else
             argv_cons += ", #{argv[i]}"
           end
@@ -369,6 +372,33 @@ module OneGadget
       def str_offset(str)
         File.binread(file).index("#{str}\x00") ||
           raise(Error::ArgumentError, "File #{file.inspect} doesn't contain string #{str.inspect}, not glibc?")
+      end
+
+      # Render one argv/envp entry for a constraint. A libc global that points to a
+      # fixed string is shown as that string (its true content); a controllable
+      # operand, or a global that isn't a plain string, is shown unchanged.
+      # @param [String] element A single argv entry.
+      # @example +$base+0x16b250+ -> +"--"+ (the do_system separator); +x21+ -> +x21+.
+      # @return [String]
+      def resolve_argv_element(element)
+        content = global_str_content(element)
+        content ? content.inspect : element
+      end
+
+      # The NUL-terminated printable string a resolved-offset global (+$base+<off>+)
+      # points to, or +nil+ when +element+ isn't such a global or the bytes aren't a
+      # short printable string. Architectures whose globals aren't yet
+      # file-offset-relative simply fall through.
+      # @param [String] element
+      # @return [String, nil]
+      def global_str_content(element)
+        m = /\A\$base\+(0x[0-9a-f]+)\z/.match(element) or return nil
+
+        bytes = File.binread(file)
+        off = m[1].to_i(16)
+        stop = bytes.index("\x00", off) or return nil
+        str = bytes[off...stop]
+        str if str.length.between?(1, 16) && str.each_byte.all? { |c| c.between?(0x20, 0x7e) }
       end
 
       def offset_of(assembly)
