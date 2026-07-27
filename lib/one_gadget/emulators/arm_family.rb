@@ -40,7 +40,9 @@ module OneGadget
         sp_based_stack
       end
 
-      # Libc calls the emulator accepts without executing, each a syscall wrapper.
+      # Libc calls the emulator accepts without executing: syscall wrappers, and
+      # +posix_spawn+'s setup helpers (matched by prefix), which precede the real
+      # call and are side-effect-free for gadget purposes.
       # +sigprocmask+ and +__sigaction+ each dereference a pointer argument unless it
       # is NULL (both guard the read with a NULL check and still reach the call on
       # the NULL path), so +sigprocmask+'s +set+ and +__sigaction+'s +act+ are marked
@@ -48,7 +50,9 @@ module OneGadget
       # See {Processor#dispatch_safe_call}.
       SAFE_CALLS = {
         'sigprocmask' => { 1 => :nullable_deref },
-        '__sigaction' => { 1 => :nullable_deref, 2 => :zero? }
+        '__sigaction' => { 1 => :nullable_deref, 2 => :zero? },
+        'posix_spawnattr_' => {},
+        'posix_spawn_file_actions_' => {}
       }.freeze
 
       private
@@ -56,8 +60,7 @@ module OneGadget
       # A +bl+/+blx+ call: record the terminal +exec*+ target, accept a known-safe
       # syscall wrapper, or +:fail+ to abort the candidate.
       def inst_bl(addr)
-        # This is the last call.
-        return registers[pc] = addr if %w[execve execl posix_spawn].any? { |n| addr.include?(n) }
+        return reach_terminal_call(addr) if terminal_call?(addr)
 
         dispatch_safe_call(addr, SAFE_CALLS)
       end
