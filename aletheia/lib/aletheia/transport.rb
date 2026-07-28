@@ -22,8 +22,26 @@ module Aletheia
         @target = target
       end
 
-      def stub = File.join(ROOT, @arch.stub_binary)
       def driver = File.join(ROOT, 'driver.py')
+
+      # A per-version sysroot for this fixture (built by +build_sysroot.sh+ under
+      # +sysroots/<arch>-<major.minor>/+), or nil. Used for a foreign libc too old
+      # to dlopen under the default cross sysroot -- it carries the matching ld.so
+      # and a park_stub linked against that libc.
+      def sysroot
+        return @sysroot if defined?(@sysroot)
+
+        ver = File.basename(@target)[/(\d+\.\d+)/, 1]
+        dir = ver && File.join(ROOT, 'sysroots', "#{@arch.name}-#{ver}")
+        @sysroot = (dir && File.directory?(dir)) ? dir : nil
+      end
+
+      # The park_stub to run: an explicit override, else the per-version sysroot's
+      # stub, else the arch default.
+      def stub
+        ENV['ALETHEIA_STUB'] || (sysroot && File.join(sysroot, 'park_stub')) ||
+          File.join(ROOT, @arch.stub_binary)
+      end
     end
 
     # Native: one gdb process runs the stub directly; L2 tty via inferior-tty.
@@ -42,7 +60,10 @@ module Aletheia
       def launch(plan_path:, stub_out:, slave:, log:)
         q = @arch.qemu
         port = free_port
-        qenv = { 'QEMU_LD_PREFIX' => q['ld_prefix'], 'ALETHEIA_STUB_OUT' => stub_out }
+        # An explicit override, else the per-version sysroot (matching ld.so for an
+        # older foreign libc), else the arch's default cross sysroot.
+        ld_prefix = ENV['ALETHEIA_LD_PREFIX'] || sysroot || q['ld_prefix']
+        qenv = { 'QEMU_LD_PREFIX' => ld_prefix, 'ALETHEIA_STUB_OUT' => stub_out }
         qpid = spawn(qenv, q['bin'], '-g', port.to_s, stub, @target,
                      in: slave, out: slave, err: log, pgroup: true)
         sleep 0.8 # let the gdbstub come up (don't pre-connect: it accepts one client)

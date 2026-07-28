@@ -1,3 +1,4 @@
 /park_stub
 *.log
 /park_stub_*
+/sysroots/
