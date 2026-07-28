@@ -35,12 +35,19 @@ module Aletheia
     # (see {#parse_relation}).
     ALIGN           = /\A(\w+) & (#{IMM}) == (#{IMM})\z/
 
+    # +<reg> is the GOT address of libc+ (i386 PIC): the register must hold the
+    # libc GOT base, i.e. +base + PLTGOT offset+.
+    GOT = /\A(\w+) is the GOT address of libc\z/
+
     # @param arch an arch backend (e.g. {Arch::AArch64})
+    # @param [Integer, nil] got_offset the libc PLTGOT file offset, for i386's
+    #   "+<reg> is the GOT address of libc+" constraint (see {GOT}).
     # @param [Boolean] strict when true, uncontrolled registers are poisoned
     #   (unmapped) so any unlisted dependency faults -- a completeness test for
     #   the constraint list. When false, they point at readable scratch.
-    def initialize(arch, strict: false)
+    def initialize(arch, got_offset: nil, strict: false)
       @arch = arch
+      @got_offset = got_offset
       @strict = strict
     end
 
@@ -102,8 +109,26 @@ module Aletheia
       when /\A\{.*\} is a valid (?:argv|envp)\z/ then 0.5 # array literal: element builder
       when /is a valid (?:argv|envp)\z/         then 0.4 # pointer form: point it at scratch
       when ALIGN                                then alignment_cost(disjunct)
-      else relational_cost(disjunct)
+      when GOT                                  then got_cost(disjunct)
+      else (op = deref_zero(disjunct)) ? null_cost(op) : relational_cost(disjunct)
       end
+    end
+
+    # A dereferenced value required to be zero (+[X] == 0+) -- equivalent to
+    # +[X] == NULL+. A bare +reg == 0+ is a settable relation handled elsewhere,
+    # so only the dereferenced form is returned here.
+    def deref_zero(disjunct)
+      m = disjunct.match(/\A(.+?) == 0\z/) or return nil
+      op = safe_parse(m[1])
+      op if op&.reg && op.deref.positive?
+    end
+
+    # +<reg> is the GOT address of libc+: settable when we know the PLTGOT offset
+    # and the register is assignable (see {GOT}).
+    # @return [Float, nil]
+    def got_cost(disjunct)
+      reg = disjunct[GOT, 1]
+      @got_offset && settable?(reg) ? 0.3 : nil
     end
 
     # +reg & mask == want+: the stack pointer is aligned by construction (the
@@ -164,11 +189,17 @@ module Aletheia
         (stack_reg?(reg) && want.zero?) || (want.zero? && scratch?(plan, reg))
       when /\A(.+?) == NULL\z/, /\A(.+?) <= 0\z/
         (op = safe_parse(Regexp.last_match(1))) && deref_reads_zero?(plan, op)
+      when GOT
+        base_relative?(plan.regs[branch[GOT, 1]])
       else
-        reg, value = parse_relation(branch)
-        current = reg && plan.regs[reg]
-        if current.is_a?(Hash) then scratch_satisfies_relation?(branch)
-        else reg && !current.nil? && current == (value & MASK64)
+        if (op = deref_zero(branch))
+          deref_reads_zero?(plan, op)
+        else
+          reg, value = parse_relation(branch)
+          current = reg && plan.regs[reg]
+          if current.is_a?(Hash) then scratch_satisfies_relation?(branch)
+          else reg && !current.nil? && current == (value & MASK64)
+          end
         end
       end
     end
@@ -220,8 +251,30 @@ module Aletheia
       when /\A\{(.*)\} is a valid (?:argv|envp)\z/ then apply_argv_list(plan, Regexp.last_match(1))
       when /is a valid (?:argv|envp)\z/            then apply_pointer(plan, pointer_form(disjunct))
       when ALIGN                                   then apply_alignment(plan, disjunct)
-      else apply_relation(plan, disjunct)
+      when GOT                                     then apply_got(plan, disjunct)
+      else (op = deref_zero(disjunct)) ? apply_deref_null(plan, op) : apply_relation(plan, disjunct)
       end
+    end
+
+    # Satisfy a dereferenced +== 0+ by pointing the register at zeroed scratch
+    # (an sp-relative slot is already zero); cf. the +== NULL+ deref handling.
+    def apply_deref_null(plan, op)
+      return true if stack_reg?(op.reg)
+
+      op.deref == 1 ? set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm }) : false
+    end
+
+    # Set the base register to the libc GOT, +base + PLTGOT offset+; the driver
+    # resolves the +base_off+ against the runtime load base (cf. +scratch_off+).
+    def apply_got(plan, disjunct)
+      return false unless @got_offset
+
+      set_reg(plan, xreg(disjunct[GOT, 1]), { 'base_off' => @got_offset })
+    end
+
+    # A register value the driver resolves against the libc load base.
+    def base_relative?(value)
+      value.is_a?(Hash) && value.key?('base_off')
     end
 
     def apply_alignment(plan, disjunct)

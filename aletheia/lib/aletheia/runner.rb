@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
 require 'json'
+require 'elftools'
 require 'one_gadget'
 
 require_relative 'arch/aarch64'
 require_relative 'arch/amd64'
+require_relative 'arch/i386'
 require_relative 'satisfier'
 require_relative 'oracle'
 
@@ -19,12 +21,12 @@ module Aletheia
   #   SKIP  - the satisfier could not produce a plan (a harness limitation, not
   #           a verdict on the gadget)
   class Runner
-    ARCHES = { amd64: Arch::Amd64, aarch64: Arch::AArch64 }.freeze
+    ARCHES = { amd64: Arch::Amd64, i386: Arch::I386, aarch64: Arch::AArch64 }.freeze
 
     def initialize(target:, arch: nil, strict: false)
       @target = target
       @arch = arch || arch_of(target)
-      @satisfier = Satisfier.new(@arch, strict: strict)
+      @satisfier = Satisfier.new(@arch, got_offset: got_offset(target), strict: strict)
       @oracle = Oracle.new(target: target, arch: @arch)
     end
 
@@ -33,6 +35,15 @@ module Aletheia
       ARCHES.fetch(OneGadget::Helper.architecture(target)) do |m|
         raise ArgumentError, "unsupported architecture: #{m}"
       end
+    end
+
+    # The libc PLTGOT file offset, for i386's GOT-base constraint; nil when absent.
+    def got_offset(target)
+      File.open(target) do |f|
+        ELFTools::ELFFile.new(f).segment_by_type(:dynamic)&.tag_by_type(:pltgot)&.value
+      end
+    rescue StandardError
+      nil
     end
 
     # @param [Array<Integer>, nil] offsets restrict to these gadget offsets

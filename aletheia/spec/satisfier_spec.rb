@@ -147,5 +147,31 @@ RSpec.describe Aletheia::Satisfier do
       plan = satisfier.satisfy(gadget(['eax == 0']))
       expect(plan.regs['rax']).to eq(0)
     end
+
+    it 'points a register at zeroed scratch for a dereferenced "[reg] == 0"' do
+      plan = satisfier.satisfy(gadget(['[rbx] == 0']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['rbx']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
+    end
+  end
+
+  context 'i386 backend' do
+    require 'aletheia/arch/i386'
+    subject(:satisfier) { described_class.new(Aletheia::Arch::I386, got_offset: 0x1d5000) }
+
+    def gadget(constraints, offset: 0x1000, effect: 'execve("/bin/sh", esp+0x34, environ)')
+      OpenStruct.new(offset: offset, effect: effect, constraints: constraints)
+    end
+
+    it 'sets the base register to the libc GOT (base + PLTGOT offset)' do
+      plan = satisfier.satisfy(gadget(['esi is the GOT address of libc']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['esi']).to eq('base_off' => 0x1d5000)
+    end
+
+    it 'SKIPs the GOT constraint when the PLTGOT offset is unknown' do
+      plan = described_class.new(Aletheia::Arch::I386).satisfy(gadget(['esi is the GOT address of libc']))
+      expect(plan.status).to eq('skip')
+    end
   end
 end

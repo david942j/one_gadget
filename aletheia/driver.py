@@ -67,8 +67,11 @@ def set_reg(reg, val):
 
 
 for reg, val in plan.get("regs", {}).items():
-    if isinstance(val, dict) and "scratch_off" in val:
-        val = scratch + val["scratch_off"]
+    if isinstance(val, dict):
+        if "scratch_off" in val:
+            val = scratch + val["scratch_off"]        # a scratch pointer
+        elif "base_off" in val:
+            val = base + val["base_off"]              # a libc load-base offset (i386 GOT)
     set_reg(reg, int(val))
 
 sp = scratch + plan.get("sp_offset", 0x2000)
