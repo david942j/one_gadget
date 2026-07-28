@@ -24,8 +24,10 @@ module Aletheia
     SP_OFFSET       = 0x2000
     STRING_POOL     = 0x100    # readable+writable zeroed bytes: a valid "" / [NULL] array
     COMMAND_POOL    = 0x200    # the "ls /" L2 command the driver seeds here
+    COMMAND_RESERVED = 0x40    # generous window at COMMAND_POOL treated as non-zero
     WRITABLE_BASE   = 0x4000   # write-areas live above the stack region (sp is at SP_OFFSET)
     WRITABLE_STRIDE = 0x800
+    WORD            = 8        # conservative pointer width for a "reads zero" check
     MASK64          = (1 << 64) - 1
     IMM             = /-?(?:0x[0-9a-fA-F]+|\d+)/
     # Bare +reg & mask == want+ (no parens): a low-bits/alignment constraint. The
@@ -160,6 +162,8 @@ module Aletheia
       when ALIGN
         reg, _mask, want = parse_alignment(branch)
         (stack_reg?(reg) && want.zero?) || (want.zero? && scratch?(plan, reg))
+      when /\A(.+?) == NULL\z/, /\A(.+?) <= 0\z/
+        (op = safe_parse(Regexp.last_match(1))) && deref_reads_zero?(plan, op)
       else
         reg, value = parse_relation(branch)
         current = reg && plan.regs[reg]
@@ -167,6 +171,26 @@ module Aletheia
         else reg && !current.nil? && current == (value & MASK64)
         end
       end
+    end
+
+    # Whether a +== NULL+ / +<= 0+ operand already reads zero under the current
+    # plan: a bare register pinned to 0, or a single deref off a scratch-pointing
+    # register whose target lands in the zero-filled region. This lets one register
+    # assignment (e.g. a +writable: reg+imm+) also satisfy a +[reg+imm] == NULL+ on
+    # the same slot, instead of the two conflicting.
+    def deref_reads_zero?(plan, op)
+      return plan.regs[op.reg] == 0 if op.deref.zero? && op.reg
+      return false unless op.deref == 1 && op.reg && scratch?(plan, op.reg)
+
+      zeroed_scratch?(plan.regs[op.reg]['scratch_off'] + op.imm)
+    end
+
+    # Whether a word read at scratch offset +off+ is zero: in-bounds, and clear of
+    # the L2 command the driver seeds at COMMAND_POOL (the only non-zero region).
+    def zeroed_scratch?(off)
+      return false unless off >= 0 && off + WORD <= SCRATCH_SIZE
+
+      off + WORD <= COMMAND_POOL || off >= COMMAND_POOL + COMMAND_RESERVED
     end
 
     # A register pointed at scratch holds a large, nonzero, mapped address, so it

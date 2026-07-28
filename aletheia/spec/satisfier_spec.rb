@@ -92,12 +92,21 @@ RSpec.describe Aletheia::Satisfier do
     expect(plan.regs['x0']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
   end
 
-  it 'retries to a consistent branch when the cheapest one conflicts' do
-    # writable: x0 pins x0 to scratch; the argv disjunction must then avoid the
-    # x0 == NULL branch and accept "x0 is a valid argv" instead.
-    plan = satisfier.satisfy(gadget(['writable: x0', '[x0] == NULL || x0 == NULL || x0 is a valid argv']))
+  it 'restores and retries when the cheapest branch genuinely conflicts' do
+    # writable: x0 pins x0 to a (nonzero) scratch address; "x0 == NULL" would need
+    # x0 = 0 -- a conflict -- so the satisfier restores and takes "x0 is a valid argv".
+    plan = satisfier.satisfy(gadget(['writable: x0', 'x0 == NULL || x0 is a valid argv']))
     expect(plan.status).to eq('ok')
     expect(plan.branches['c1']).to eq('x0 is a valid argv')
+  end
+
+  it 'lets a writable slot also satisfy a "[reg] == NULL" on that same slot' do
+    # writable: x0 points x0 at zeroed scratch, so the deref [x0] already reads
+    # NULL -- the cheapest argv branch holds without re-assigning (and conflicting on) x0.
+    plan = satisfier.satisfy(gadget(['writable: x0', '[x0] == NULL || x0 == NULL || x0 is a valid argv']))
+    expect(plan.status).to eq('ok')
+    expect(plan.branches['c1']).to eq('[x0] == NULL')
+    expect(plan.regs['x0']).to be_a(Hash) # still the single writable scratch pointer
   end
 
   it 'SKIPs (does not crash) on an unparseable operand' do
