@@ -30,11 +30,11 @@ module OneGadget
       end
 
       def str_bin_sh?(str)
-        str.include?('rip+0x') # && str.include?(bin_sh_hex)
+        str.include?('$base') && str.include?(bin_sh_hex)
       end
 
       def global_var?(str)
-        str.include?('rip')
+        str.include?('$base')
       end
     end
   end

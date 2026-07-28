@@ -48,6 +48,7 @@ module OneGadget
       # @return [Boolean]
       #   If successfully processed.
       def process!(cmd)
+        cmd = concretize_rip(cmd)
         resolve_pending_branch(cmd)
         mnem = mnemonic(cmd)
         return handle_compare(COMPARES[mnem], cmd) if COMPARES.key?(mnem)
@@ -129,6 +130,11 @@ module OneGadget
           o.gsub(/\b(XMMWORD|QWORD|DWORD|WORD|BYTE|PTR)\b/, '').strip.sub(/\s*<.*>\z/, '')
         end
       end
+
+      # Arch-specific hook to rewrite a line's operands before it is processed. A
+      # no-op here; amd64 overrides it to resolve rip-relative operands (i386 has
+      # no rip-relative addressing, so it keeps the no-op). See {Amd64#concretize_rip}.
+      def concretize_rip(cmd) = cmd
 
       # The (direct) target address of a jump line.
       def jump_target(cmd)
@@ -291,10 +297,17 @@ module OneGadget
 
       def add_writable(dst)
         lmda = arg_to_lambda(dst).ref!
-        # pc-relative addresses should be writable
-        return if lmda.obj == pc
+        @constraints << [:writable, lmda] if needs_writable?(lmda)
+      end
 
-        @constraints << [:writable, lmda]
+      # Whether a store through +lmda+ imposes a "must be writable" constraint. A
+      # fixed libc-internal target does not: pc-relative here, plus amd64's
+      # concretized +$base+ globals.
+      # @example (pc is +rip+)
+      #   needs_writable?(arg_to_lambda('rax'))  #=> true   # an attacker register
+      #   needs_writable?(arg_to_lambda('rip'))  #=> false  # pc-relative libc address
+      def needs_writable?(lmda)
+        lmda.obj != pc
       end
 
       def to_lambda(reg)
