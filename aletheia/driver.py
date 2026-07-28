@@ -55,10 +55,21 @@ if fill is not None:
     for r in arch["gprs"]:
         gdb.execute("set $%s = %#x" % (r, fill))
 
+def set_reg(reg, val):
+    # gdb rejects `set $xmm0 = <int>` (an XMM register is a vector union, not a
+    # scalar). The satisfier only ever pins an XMM lane to a u64 (a `(u64)xmm*`
+    # constraint), so write the 64-bit lanes directly.
+    if reg.startswith("xmm"):
+        gdb.execute("set $%s.v2_int64[0] = %#x" % (reg, val & MASK))
+        gdb.execute("set $%s.v2_int64[1] = 0" % reg)
+    else:
+        gdb.execute("set $%s = %#x" % (reg, val & MASK))
+
+
 for reg, val in plan.get("regs", {}).items():
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
-    gdb.execute("set $%s = %#x" % (reg, int(val) & MASK))
+    set_reg(reg, int(val))
 
 sp = scratch + plan.get("sp_offset", 0x2000)
 gdb.execute("set $%s = %#x" % (arch["sp"], sp))
