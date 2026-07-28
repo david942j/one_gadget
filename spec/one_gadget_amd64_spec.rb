@@ -64,12 +64,11 @@ describe 'one_gadget_amd64' do
     end
 
     it 'libc-2.43' do
-      path = data_path('libc-2.43-94d508beb08edbbbafc159774d75250bb285cb44.so')
+      path = data_path('libc-2.43-90ebd03ae9d9f42b23b4eb82fdf70352cf744198.so')
       expect(OneGadget.gadgets(file: path, force_file: true,
-                               level: 1)).to eq [0x547fe, 0x54803, 0x8233c, 0x82343, 0x82348, 0x8234f, 0x82356, 0x82369,
-                                                 0x8236d, 0x82372, 0x82384, 0xe1067, 0xe106b, 0xe106f, 0xfe6e9, 0xfe7ca,
-                                                 0xfe7d2, 0xfe7d7, 0xfe7df, 0xfe7e6]
-      expect(OneGadget.gadgets(file: path)).to eq [0xe1067, 0xe106b, 0xe106f]
+                               level: 1)).to eq [0x5c20e, 0x5c213, 0x5c227, 0xf8640, 0xf87a3, 0x11d6c5, 0x11d7aa,
+                                                 0x11d7b2, 0x11d7b7, 0x11d7bf, 0x11d7c9]
+      expect(OneGadget.gadgets(file: path)).to eq [0xf87a3, 0x11d7aa, 0x11d7b2, 0x11d7b7]
     end
 
     it 'not ELF' do
