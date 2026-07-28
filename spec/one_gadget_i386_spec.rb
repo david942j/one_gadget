@@ -32,6 +32,13 @@ describe 'one_gadget_i386' do
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq ans
     end
 
+    it 'libc-2.43' do
+      path = data_path('libc-2.43-7a08e84aa7f1e0bd80a7da6227c3a006c3ff327d.so')
+      expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
+        .to eq [0xed234, 0xed237, 0xed240, 0xed300, 0x18a495, 0x18a496]
+      expect(OneGadget.gadgets(file: path)).to eq [0xed300, 0x18a495, 0x18a496]
+    end
+
     it 'special filename' do
       expect(OneGadget.gadgets(file: data_path('filename$with+special&keys'))).not_to be_empty
     end
