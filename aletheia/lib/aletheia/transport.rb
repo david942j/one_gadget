@@ -33,21 +33,28 @@ module Aletheia
         return @sysroot if defined?(@sysroot)
 
         ver = File.basename(@target)[/(\d+\.\d+)/, 1]
-        dir = ver && File.join(ROOT, 'sysroots', "#{@arch.name}-#{ver}")
-        dir = nil unless dir && (File.directory?(dir) || build_sysroot(dir))
-        @sysroot = dir
+        # The default cross sysroot already loads its own toolchain version; only a
+        # DIFFERENT version on a version-strict arch (i386) needs a matched sysroot.
+        need = ver && @arch.version_strict? && ver != default_libc_version
+        dir = need && File.join(ROOT, 'sysroots', "#{@arch.name}-#{ver}")
+        @sysroot = (dir && (stub_built?(dir) || build_sysroot(dir))) ? dir : nil
       end
 
-      # Build the per-version sysroot from the fixture's own Ubuntu package version,
-      # but only when the arch needs one (see {Arch::I386.version_strict?}) and the
-      # fixture is Ubuntu-sourced. Returns whether the sysroot now exists.
-      def build_sysroot(dir)
-        return false unless @arch.version_strict?
+      # glibc major.minor of the arch's default cross sysroot (its +ld_prefix+ libc).
+      def default_libc_version
+        libc = Dir[File.join(@arch.qemu['ld_prefix'], 'lib', '**', 'libc.so.6')].first
+        libc && File.binread(libc)[/GLIBC (\d+\.\d+)/, 1]
+      end
 
+      def stub_built?(dir) = File.file?(File.join(dir, 'park_stub'))
+
+      # Build the per-version sysroot from the fixture's own Ubuntu package version
+      # (Ubuntu-sourced fixtures only). Returns whether its park_stub now exists.
+      def build_sysroot(dir)
         uver = File.binread(@target)[/Ubuntu E?GLIBC (\d[^)]*)/, 1] or return false
         warn "aletheia: building #{File.basename(dir)} sysroot (libc #{uver})..."
         system(File.join(ROOT, 'build_sysroot.sh'), @arch.name, uver, %i[out err] => File::NULL)
-        File.directory?(dir)
+        stub_built?(dir)
       end
 
       # The park_stub to run: an explicit override, else the per-version sysroot's

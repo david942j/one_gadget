@@ -118,7 +118,7 @@ module Aletheia
     # +[X] == NULL+. A bare +reg == 0+ is a settable relation handled elsewhere,
     # so only the dereferenced form is returned here.
     def deref_zero(disjunct)
-      m = disjunct.match(/\A(.+?) == 0\z/) or return nil
+      m = disjunct.match(/\A(.+?) == (?:0|0x0+)\z/) or return nil # decimal or hex zero
       op = safe_parse(m[1])
       op if op&.reg && op.deref.positive?
     end
