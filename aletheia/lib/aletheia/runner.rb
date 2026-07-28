@@ -7,6 +7,7 @@ require 'one_gadget'
 require_relative 'arch/aarch64'
 require_relative 'arch/amd64'
 require_relative 'arch/i386'
+require_relative 'arch/arm'
 require_relative 'satisfier'
 require_relative 'oracle'
 
@@ -21,7 +22,7 @@ module Aletheia
   #   SKIP  - the satisfier could not produce a plan (a harness limitation, not
   #           a verdict on the gadget)
   class Runner
-    ARCHES = { amd64: Arch::Amd64, i386: Arch::I386, aarch64: Arch::AArch64 }.freeze
+    ARCHES = { amd64: Arch::Amd64, i386: Arch::I386, arm: Arch::Arm, aarch64: Arch::AArch64 }.freeze
 
     def initialize(target:, arch: nil, strict: false)
       @target = target

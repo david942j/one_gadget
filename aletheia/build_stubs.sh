@@ -29,4 +29,5 @@ esac
 [ "$(uname -m)" = aarch64 ] && build x86_64-linux-gnu-gcc park_stub_x86_64
 [ "$(uname -m)" = x86_64 ]  && build aarch64-linux-gnu-gcc park_stub_aarch64
 build i686-linux-gnu-gcc park_stub_i386 # i386 (32-bit) is always cross-built
+build arm-linux-gnueabihf-gcc park_stub_arm # armhf (32-bit) is always cross-built
 exit 0

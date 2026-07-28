@@ -77,6 +77,8 @@ for reg, val in plan.get("regs", {}).items():
 sp = scratch + plan.get("sp_offset", 0x2000)
 gdb.execute("set $%s = %#x" % (arch["sp"], sp))
 gdb.execute("set $%s = %#x" % (arch["pc"], gadget))
+if arch.get("thumb"):
+    gdb.execute("set $cpsr = ($cpsr | 0x20)")  # arm: enter Thumb state (CPSR T bit)
 
 # posix_spawn forks a child that execs the shell. Natively, gdb follows the child
 # and drives it directly. Over a qemu-user gdbstub, a single stub can't debug both
