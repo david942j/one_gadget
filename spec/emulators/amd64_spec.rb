@@ -47,7 +47,10 @@ describe OneGadget::Emulators::Amd64 do
       EOS
       gadget.each_line { |s| @processor.process(s) }
       expect(@processor.registers['rsi'].to_s).to eq 'rsp+0x70'
-      expect(@processor.registers['rdx'].to_s).to eq '[[rip+0x2c16b4]]'
+      # rip-relative operands are concretized to $base+<file offset> (from objdump's
+      # resolution comment), so a libc global carries the $base marker.
+      expect(@processor.registers['rdi'].to_s).to eq '$base+0x161359'
+      expect(@processor.registers['rdx'].to_s).to eq '[[$base+0x397ea0]]'
     end
 
     it 'mov' do
