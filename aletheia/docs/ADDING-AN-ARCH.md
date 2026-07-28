@@ -52,6 +52,22 @@ plus `gdb-multiarch`. `QEMU_LD_PREFIX` (the backend's `ld_prefix`) must point at
 `ld.so`/`libc.so.6` matches the stub's own arch — the cross toolchain's sysroot works because the
 stub `dlopen`s the *target* fixture separately.
 
+## Older foreign libcs (per-version sysroots)
+
+The default cross sysroot only loads fixtures close to its own glibc version. An *older* libc
+fails two ways: its init crashes under the newer `ld.so`, and the modern-toolchain stub needs
+symbol versions the old libc lacks (e.g. i386 `dlopen@GLIBC_2.34`). Build a matching sysroot:
+
+```
+./build_sysroot.sh i386 2.27-3ubuntu1     # fetch that libc6 + libc6-dev, cross-build a stub
+```
+
+It fetches the fixture's `libc6`/`libc6-dev` `.deb`s (the fixtures come from ubuntu; the version
+is in the fixture's `GNU C Library (Ubuntu GLIBC …)` string), extracts `sysroots/<arch>-<ver>/`
+with the matching `ld.so`, and links `park_stub` against that libc. The transport auto-uses
+`sysroots/<arch>-<major.minor>/` for a fixture of that glibc version; `ALETHEIA_LD_PREFIX` /
+`ALETHEIA_STUB` override it manually. `sysroots/` is git-ignored.
+
 ## posix_spawn note
 
 `do_system` gadgets fork a child that execs the shell. Natively, gdb follows the child and drives
