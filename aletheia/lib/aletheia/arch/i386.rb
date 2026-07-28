@@ -22,6 +22,11 @@ module Aletheia
 
       def native_on?(host_machine) = %w[i386 i486 i586 i686].include?(host_machine)
 
+      # i386's loader/libc reject a version-mismatched libc (an older fixture's init
+      # crashes under a newer ld.so), so an older fixture needs a per-version sysroot
+      # (see {Transport::Base#sysroot}). amd64 tolerates the mismatch and does not.
+      def version_strict? = true
+
       def gdb_reg(name) = "$#{name}"
 
       # i386 constraints already name the 32-bit registers, so no folding is needed.

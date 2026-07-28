@@ -21,6 +21,10 @@ module Aletheia
 
       def native_on?(host_machine) = host_machine == 'x86_64'
 
+      # amd64's loader tolerates a version-mismatched libc, so the default cross
+      # sysroot loads every fixture; no per-version sysroot is needed (cf. i386).
+      def version_strict? = false
+
       def gdb_reg(name) = "$#{name}"
 
       E2R = { 'eax' => 'rax', 'ebx' => 'rbx', 'ecx' => 'rcx', 'edx' => 'rdx',

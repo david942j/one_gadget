@@ -64,9 +64,14 @@ symbol versions the old libc lacks (e.g. i386 `dlopen@GLIBC_2.34`). Build a matc
 
 It fetches the fixture's `libc6`/`libc6-dev` `.deb`s (the fixtures come from ubuntu; the version
 is in the fixture's `GNU C Library (Ubuntu GLIBC …)` string), extracts `sysroots/<arch>-<ver>/`
-with the matching `ld.so`, and links `park_stub` against that libc. The transport auto-uses
-`sysroots/<arch>-<major.minor>/` for a fixture of that glibc version; `ALETHEIA_LD_PREFIX` /
-`ALETHEIA_STUB` override it manually. `sysroots/` is git-ignored.
+with the matching `ld.so`, and links `park_stub` against that libc.
+
+The transport uses `sysroots/<arch>-<major.minor>/` for a fixture of that glibc version, and
+**builds it on demand** when missing — but only for an arch that needs it (`version_strict?`, i.e.
+i386, not amd64) and a Ubuntu-sourced fixture. So `sysroots/` (git-ignored) can be deleted anytime
+to reclaim disk; the next verify rebuilds what it needs. `ALETHEIA_LD_PREFIX` / `ALETHEIA_STUB`
+override manually. (Debian-sourced older fixtures would need their `.deb`s fetched differently —
+not handled yet; the default cross sysroot covers the toolchain-matched version.)
 
 ## posix_spawn note
 

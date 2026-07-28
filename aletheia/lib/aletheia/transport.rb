@@ -24,16 +24,30 @@ module Aletheia
 
       def driver = File.join(ROOT, 'driver.py')
 
-      # A per-version sysroot for this fixture (built by +build_sysroot.sh+ under
-      # +sysroots/<arch>-<major.minor>/+), or nil. Used for a foreign libc too old
-      # to dlopen under the default cross sysroot -- it carries the matching ld.so
-      # and a park_stub linked against that libc.
+      # A per-version sysroot for this fixture (under +sysroots/<arch>-<major.minor>/+),
+      # or nil. Used for a foreign libc too old to dlopen under the default cross
+      # sysroot -- it carries the matching ld.so and a park_stub linked against that
+      # libc. Built on demand (and cached) when missing, so the git-ignored
+      # +sysroots/+ can be deleted anytime to reclaim disk.
       def sysroot
         return @sysroot if defined?(@sysroot)
 
         ver = File.basename(@target)[/(\d+\.\d+)/, 1]
         dir = ver && File.join(ROOT, 'sysroots', "#{@arch.name}-#{ver}")
-        @sysroot = (dir && File.directory?(dir)) ? dir : nil
+        dir = nil unless dir && (File.directory?(dir) || build_sysroot(dir))
+        @sysroot = dir
+      end
+
+      # Build the per-version sysroot from the fixture's own Ubuntu package version,
+      # but only when the arch needs one (see {Arch::I386.version_strict?}) and the
+      # fixture is Ubuntu-sourced. Returns whether the sysroot now exists.
+      def build_sysroot(dir)
+        return false unless @arch.version_strict?
+
+        uver = File.binread(@target)[/Ubuntu E?GLIBC (\d[^)]*)/, 1] or return false
+        warn "aletheia: building #{File.basename(dir)} sysroot (libc #{uver})..."
+        system(File.join(ROOT, 'build_sysroot.sh'), @arch.name, uver, %i[out err] => File::NULL)
+        File.directory?(dir)
       end
 
       # The park_stub to run: an explicit override, else the per-version sysroot's
