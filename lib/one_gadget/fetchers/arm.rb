@@ -105,8 +105,25 @@ module OneGadget
       # +ldr rX, [pc]; add rX, pc+ setup so it resolves to +$base + got+.
       def emulate(cmds)
         emu = emulator
-        seed_got_registers(emu, cmds)
+        @got_base_regs = seed_got_registers(emu, cmds)
         cmds.each_with_object(emu) { |cmd, obj| break obj unless obj.process(cmd) }
+      end
+
+      # A GOT base register seeded from the prologue is a runtime precondition: it
+      # must hold the libc GOT base for the candidate to reach +environ+. Surface
+      # that as a constraint (mirroring i386's +<reg> is the GOT address of libc+)
+      # whenever a GOT-resolved global actually made it into the effect. Seeding
+      # only ever primes registers set up *before* the window, so a gadget that
+      # establishes the base itself carries no such constraint.
+      def resolve(processor)
+        res = super
+        return res if res.nil? || !res[:effect].include?('environ')
+
+        @got_base_regs.each do |reg|
+          res[:constraints].unshift("#{reg} is the GOT address of libc")
+          res[:constraints].delete_if { |c| c.start_with?("writable: #{reg}") }
+        end
+        res
       end
 
       # Collect the registers used as a base in a register-offset load (+[rB, rX]+);
@@ -123,12 +140,17 @@ module OneGadget
       # replaying the +ldr rX, [pc]; add rX, pc+ pair (found via {#got_setup_lines})
       # that established it earlier in the function, so +[rX, ...]+ loads inside the
       # candidate resolve against +$base+.
+      # @return [Array<String>] the registers actually seeded (their setup was
+      #   found before the window), i.e. the GOT-base runtime preconditions.
       def seed_got_registers(emu, cmds)
         start = cmds.first[/\A\s*([0-9a-f]+):/, 1]&.to_i(16)
-        return if start.nil?
+        return [] if start.nil?
 
-        got_base_registers(cmds).each do |reg|
-          got_setup_lines(reg, start)&.each { |line| emu.process(line) }
+        got_base_registers(cmds).select do |reg|
+          lines = got_setup_lines(reg, start) or next false
+
+          lines.each { |line| emu.process(line) }
+          true
         end
       end
 
