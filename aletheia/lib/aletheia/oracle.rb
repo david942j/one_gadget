@@ -80,6 +80,11 @@ module Aletheia
         # could not drive `ls /` through this shell (e.g. a fixed `-c` command,
         # an uncontrolled argv[1], or a posix_spawn parent/child tty race).
         Result.new(result: 'EXEC', reason: 'execve("/bin/sh") reached; shell not L2-drivable', **common)
+      elsif (sysno = log[/Unknown syscall (\d+)/, 1])
+        # The emulator (qemu-user, -strace) hit a syscall it doesn't implement, so
+        # the gadget couldn't run to a shell. A harness limit, not a gadget verdict.
+        # @example qemu-arm lacks clone3 (435), which glibc posix_spawn forks with.
+        Result.new(result: 'SKIP', reason: "qemu could not emulate syscall #{sysno} (harness limitation)", **common)
       else
         Result.new(result: 'FAIL', reason: 'no execve("/bin/sh") and no shell output', **common)
       end

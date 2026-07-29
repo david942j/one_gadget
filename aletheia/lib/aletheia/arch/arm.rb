@@ -22,6 +22,12 @@ module Aletheia
 
       def native_on?(host_machine) = %w[armv7l armv6l arm].include?(host_machine)
 
+      # arm runs via stub self-injection rather than a gdbstub: qemu-arm's
+      # gdbstub kills the fork'd child of a posix_spawn gadget, so the L2 shell
+      # never runs. The stub applies the plan and jumps itself, keeping the whole
+      # run under plain qemu-user where the child survives (see {Transport::SelfInject}).
+      def self_inject? = true
+
       # Like i386, an older armhf libc needs a per-version sysroot (its init
       # crashes under a newer ld.so); the toolchain-matched version uses the default.
       def version_strict? = true

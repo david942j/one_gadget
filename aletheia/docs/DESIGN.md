@@ -33,6 +33,22 @@ init means relocations/TLS are done and `environ` is populated, and we hijack a 
 whose state is disposable — we overwrite pc/sp/regs and point sp at fresh scratch, so we
 never corrupt the loader.
 
+## Transports (how the process is run and injected)
+
+`Transport.for` picks one; all share the self-describing `park_stub` (it reports its own
+load base + scratch, so the debugger needs no inferior calls or `/proc` access):
+
+- **Native** — host arch: one `gdb` runs the stub directly.
+- **Qemu** — foreign arch: `qemu-user -g` exposes a gdbstub, `gdb-multiarch` attaches and
+  injects. This is where L0's `catch exec` and the fork-following live.
+- **SelfInject** — no gdb at all: the stub reads the plan from `$ALETHEIA_SELFINJECT` and
+  applies it itself (a small asm trampoline loads the registers/sp and branches to the
+  gadget), so the whole run stays under plain `qemu-user`. Used by arm because qemu-arm's
+  gdbstub kills the fork'd child of a `posix_spawn` gadget, so the L2 shell never survives
+  the gdb path. Trade-off: no gdb means no L0 signal, so a SelfInject gadget is judged on
+  L2 alone (PASS) or its absence. qemu runs with `-strace` so the oracle can see an
+  unimplemented-syscall abort and report SKIP rather than FAIL.
+
 ## The oracle: layered L0 + L2
 
 `driver.py` runs the injected gadget and reports two signals:
@@ -48,8 +64,10 @@ Outcomes: **PASS** = L2; **EXEC** = L0 without L2 (the gadget works, but the har
 drive `ls /` through that shell — a fixed `-c` command from a libc global, an uncontrolled
 `argv[1]` that `sh` treats as a script name, or a `posix_spawn` parent/child tty race);
 **FAIL** = neither (a candidate one_gadget bug, especially under `--strict`); **SKIP** = the
-satisfier produced no plan. EXEC exists because "reaches a shell" and "we can drive that shell"
-are different questions — conflating them would mislabel working gadgets as failures.
+satisfier produced no plan, or the emulator couldn't run the gadget (e.g. qemu-user hit a
+syscall it doesn't implement — see the clone3 limitation below). EXEC exists because "reaches a
+shell" and "we can drive that shell" are different questions — conflating them would mislabel
+working gadgets as failures.
 
 **Promotion (EXEC\*)**: an EXEC gadget is retried with the uncontrolled registers nulled
 (`null_default`). Many EXEC results are only inconclusive because the code writes an
@@ -112,6 +130,13 @@ that won't `dlopen`) is a harness limitation, not a verdict on the gadget.
 
 ## Known limitations
 
+- **qemu-arm can't verify `posix_spawn` gadgets.** glibc 2.43's `posix_spawn` forks with
+  the `clone3` syscall (arm EABI 435), which qemu-arm 10.2 doesn't implement — it returns
+  ENOSYS, no child spawns, and `do_system` aborts on `wait4 == ECHILD`. So arm `posix_spawn`
+  gadgets are reported SKIP (the SelfInject `-strace` detects the unknown syscall); arm
+  `execve` gadgets (a plain syscall) verify fine. qemu-x86_64 does implement `clone3`, which
+  is why amd64/i386 `posix_spawn` gadgets PASS. This clears the moment qemu-arm gains 32-bit
+  `clone3` support (or on real arm hardware) — no Aletheia change needed.
 - Older libcs may not `dlopen` standalone on a newer host (e.g. `aarch64-libc-2.27.so`
   aborts with SIGILL on glibc 2.43). Fallback loaders (explicit old `ld.so`, or manual
   map+relocate) are future work.

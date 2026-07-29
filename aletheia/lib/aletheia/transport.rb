@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'json'
 require 'socket'
 
 module Aletheia
@@ -11,9 +12,15 @@ module Aletheia
   module Transport
     ROOT = File.expand_path('../..', __dir__) # aletheia/
 
-    # @return [Transport::Native, Transport::Qemu]
+    # @return [Transport::Native, Transport::Qemu, Transport::SelfInject]
     def self.for(arch, target)
-      arch.qemu ? Qemu.new(arch, target) : Native.new(arch, target)
+      if arch.respond_to?(:self_inject?) && arch.self_inject?
+        SelfInject.new(arch, target)
+      elsif arch.qemu
+        Qemu.new(arch, target)
+      else
+        Native.new(arch, target)
+      end
     end
 
     class Base
@@ -101,6 +108,62 @@ module Aletheia
         s.close
         port
       end
+    end
+
+    # Self-injecting: plain qemu-user with no gdbstub. The stub applies the plan
+    # (passed as text in $ALETHEIA_SELFINJECT) and jumps to the gadget itself, so
+    # the whole run stays under plain qemu-user. Without gdb there is no L0 signal,
+    # so a gadget is judged purely on L2 (PASS) or its absence.
+    #
+    # Runs qemu with +-strace+ so its syscall log lands in +log+ (the tty stays
+    # clean): it lets the oracle see when qemu can't emulate a syscall the gadget
+    # needs and report SKIP instead of FAIL.
+    #
+    # @example A limitation this surfaces
+    #   glibc 2.43 posix_spawn forks via clone3, which qemu-arm doesn't implement
+    #   ("Unknown syscall 435"); no child spawns, so posix_spawn gadgets can't be
+    #   L2-verified here. execve gadgets (a plain syscall) verify fine.
+    class SelfInject < Base
+      def launch(plan_path:, stub_out:, slave:, log:)
+        q = @arch.qemu
+        ld_prefix = ENV['ALETHEIA_LD_PREFIX'] || sysroot || q['ld_prefix']
+        env = { 'QEMU_LD_PREFIX' => ld_prefix, 'ALETHEIA_STUB_OUT' => stub_out,
+                'ALETHEIA_SELFINJECT' => plan_text(JSON.parse(File.read(plan_path))) }
+        [spawn(env, q['bin'], '-strace', stub, @target, in: slave, out: slave, err: log, pgroup: true)]
+      end
+
+      # Render the JSON plan as the stub's line grammar (see park_stub.c). Offsets
+      # are emitted as 32-bit two's-complement so a negative scratch_off survives.
+      def plan_text(plan)
+        lines = ["default #{default_fill(plan)}"]
+        (plan['regs'] || {}).each do |name, val|
+          num = name[/\d+/] or next
+          lines << reg_line(num, val)
+        end
+        lines << "sp #{hex(plan['sp_offset'] || 0x2000)}"
+        lines << "pc #{hex(Integer(plan['offset']))}"
+        lines << 'thumb 1' if plan.dig('arch', 'thumb')
+        "#{lines.join("\n")}\n"
+      end
+
+      def default_fill(plan)
+        return 'poison' if plan['poison_default']
+        return 'null' if plan['null_default']
+
+        'benign'
+      end
+
+      def reg_line(num, val)
+        if val.is_a?(Hash)
+          return "reg #{num} s #{hex(val['scratch_off'])}" if val.key?('scratch_off')
+
+          "reg #{num} b #{hex(val['base_off'])}"
+        else
+          "reg #{num} l #{hex(val)}"
+        end
+      end
+
+      def hex(val) = format('0x%x', val & 0xffffffff)
     end
   end
 end

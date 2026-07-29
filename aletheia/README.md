@@ -10,8 +10,10 @@ part of the published gem.
 
 ## Status
 
-Verifies aarch64 libc natively (the reference backend) and amd64 libc under qemu-user. The
-backend is picked automatically from the target ELF's machine; other architectures plug in
+Verifies aarch64 natively (the reference backend) and amd64/i386 under qemu-user. arm runs
+via stub self-injection (no gdbstub); its `execve` gadgets verify, but `posix_spawn` gadgets
+are SKIPped because qemu-arm lacks the `clone3` syscall glibc uses to fork (see `docs/DESIGN.md`).
+The backend is picked automatically from the target ELF's machine; other architectures plug in
 behind `Aletheia::Arch` — see `docs/ADDING-AN-ARCH.md`.
 
 ## Prerequisites
