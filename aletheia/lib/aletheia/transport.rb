@@ -128,7 +128,11 @@ module Aletheia
         q = @arch.qemu
         ld_prefix = ENV['ALETHEIA_LD_PREFIX'] || sysroot || q['ld_prefix']
         env = { 'QEMU_LD_PREFIX' => ld_prefix, 'ALETHEIA_STUB_OUT' => stub_out,
-                'ALETHEIA_SELFINJECT' => plan_text(JSON.parse(File.read(plan_path))) }
+                'ALETHEIA_SELFINJECT' => plan_text(JSON.parse(File.read(plan_path))),
+                # TEMPORARY: redirect glibc's clone3 to legacy clone so posix_spawn
+                # can fork under qemu-arm (which lacks clone3). No-op if the stub's
+                # signature check doesn't match. See park_stub.c patch_clone3.
+                'ALETHEIA_CLONE3_HACK' => '1' }
         [spawn(env, q['bin'], '-strace', stub, @target, in: slave, out: slave, err: log, pgroup: true)]
       end
 

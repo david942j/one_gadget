@@ -43,6 +43,77 @@ void aletheia_park(void) {
 }
 
 #ifdef __arm__
+/* --- TEMPORARY HACK: clone3 -> clone for qemu-arm -----------------------------
+ * qemu-arm doesn't implement clone3 (EABI 435), which glibc 2.43's posix_spawn
+ * forks with, so posix_spawn gadgets can't spawn a shell under emulation. This
+ * redirects the target libc's __clone3 wrapper -- which the loader calls as
+ *   __clone3(struct clone_args *a, size_t size, int (*fn)(void*), void *arg)
+ * -- to a shim that translates to the legacy clone (syscall 120, which qemu-arm
+ * does implement) via glibc's own __clone. Gated on $ALETHEIA_CLONE3_HACK and a
+ * byte-signature match, so it only fires where expected. Remove once qemu-arm
+ * gains 32-bit clone3. */
+struct clone_args_min { /* prefix of the kernel struct clone_args (all u64) */
+    unsigned long long flags, pidfd, child_tid, parent_tid, exit_signal,
+                       stack, stack_size, tls;
+};
+
+extern int __clone(int (*fn)(void *), void *stack, int flags, void *arg,
+                   void *ptid, void *tls, void *ctid);
+
+__attribute__((used)) static int
+shim_clone3(struct clone_args_min *a, unsigned long size,
+            int (*fn)(void *), void *arg) {
+    (void)size;
+    int flags = (int)(a->flags | a->exit_signal);
+    void *stack_top = (void *)(unsigned long)(a->stack + a->stack_size);
+    return __clone(fn, stack_top, flags, arg,
+                   (void *)(unsigned long)a->parent_tid,
+                   (void *)(unsigned long)a->tls,
+                   (void *)(unsigned long)a->child_tid);
+}
+
+/* Encode `movw Rd,#lo16 ; movt Rd,#hi16` (Thumb-2 T3/T1) into 8 bytes, loading
+ * the full 32-bit +val+ into register +rd+. */
+static void emit_movw_movt(unsigned char *p, int rd, unsigned long val) {
+    for (int hi = 0; hi < 2; hi++) {
+        unsigned int imm16 = (val >> (hi * 16)) & 0xffff;
+        unsigned int i = (imm16 >> 11) & 1, imm4 = (imm16 >> 12) & 0xf;
+        unsigned int imm3 = (imm16 >> 8) & 0x7, imm8 = imm16 & 0xff;
+        unsigned int hw1 = 0xf240 | (hi ? 0x80 : 0) | (i << 10) | imm4;
+        unsigned int hw2 = (imm3 << 12) | (rd << 8) | imm8;
+        p[hi * 4 + 0] = hw1 & 0xff; p[hi * 4 + 1] = (hw1 >> 8) & 0xff;
+        p[hi * 4 + 2] = hw2 & 0xff; p[hi * 4 + 3] = (hw2 >> 8) & 0xff;
+    }
+}
+
+/* Redirect the libc's __clone3 to shim_clone3 (an absolute Thumb branch via
+ * movw/movt/bx). Returns 1 if the patch was applied. */
+static int patch_clone3(unsigned long base) {
+    /* push {r7}; movw r7,#435; svc 0 -- the wrapper's syscall site, little-endian */
+    static const unsigned char sig[] = {0x80, 0xb4, 0x40, 0xf2, 0xb3, 0x17, 0x00, 0xdf};
+    static const unsigned long OFFSET = 0xb695e; /* fixture-specific (libc-2.43-8c7af7f2) */
+    unsigned char *site = (unsigned char *)(base + OFFSET);
+    if (memcmp(site, sig, sizeof sig) != 0) {
+        fprintf(stderr, "aletheia: clone3 hack signature mismatch; not applied\n");
+        return 0;
+    }
+
+    unsigned long page = (unsigned long)site & ~0xfffUL;
+    if (mprotect((void *)page, 0x2000, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+        fprintf(stderr, "aletheia: clone3 hack mprotect failed\n");
+        return 0;
+    }
+
+    unsigned long tgt = (unsigned long)&shim_clone3; /* Thumb bit already set */
+    unsigned char patch[10];
+    emit_movw_movt(patch, 12, tgt);                  /* movw ip; movt ip */
+    patch[8] = 0x60; patch[9] = 0x47;                /* bx ip */
+    memcpy(site, patch, sizeof patch);
+    __builtin___clear_cache((char *)site, (char *)site + sizeof patch);
+    fprintf(stderr, "aletheia: clone3->clone hack applied at %p\n", (void *)site);
+    return 1;
+}
+
 /* Register file to load before jumping to the gadget (r0..r12, sp, pc). */
 struct inj { unsigned int r[13]; unsigned int sp; unsigned int pc; };
 
@@ -89,6 +160,8 @@ static void self_inject(unsigned long base, unsigned char *scratch, const char *
     int thumb = 0, i;
 
     memcpy(scratch + COMMAND_POOL, "ls /", 5); /* the L2 command the gadget runs */
+
+    if (getenv("ALETHEIA_CLONE3_HACK")) patch_clone3(base);
 
     char *buf = strdup(plan);
     for (char *line = strtok(buf, "\n"); line; line = strtok(NULL, "\n")) {
