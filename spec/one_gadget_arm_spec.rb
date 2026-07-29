@@ -31,10 +31,14 @@ describe 'one_gadget_arm' do
       expect(gadget.constraints).to include('[r1] == 0')
     end
 
-    it 'resolves environ through the GOT base register' do
+    it 'resolves environ through the GOT base register and constrains it' do
       path = data_path('arm-libc-2.23.so')
       gadgets = OneGadget.gadgets(file: path, force_file: true, details: true)
-      expect(gadgets.map(&:effect)).to include('execve("/bin/sh", r4, environ)')
+      gadget = gadgets.find { |g| g.effect == 'execve("/bin/sh", r4, environ)' }
+      expect(gadget).not_to be_nil
+      # Reaching environ needs the GOT base in a register (loaded in the prologue,
+      # outside the window); it must be pinned, like i386's GOT-base constraint.
+      expect(gadget.constraints).to include('r8 is the GOT address of libc')
     end
 
     it 'finds posix_spawn (do_system) gadgets with stack-passed argv/envp' do
