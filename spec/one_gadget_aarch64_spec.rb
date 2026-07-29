@@ -22,7 +22,17 @@ describe 'one_gadget_aarch64' do
 
     it 'libc-2.27' do
       path = data_path('aarch64-libc-2.27.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f160, 0x63e90, 0xa32e8]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f160, 0x63e90, 0xa32e8, 0xa32ec]
+    end
+
+    it 'constrains argv[1] for an argv built off the frame pointer' do
+      path = data_path('aarch64-libc-2.27.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, details: true, level: 1)
+                        .find { |g| g.offset == 0xa3234 }
+      # execve("/bin/sh", x29+0x40, ...): the code stores x0 as argv[1] in the
+      # frame, so x0 must be NULL (or a valid arg) -- not an opaque "valid argv".
+      expect(gadget.effect).to eq 'execve("/bin/sh", x29+0x40, x2)'
+      expect(gadget.constraints).to include('x0 == NULL || {"/bin/sh", x0, NULL} is a valid argv')
     end
 
     # do_system reaches execve via a sigprocmask(set) call that dereferences its
