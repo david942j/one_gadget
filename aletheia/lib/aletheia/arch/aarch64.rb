@@ -37,12 +37,16 @@ module Aletheia
       # park_stub binary for this arch (built by the build helper).
       def stub_binary = 'park_stub_aarch64'
 
-      # qemu-user transport config, or nil when the arch runs natively on the host.
-      def qemu = nil
+      # qemu-user transport config. Used when aarch64 is the *foreign* arch (a
+      # non-aarch64 host), or when +ALETHEIA_FORCE_QEMU+ drives it under qemu on an
+      # aarch64 host -- there the transport resolves the runtime prefix to the host
+      # root instead of this cross sysroot.
+      def qemu = { 'bin' => 'qemu-aarch64', 'ld_prefix' => '/usr/aarch64-linux-gnu',
+                   'gdb_arch' => 'aarch64' }
 
       # Register/syscall model the gdb driver needs (serialized into the plan).
       def driver_model
-        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => nil,
+        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'aarch64',
           'sysno_reg' => 'x8', 'execve_syscalls' => [221, 281],
           'path_reg' => 'x0', 'argv_reg' => 'x1', 'envp_reg' => 'x2' }
       end

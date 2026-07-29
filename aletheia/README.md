@@ -10,11 +10,14 @@ part of the published gem.
 
 ## Status
 
-Verifies aarch64 natively (the reference backend) and amd64/i386 under qemu-user. arm runs
-via stub self-injection (no gdbstub); its `execve` gadgets verify, but `posix_spawn` gadgets
-are SKIPped because qemu-arm lacks the `clone3` syscall glibc uses to fork (see `docs/DESIGN.md`).
-The backend is picked automatically from the target ELF's machine; other architectures plug in
-behind `Aletheia::Arch` — see `docs/ADDING-AN-ARCH.md`.
+Verifies amd64, i386, arm, and aarch64. The backend is picked from the target ELF's machine,
+and the transport from the *host* arch: the arch that matches the host runs natively, the rest
+under qemu-user — so the same suite works on any host (an aarch64 host runs aarch64 natively and
+the others under qemu; an x86_64 host does the reverse). arm runs via stub self-injection (no
+gdbstub); its `execve` gadgets verify, but `posix_spawn` gadgets are SKIPped because qemu-arm
+lacks the `clone3` syscall glibc uses to fork (see `docs/DESIGN.md`). Set `ALETHEIA_FORCE_QEMU=1`
+to run a native arch under qemu too. Other architectures plug in behind `Aletheia::Arch` — see
+`docs/ADDING-AN-ARCH.md`.
 
 ## Prerequisites
 

@@ -12,15 +12,24 @@ module Aletheia
   module Transport
     ROOT = File.expand_path('../..', __dir__) # aletheia/
 
+    # Pick the transport from the *host* arch, not a per-arch flag, so the same
+    # backend runs natively on its own host and under qemu-user anywhere else. Set
+    # +ALETHEIA_FORCE_QEMU+ to drive a native arch through qemu too (e.g. to
+    # exercise the aarch64 qemu path on an aarch64 host).
     # @return [Transport::Native, Transport::Qemu, Transport::SelfInject]
     def self.for(arch, target)
-      if arch.respond_to?(:self_inject?) && arch.self_inject?
-        SelfInject.new(arch, target)
-      elsif arch.qemu
-        Qemu.new(arch, target)
-      else
+      if arch.native_on?(host_machine) && !ENV['ALETHEIA_FORCE_QEMU']
         Native.new(arch, target)
+      elsif arch.respond_to?(:self_inject?) && arch.self_inject?
+        SelfInject.new(arch, target)
+      else
+        Qemu.new(arch, target)
       end
+    end
+
+    # +uname -m+ of the host running the harness.
+    def self.host_machine
+      @host_machine ||= `uname -m`.strip
     end
 
     class Base
@@ -89,8 +98,10 @@ module Aletheia
         q = @arch.qemu
         port = free_port
         # An explicit override, else the per-version sysroot (matching ld.so for an
-        # older foreign libc), else the arch's default cross sysroot.
-        ld_prefix = ENV['ALETHEIA_LD_PREFIX'] || sysroot || q['ld_prefix']
+        # older foreign libc), else the runtime prefix: a native arch forced under
+        # qemu resolves against the host root, a foreign one against its cross sysroot.
+        default_prefix = @arch.native_on?(Transport.host_machine) ? '/' : q['ld_prefix']
+        ld_prefix = ENV['ALETHEIA_LD_PREFIX'] || sysroot || default_prefix
         qenv = { 'QEMU_LD_PREFIX' => ld_prefix, 'ALETHEIA_STUB_OUT' => stub_out }
         qpid = spawn(qenv, q['bin'], '-g', port.to_s, stub, @target,
                      in: slave, out: slave, err: log, pgroup: true)

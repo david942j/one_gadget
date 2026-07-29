@@ -35,12 +35,16 @@ never corrupt the loader.
 
 ## Transports (how the process is run and injected)
 
-`Transport.for` picks one; all share the self-describing `park_stub` (it reports its own
-load base + scratch, so the debugger needs no inferior calls or `/proc` access):
+`Transport.for` picks one from the *host* arch (`uname -m` vs each backend's `native_on?`),
+not a per-arch flag, so a backend runs natively on its own host and under qemu-user on any
+other. All share the self-describing `park_stub` (it reports its own load base + scratch, so
+the debugger needs no inferior calls or `/proc` access):
 
-- **Native** — host arch: one `gdb` runs the stub directly.
-- **Qemu** — foreign arch: `qemu-user -g` exposes a gdbstub, `gdb-multiarch` attaches and
-  injects. This is where L0's `catch exec` and the fork-following live.
+- **Native** — the arch is the host's: one `gdb` runs the stub directly.
+- **Qemu** — a foreign arch: `qemu-user -g` exposes a gdbstub, `gdb-multiarch` attaches and
+  injects. This is where L0's `catch exec` and the fork-following live. `QEMU_LD_PREFIX` is
+  the arch's cross sysroot (`/usr/<triplet>`) — or the host root `/` when a *native* arch is
+  forced under qemu (see below).
 - **SelfInject** — no gdb at all: the stub reads the plan from `$ALETHEIA_SELFINJECT` and
   applies it itself (a small asm trampoline loads the registers/sp and branches to the
   gadget), so the whole run stays under plain `qemu-user`. Used by arm because qemu-arm's
@@ -48,6 +52,10 @@ load base + scratch, so the debugger needs no inferior calls or `/proc` access):
   the gdb path. Trade-off: no gdb means no L0 signal, so a SelfInject gadget is judged on
   L2 alone (PASS) or its absence. qemu runs with `-strace` so the oracle can see an
   unimplemented-syscall abort and report SKIP rather than FAIL.
+
+Set `ALETHEIA_FORCE_QEMU=1` to route a *native* arch through the Qemu transport too — e.g. to
+exercise the aarch64 qemu path on an aarch64 host. Both agree gadget-for-gadget (the aarch64
+2.43 set is 8/8 PASS native and forced-qemu).
 
 ## The oracle: layered L0 + L2
 
