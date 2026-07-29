@@ -17,6 +17,7 @@ module OneGadget
         # Constant registers
         %w[xzr wzr].each { |r| @registers[r] = 0 }
         @pc = 'pc'
+        setup_frame_pointer('x29') # track argv/data staged off the frame pointer
       end
 
       # @see OneGadget::Emulators::X86#process!
@@ -119,10 +120,11 @@ module OneGadget
         raise_unsupported('stp', reg1, reg2, dst) unless reg64?(reg1) && reg64?(reg2)
 
         dst_l = arg_to_lambda(dst).ref!
-        if dst_l.obj == sp && dst_l.deref_count.zero?
+        stack = dst_l.deref_count.zero? ? get_corresponding_stack(dst_l.obj) : nil
+        if stack
           cur_top = dst_l.evaluate(eval_dict)
-          sp_based_stack[cur_top] = registers[reg1]
-          sp_based_stack[cur_top + size_t] = registers[reg2]
+          stack[cur_top] = registers[reg1]
+          stack[cur_top + size_t] = registers[reg2]
         else
           # Don't know where it points; just require it be writable (as inst_str does).
           add_writable(dst_l)
@@ -136,10 +138,11 @@ module OneGadget
         raise_unsupported('str', src, dst, index) unless OneGadget::Helper.integer?(index)
 
         dst_l = arg_to_lambda(dst).ref!
-        # Only stores on stack.
-        if dst_l.obj == sp && dst_l.deref_count.zero?
+        # Only stores on stack (sp- or frame-pointer-relative).
+        stack = dst_l.deref_count.zero? ? get_corresponding_stack(dst_l.obj) : nil
+        if stack
           cur_top = dst_l.evaluate(eval_dict)
-          sp_based_stack[cur_top] = registers[src]
+          stack[cur_top] = registers[src]
         else
           # Unlike the stack case, don't know where to save the value.
           # Simply add a constraint.
