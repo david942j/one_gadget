@@ -195,6 +195,44 @@ resolve a global that appears in the final effect/constraints, and emit
 the harness to build deeper argv/envp/arg0 scratch state (double derefs like argv `= [sp]`,
 arg0 `= [sp+0x30]`) and are satisfier limitations, not one_gadget bugs.
 
+## Finding 4 — imprecise constraint: frame-built argv hides an `argv[1]` requirement
+
+**Gadgets:** `0xa3234`, `0xa3238`, `0xa3240`, `0xa32e8` (aarch64 libc-2.27, in `execvpe`).
+**Status: candidate imprecision, not yet fixed.** Surfaced now that 2.27 is loadable under qemu.
+
+**Constraint form:** `execve("/bin/sh", x29+0x40, <envp>)` with argv reported only as
+`[x29+0x40] == NULL || x29+0x40 == NULL || x29+0x40 is a valid argv`. **No constraint on the
+value that becomes `argv[1]`.**
+
+**Symptom:** the gadget reaches `execve("/bin/sh", ...)` (so L0 passes, reported EXEC) but the
+shell isn't drivable and isn't promotable. At the `execve`, the argv array is actually
+`{"/bin/sh", "", NULL}` — a *non-NULL empty* `argv[1]` — so `sh` treats `""` as a script name
+(`sh: 0: cannot open : No such file`) and exits.
+
+**Root cause (verified):** on the `[x1] == 0` branch the code builds argv in the frame:
+`add x1, x21, #0x7d0` (`"/bin/sh"`), then `stp x1, x0, [x29, #64]` — so `argv[0] = "/bin/sh"`,
+`argv[1] = x0`, `argv[2] = NULL`. `argv[1]` is the incoming register `x0`; the benign fill makes
+it a readable pointer to an empty string. Pinning `x0 = NULL` makes argv `{"/bin/sh", NULL}` and
+the gadget **PASSes** (a real shell runs `ls /`). So the true precondition is `x0 == NULL` (or
+`x0` a valid arg), which the listed constraints omit.
+
+**Why one_gadget misses it:** the emulator tracks `sp`-relative stacks (for which it *does* emit
+precise per-element argv constraints like `argv[1] == NULL || {...}`), but here argv is built at
+`x29 + 0x40` off the *frame pointer*, which the candidate enters uninitialised. Writes into that
+frame aren't tracked, so instead of `{"/bin/sh", x0, ...}` it falls back to the opaque
+`x29+0x40 is a valid argv` — which is satisfiable by pointing the register at empty scratch even
+though the code overwrites that memory. The `argv[1] = x0` requirement is lost.
+
+**Discriminator:** not a harness limitation — the plan satisfied every listed constraint and the
+gadget still yields a broken shell; adding the unlisted `x0 == NULL` fixes it. Impact: a
+return-to-one_gadget with an uncontrolled `x0` gets a shell that immediately exits.
+
+### Suggested fix (for review, not yet applied)
+Track frame-pointer-relative argv construction (or recognise the `execvpe` rebuild) so the
+emitted constraint names `argv[1]`'s source register — mirroring the existing `sp`-relative
+argv handling (`x0 == NULL || {"/bin/sh", x0, ...} is a valid argv`). Harder than Finding 3:
+it needs the emulator to model `x29`-relative writes, so filed for review before a fix.
+
 ## Reproduce
 
 ```
