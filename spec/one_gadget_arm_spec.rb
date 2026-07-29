@@ -23,6 +23,22 @@ describe 'one_gadget_arm' do
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x38f6c, 0x88a48, 0x9ef1a, 0x9f2bc]
     end
 
+    it 'libc-2.43' do
+      path = data_path('libc-2.43-8c7af7f227b3871d6afba752cbb617f317023de5.so')
+      expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
+        .to eq [0x3afdc, 0x3affc, 0x3b000, 0x3b002, 0x3b004, 0x543d2, 0x8d94a, 0xa42c8, 0xa4334, 0xa4338]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3affc, 0x3b004, 0x8d94a, 0xa4334, 0xa4338]
+    end
+
+    it 'constrains the GOT base register on arm-libc-2.43 environ gadgets' do
+      path = data_path('libc-2.43-8c7af7f227b3871d6afba752cbb617f317023de5.so')
+      by_offset = OneGadget.gadgets(file: path, force_file: true, details: true, level: 1)
+                           .to_h { |g| [g.offset, g] }
+      # Two environ gadgets whose GOT base lives in different registers.
+      expect(by_offset[0x3afdc].constraints).to include('r6 is the GOT address of libc')
+      expect(by_offset[0x543d2].constraints).to include('r7 is the GOT address of libc')
+    end
+
     it 'resolves a gadget guarded by a conditional branch' do
       path = data_path('arm-libc-2.27.so')
       gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
