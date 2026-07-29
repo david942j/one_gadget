@@ -146,6 +146,55 @@ constraint set, and `trim_gadgets` then drops it in favour of the dominating, re
 `0x3c930` (`act` set up via `x20+8`). Aletheia `--strict` on libc-2.24 is now **3/3 PASS** —
 the emitted set is complete. Same shape on libc-2.23 (`0x3d6dc` → `0x3d6d8`).
 
+## Finding 3 — missing constraint: arm GOT-base register (environ gadgets)
+
+**Gadgets:** `0x3afdc`, `0x543d2` (arm libc-2.43-8c7af7f2). **Status: candidate bug,
+not yet fixed.**
+
+**Constraint form:** `posix_spawn(..., environ)` — the envp argument is the libc global
+`environ`. Listed constraints govern only the argv/attrp (e.g. `{"sh","-c","--",r9,...}
+is a valid argv`, `r7 == NULL || (u16)[r7] == NULL`). **No constraint names the GOT base.**
+
+**Symptom:** SIGSEGV at NULL before ever reaching `posix_spawn`, with the fully-satisfied
+plan. Disasm at `0x3afdc`: `ldr r1, [pc, #416]` (GOT offset of `environ`), `ldr r1, [r6, r1]`
+(GOT-base + offset), `ldr r3, [r1, #0]` — the last deref faults because `r6` isn't the GOT.
+
+**Root cause (verified):** in ARM PIC, `environ` is reached through a GOT-base register that
+glibc loads in the function prologue (`ldr rX, [pc]; add rX, pc`) — *outside* the gadget
+window. The register is a precondition: it must hold `$base + got` (the libc `.got` base).
+Setting it makes the gadget PASS (a real shell runs `ls /`):
+
+| gadget | GOT-base reg | with `reg = $base + 0x12fe38` |
+| --- | --- | --- |
+| `0x3afdc` | `r6` (`ldr r1, [r6, r1]`) | PASS |
+| `0x543d2` | `r7` (`ldr r2, [r7, r2]`) | PASS |
+
+The register differs per gadget, so the constraint must name the right one.
+
+**Why one_gadget misses it:** the arm fetcher already *detects* these registers and replays
+their prologue setup so the emulator can resolve `environ` — `Fetchers::Arm#seed_got_registers`
+seeds each GOT-base register with `$base + got` before emulating the candidate. But that
+seeded assumption is never surfaced as a constraint. Contrast i386, whose fetcher derives the
+GOT-base register from the (GOT-relative) `/bin/sh` pointer and emits
+`"#{@base_reg} is the GOT address of libc"` (`Fetchers::I386#resolve`). arm should do the
+same for the register(s) whose seeded GOT value flows into a resolved global.
+
+**Discriminator:** a genuine imprecision, not a harness limitation — the plan satisfied every
+listed constraint and failed only on an input the list omits. Impact: a return-to-one-gadget
+attempt with an uncontrolled GOT-base register crashes before `posix_spawn` instead of
+spawning a shell.
+
+### Suggested fix (for review, not yet applied)
+In `Fetchers::Arm`, record which seeded GOT-base register(s) were actually dereferenced to
+resolve a global that appears in the final effect/constraints, and emit
+`"<reg> is the GOT address of libc"` for each (mirroring i386, and reusing the existing
+`Satisfier` support for that constraint). Add a regression expectation to the arm spec.
+
+**Not the GOT issue:** the other level-1 posix_spawn FAILs on this fixture (`0x3b000`,
+`0x3b002`, `0x3b004`, `0xa42c8`, `0xa4334`, `0xa4338`) do not reference `environ`; they need
+the harness to build deeper argv/envp/arg0 scratch state (double derefs like argv `= [sp]`,
+arg0 `= [sp+0x30]`) and are satisfier limitations, not one_gadget bugs.
+
 ## Reproduce
 
 ```
