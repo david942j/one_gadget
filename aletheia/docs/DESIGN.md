@@ -145,9 +145,11 @@ that won't `dlopen`) is a harness limitation, not a verdict on the gadget.
   `execve` gadgets (a plain syscall) verify fine. qemu-x86_64 does implement `clone3`, which
   is why amd64/i386 `posix_spawn` gadgets PASS. This clears the moment qemu-arm gains 32-bit
   `clone3` support (or on real arm hardware) — no Aletheia change needed.
-- Older libcs may not `dlopen` standalone on a newer host (e.g. `aarch64-libc-2.27.so`
-  aborts with SIGILL on glibc 2.43). Fallback loaders (explicit old `ld.so`, or manual
-  map+relocate) are future work.
+- Older libcs may not `dlopen` standalone under the host loader (e.g. `aarch64-libc-2.27.so`
+  aborts with SIGILL on glibc 2.43). Run them under qemu with `ALETHEIA_FORCE_QEMU=1`: a
+  per-version sysroot (matching ld.so, cross-built stub) is fetched on demand, so 2.27 now
+  verifies. A non-Ubuntu fixture (no fetchable deb, e.g. the 2.24) instead falls back to the
+  host loader, which works only when it can load that libc.
 - The argv/envp builder is not implemented yet (not needed for the current fixtures).
 - `x29`/frame-chain assumptions: poison leaves x29 poisoned; if a gadget needs a valid
   frame this shows up as a fault — treat with the discovery loop before calling it a bug.

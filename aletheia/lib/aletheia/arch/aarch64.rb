@@ -24,8 +24,9 @@ module Aletheia
       # @param [String] host_machine value of +uname -m+
       def native_on?(host_machine) = host_machine == 'aarch64'
 
-      # Runs natively (no qemu sysroot), so version-matching never applies.
-      def version_strict? = false
+      # Under qemu, an older aarch64 libc needs a per-version sysroot (its ld.so
+      # differs too much from the host's); the native run loads it directly.
+      def version_strict? = true
 
       # gdb register expression for GPR +name+ (e.g. "x0" -> "$x0").
       def gdb_reg(name) = "$#{name}"

@@ -18,8 +18,9 @@ ver="${2:?usage: build_sysroot.sh <i386> <ubuntu-libc6-version>}"
 short=$(echo "$ver" | grep -oE '^[0-9]+\.[0-9]+')
 
 case "$arch" in
-  i386) deb_arch=i386;  triplet=i386-linux-gnu;        cc=i686-linux-gnu-gcc;      ldso=ld-linux.so.2 ;;
-  arm)  deb_arch=armhf; triplet=arm-linux-gnueabihf;   cc=arm-linux-gnueabihf-gcc; ldso=ld-linux-armhf.so.3 ;;
+  i386)    deb_arch=i386;  triplet=i386-linux-gnu;      cc=i686-linux-gnu-gcc;      ldso=ld-linux.so.2 ;;
+  arm)     deb_arch=armhf; triplet=arm-linux-gnueabihf; cc=arm-linux-gnueabihf-gcc; ldso=ld-linux-armhf.so.3 ;;
+  aarch64) deb_arch=arm64; triplet=aarch64-linux-gnu;   cc=aarch64-linux-gnu-gcc;   ldso=ld-linux-aarch64.so.1 ;;
   *) echo "unsupported arch $arch" >&2; exit 2 ;;
 esac
 dl=-l:libdl.so.2
@@ -38,6 +39,16 @@ rm -rf "$tmp"
 
 # qemu resolves the stub's interpreter (/lib/$ldso) against QEMU_LD_PREFIX=$root.
 [ -e "$root/lib/$ldso" ] || ln -sf "$triplet/$ldso" "$root/lib/$ldso"
+
+# Mirror the runtime libs under /usr/lib/$triplet too. A native arch's ld.so
+# (running under qemu on a host of the same arch) may probe /usr/lib/$triplet
+# before /lib/$triplet; without the libs there, qemu falls back to the HOST's
+# newer libc and the versions clash. This keeps every standard path in-sysroot.
+mkdir -p "$root/usr/lib/$triplet"
+for so in "$root/lib/$triplet"/*.so*; do
+  [ -e "$so" ] && ln -sf "../../../lib/$triplet/$(basename "$so")" \
+                        "$root/usr/lib/$triplet/$(basename "$so")"
+done
 
 libdir="$root/usr/lib/$triplet"
 # -nostdinc: use ONLY the sysroot's headers (plus gcc's own builtins), so an old

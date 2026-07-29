@@ -204,6 +204,12 @@ aletheia/bin/aletheia verify spec/data/aarch64-libc-2.24.so
 aletheia/bin/aletheia verify --strict spec/data/aarch64-libc-2.24.so
 ```
 
-Note: `aarch64-libc-2.27.so` cannot be loaded standalone on a glibc-2.43 host (dlopen
-aborts with SIGILL), so it is currently out of scope; see the loader-fallback risk in the
-project plan.
+Note: `aarch64-libc-2.27.so` aborts with SIGILL if `dlopen`ed under the glibc-2.43 host
+loader, so verify it under qemu with a matched loader:
+
+```
+ALETHEIA_FORCE_QEMU=1 aletheia/bin/aletheia verify --level 1 spec/data/aarch64-libc-2.27.so
+```
+
+A per-version sysroot (the 2.27 ld.so + a stub cross-built against it) is fetched on demand;
+the fixture then loads and its level-1 gadgets verify (12 PASS / 4 EXEC).

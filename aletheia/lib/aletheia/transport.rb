@@ -49,16 +49,31 @@ module Aletheia
         return @sysroot if defined?(@sysroot)
 
         ver = File.basename(@target)[/(\d+\.\d+)/, 1]
-        # The default cross sysroot already loads its own toolchain version; only a
-        # DIFFERENT version on a version-strict arch (i386) needs a matched sysroot.
-        need = ver && @arch.version_strict? && ver != default_libc_version
+        # Only a qemu run needs a matched ld.so; a native run loads the fixture with
+        # the host loader directly. Otherwise: a DIFFERENT version than the runtime
+        # libc, on a version-strict arch, needs a per-version sysroot.
+        need = qemu_transport? && ver && @arch.version_strict? && ver != default_libc_version
         dir = need && File.join(ROOT, 'sysroots', "#{@arch.name}-#{ver}")
         @sysroot = (dir && (stub_built?(dir) || build_sysroot(dir))) ? dir : nil
       end
 
-      # glibc major.minor of the arch's default cross sysroot (its +ld_prefix+ libc).
+      # Whether this run drives the target through qemu (a foreign arch, or a native
+      # one forced under qemu) rather than natively.
+      def qemu_transport?
+        !@arch.native_on?(Transport.host_machine) || ENV['ALETHEIA_FORCE_QEMU']
+      end
+
+      # QEMU_LD_PREFIX base: the host root for a native arch (forced under qemu),
+      # else the arch's cross sysroot.
+      def runtime_prefix
+        @arch.native_on?(Transport.host_machine) ? '/' : @arch.qemu['ld_prefix']
+      end
+
+      # glibc major.minor of the libc the runtime prefix resolves to (the host libc
+      # for a native arch, the cross sysroot's otherwise).
       def default_libc_version
-        libc = Dir[File.join(@arch.qemu['ld_prefix'], 'lib', '**', 'libc.so.6')].first
+        libc = Dir[File.join(runtime_prefix, 'lib', '**', 'libc.so.6')].first ||
+               Dir[File.join(runtime_prefix, 'lib', '*', 'libc.so.6')].first
         libc && File.binread(libc)[/GLIBC (\d+\.\d+)/, 1]
       end
 
@@ -98,10 +113,9 @@ module Aletheia
         q = @arch.qemu
         port = free_port
         # An explicit override, else the per-version sysroot (matching ld.so for an
-        # older foreign libc), else the runtime prefix: a native arch forced under
-        # qemu resolves against the host root, a foreign one against its cross sysroot.
-        default_prefix = @arch.native_on?(Transport.host_machine) ? '/' : q['ld_prefix']
-        ld_prefix = ENV['ALETHEIA_LD_PREFIX'] || sysroot || default_prefix
+        # older libc), else the runtime prefix (host root for a native arch forced
+        # under qemu, the cross sysroot for a foreign one).
+        ld_prefix = ENV['ALETHEIA_LD_PREFIX'] || sysroot || runtime_prefix
         qenv = { 'QEMU_LD_PREFIX' => ld_prefix, 'ALETHEIA_STUB_OUT' => stub_out }
         qpid = spawn(qenv, q['bin'], '-g', port.to_s, stub, @target,
                      in: slave, out: slave, err: log, pgroup: true)
