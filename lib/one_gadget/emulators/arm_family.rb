@@ -28,16 +28,49 @@ module OneGadget
       # its own {X86::COMPARES}.
       COMPARES = { 'cmp' => :sub, 'cmn' => :add, 'tst' => :and }.freeze
 
-      # The sp-based stack that +obj+ addresses, or +nil+ when +obj+ isn't sp-relative.
+      # Frame-pointer register whose relative stores are tracked, or +nil+ when this
+      # arch tracks none. Enabled via {#setup_frame_pointer} (mirrors x86's +bp+).
+      attr_reader :bp
+
+      # @return [Hash{Integer => Lambda}, nil] Stack content based on {#bp}, or nil.
+      attr_reader :bp_based_stack
+
+      # Enable frame-pointer stack tracking with +bp+ as the frame register (so a
+      # gadget that stages data at +[bp+imm]+ -- e.g. an argv array off +x29+ -- is
+      # recovered instead of collapsing to a bare +writable:+). Nil disables it,
+      # leaving the arch +sp+-only. Call from the arch initializer after +super+.
+      def setup_frame_pointer(bp)
+        @bp = bp
+        return if bp.nil?
+
+        @bp_based_stack = Hash.new do |h, k|
+          h[k] = OneGadget::Emulators::Lambda.new(bp).tap do |lmda|
+            lmda.immi = k
+            lmda.deref!
+          end
+        end
+      end
+
+      # The stack that +obj+ addresses -- +sp+-based, {#bp}-based, or +nil+ when
+      # +obj+ isn't stack-relative.
       # @param [String, Lambda] obj A lambda object or its string.
       # @return [Hash{Integer => Lambda}, nil]
       # @example
       #   get_corresponding_stack('sp+0x10') #=> sp_based_stack
+      #   get_corresponding_stack('x29+0x40') #=> bp_based_stack (aarch64)
       #   get_corresponding_stack('x21')     #=> nil
       def get_corresponding_stack(obj)
-        return nil unless obj.to_s.include?(sp)
+        s = obj.to_s
+        return sp_based_stack if s.include?(sp)
+        return bp_based_stack if bp && s.include?(bp)
 
-        sp_based_stack
+        nil
+      end
+
+      # Resolve +sp+- and (when tracked) {#bp}-relative operands to their offset;
+      # the base {Processor#eval_dict} covers only +sp+ (cf. x86).
+      def eval_dict
+        bp ? { sp => 0, bp => 0 } : { sp => 0 }
       end
 
       # Libc calls the emulator accepts without executing: syscall wrappers, and
