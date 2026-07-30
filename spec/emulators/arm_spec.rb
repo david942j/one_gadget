@@ -25,7 +25,7 @@ describe OneGadget::Emulators::Arm do
     it 'renders signed/unsigned and cbz' do
       expect(branch_constraint('cmp r0, #0x400', 'bcs', 0x2000, 0x2000)).to eq ['(u32)r0 >= 0x400'] # taken
       @processor = described_class.new
-      expect(branch_constraint(nil, 'cbz r0,', 0x2000, 0x1008)).to eq ['r0 != 0'] # not taken
+      expect(branch_constraint(nil, 'cbz r0,', 0x2000, 0x1008)).to eq ['r0 != 0x0'] # not taken
     end
 
     it 'aborts a cmp-based branch with no preceding compare' do

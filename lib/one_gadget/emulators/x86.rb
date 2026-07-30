@@ -176,7 +176,7 @@ module OneGadget
         raise_unsupported('movaps', dst, src) unless src.is_a?(Array)
 
         off = dst.evaluate(eval_dict)
-        @constraints << [:raw, "#{sp} & 0xf == #{0x10 - off & 0xf}"]
+        @constraints << [:raw, "#{sp} & 0xf == #{OneGadget::Helper.hex(0x10 - off & 0xf)}"]
         (128 / self.class.bits).times do |i|
           sp_based_stack[off + i * size_t] = src[i]
         end

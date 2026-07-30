@@ -339,9 +339,9 @@ module OneGadget
           end
         end
         arg2 = args[2]
-        cons << "#{arg2} == NULL || (s32)#{(arg2 + 4).deref} <= 0" if arg2.to_s != '0'
+        cons << "#{arg2} == NULL || (s32)#{(arg2 + 4).deref} <= 0x0" if arg2.to_s != '0'
         arg3 = args[3]
-        cons << "#{arg3} == NULL || (u16)#{arg3.deref} == NULL" if arg3.to_s != '0'
+        cons << "#{arg3} == NULL || (u16)#{arg3.deref} == 0x0" if arg3.to_s != '0'
 
         { constraints: cons, effect: %(posix_spawn(#{arg0}, "/bin/sh", #{arg2}, #{arg3}, #{args[4]}, #{res[:envp]})) }
       end
