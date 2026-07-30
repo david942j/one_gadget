@@ -41,13 +41,13 @@ describe OneGadget::CLI do
 0x7fff7f04f2be execve("/bin/sh", rsp+0x40, environ)
 constraints:
   address rsp+0x50 is writable
-  rsp & 0xf == 0
+  rsp & 0xf == 0x0
   rcx == NULL || {rcx, "-c", r12, NULL} is a valid argv
 
 0x7fff7f04f2c5 execve("/bin/sh", rsp+0x40, environ)
 constraints:
   address rsp+0x50 is writable
-  rsp & 0xf == 0
+  rsp & 0xf == 0x0
   rcx == NULL || {rcx, rax, r12, NULL} is a valid argv
 
 0x7fff7f04f322 execve("/bin/sh", rsp+0x40, environ)
@@ -65,13 +65,13 @@ constraints:
 0x4f2be execve("/bin/sh", rsp+0x40, environ)
 constraints:
   address rsp+0x50 is writable
-  rsp & 0xf == 0
+  rsp & 0xf == 0x0
   rcx == NULL || {rcx, "-c", r12, NULL} is a valid argv
 
 0x4f2c5 execve("/bin/sh", rsp+0x40, environ)
 constraints:
   address rsp+0x50 is writable
-  rsp & 0xf == 0
+  rsp & 0xf == 0x0
   rcx == NULL || {rcx, rax, r12, NULL} is a valid argv
 
 0x4f322 execve("/bin/sh", rsp+0x40, environ)
@@ -206,14 +206,14 @@ constraints:
     it 'normal case' do
       argv = b_param + %w[--output-format json]
       expect { hook_logger { described_class.work(argv) } }.to output(<<-EOS).to_stdout
-[{"value":324286,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0","writable: rsp+0x50","rcx == NULL || {rcx, \\"-c\\", r12, NULL} is a valid argv"]},{"value":324293,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0","writable: rsp+0x50","rcx == NULL || {rcx, rax, r12, NULL} is a valid argv"]},{"value":324386,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["[rsp+0x40] == NULL || {[rsp+0x40], [rsp+0x48], [rsp+0x50], [rsp+0x58], ...} is a valid argv"]},{"value":1090444,"effect":"execve(\\"/bin/sh\\", rsp+0x70, environ)","constraints":["[rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv"]}]
+[{"value":324286,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0x0","writable: rsp+0x50","rcx == NULL || {rcx, \\"-c\\", r12, NULL} is a valid argv"]},{"value":324293,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0x0","writable: rsp+0x50","rcx == NULL || {rcx, rax, r12, NULL} is a valid argv"]},{"value":324386,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["[rsp+0x40] == NULL || {[rsp+0x40], [rsp+0x48], [rsp+0x50], [rsp+0x58], ...} is a valid argv"]},{"value":1090444,"effect":"execve(\\"/bin/sh\\", rsp+0x70, environ)","constraints":["[rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv"]}]
       EOS
     end
 
     it 'with near' do
       argv = [libc_file] + %w[-o json --near exit,mkdir]
       expect { hook_logger { described_class.work(argv) } }.to output(<<-EOS).to_stdout
-[{"near":"exit","near_offset":274720,"gadgets":[{"value":324286,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0","writable: rsp+0x50","rcx == NULL || {rcx, \\"-c\\", r12, NULL} is a valid argv"]},{"value":324293,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0","writable: rsp+0x50","rcx == NULL || {rcx, rax, r12, NULL} is a valid argv"]},{"value":324386,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["[rsp+0x40] == NULL || {[rsp+0x40], [rsp+0x48], [rsp+0x50], [rsp+0x58], ...} is a valid argv"]},{"value":1090444,"effect":"execve(\\"/bin/sh\\", rsp+0x70, environ)","constraints":["[rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv"]}]},{"near":"mkdir","near_offset":1113008,"gadgets":[{"value":1090444,"effect":"execve(\\"/bin/sh\\", rsp+0x70, environ)","constraints":["[rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv"]},{"value":324386,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["[rsp+0x40] == NULL || {[rsp+0x40], [rsp+0x48], [rsp+0x50], [rsp+0x58], ...} is a valid argv"]},{"value":324293,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0","writable: rsp+0x50","rcx == NULL || {rcx, rax, r12, NULL} is a valid argv"]},{"value":324286,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0","writable: rsp+0x50","rcx == NULL || {rcx, \\"-c\\", r12, NULL} is a valid argv"]}]}]
+[{"near":"exit","near_offset":274720,"gadgets":[{"value":324286,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0x0","writable: rsp+0x50","rcx == NULL || {rcx, \\"-c\\", r12, NULL} is a valid argv"]},{"value":324293,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0x0","writable: rsp+0x50","rcx == NULL || {rcx, rax, r12, NULL} is a valid argv"]},{"value":324386,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["[rsp+0x40] == NULL || {[rsp+0x40], [rsp+0x48], [rsp+0x50], [rsp+0x58], ...} is a valid argv"]},{"value":1090444,"effect":"execve(\\"/bin/sh\\", rsp+0x70, environ)","constraints":["[rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv"]}]},{"near":"mkdir","near_offset":1113008,"gadgets":[{"value":1090444,"effect":"execve(\\"/bin/sh\\", rsp+0x70, environ)","constraints":["[rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv"]},{"value":324386,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["[rsp+0x40] == NULL || {[rsp+0x40], [rsp+0x48], [rsp+0x50], [rsp+0x58], ...} is a valid argv"]},{"value":324293,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0x0","writable: rsp+0x50","rcx == NULL || {rcx, rax, r12, NULL} is a valid argv"]},{"value":324286,"effect":"execve(\\"/bin/sh\\", rsp+0x40, environ)","constraints":["rsp & 0xf == 0x0","writable: rsp+0x50","rcx == NULL || {rcx, \\"-c\\", r12, NULL} is a valid argv"]}]}]
       EOS
     end
   end

@@ -103,7 +103,10 @@ module OneGadget
         when /GOT address/ then 0.9
         when /^writable/ then calculate_writable_score(expr.sub('writable: ', ''))
         when / == NULL$/ then calculate_null_score(expr.sub(' == NULL', ''))
-        when / <= 0$/ then calculate_null_score(expr.sub(' <= 0', ''))
+        # A sized-cast value required to be zero -- (u16)[..] == 0x0, (s32)[..] <= 0x0 --
+        # is an easy "must be zero" like a NULL pointer, not a generic branch relation.
+        when /\A\([su]\d+\).+ == 0x0$/ then calculate_null_score(expr.sub(' == 0x0', ''))
+        when / <= 0x0$/ then calculate_null_score(expr.sub(' <= 0x0', ''))
         when / is a valid (argv|envp)$/ then 0.2 # This usually means the register has to be a readable pointer.
         when / (==|!=|<=|>=|<|>) / then calculate_relation_score(expr) # a branch condition
         end

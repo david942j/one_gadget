@@ -15,7 +15,7 @@ require 'one_gadget/gadget'
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 324565,
-                      constraints: ["rsp & 0xf == 0", "rcx == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "rcx == NULL"],
                       effect: "execve(\"/bin/sh\", rsp+0x40, environ)")
 OneGadget::Gadget.add(build_id, 324658,
                       constraints: ["[rsp+0x40] == NULL"],

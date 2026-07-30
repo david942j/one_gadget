@@ -52,6 +52,13 @@ module OneGadget
         and: { ordered: false, render: :render_and }   # bitwise AND: flags from  lhs & rhs (zero flag)
       }.freeze
 
+      # A value comparison's zero literal, always hex. Pointer operands render
+      # +NULL+ (chosen by the arg resolvers); every value-context zero here is
+      # +0x0+, so a bare +0+ (and objdump's arch-specific +#0+ vs +0x0+) never leaks
+      # into a constraint.
+      ZERO = '0x0'
+      private_constant :ZERO
+
       # Record a compare so a following conditional branch can be rendered.
       # Normally reached through {#handle_compare}; call it directly only when an
       # arch models a flag-setting instruction that {#handle_compare} doesn't cover.
@@ -169,7 +176,7 @@ module OneGadget
       def branch_on_zero(target, reg, negate:)
         hit = negate ? '!=' : '==' # taken (not negated) => reg == 0
         miss = negate ? '==' : '!='
-        @pending = { target:, render: ->(taken) { "#{reg} #{taken ? hit : miss} 0" } }
+        @pending = { target:, render: ->(taken) { "#{reg} #{taken ? hit : miss} #{ZERO}" } }
         true
       end
 
@@ -186,7 +193,7 @@ module OneGadget
         mask = OneGadget::Helper.hex(1 << bit)
         hit = negate ? '!=' : '=='
         miss = negate ? '==' : '!='
-        @pending = { target:, render: ->(taken) { "(#{reg} & #{mask}) #{taken ? hit : miss} 0" } }
+        @pending = { target:, render: ->(taken) { "(#{reg} & #{mask}) #{taken ? hit : miss} #{ZERO}" } }
         true
       end
 
@@ -232,17 +239,18 @@ module OneGadget
 
       # Subtraction (+:sub+): a direct comparison of the two operands.
       def render_sub(cast, lhs, rhs, op)
+        rhs = ZERO if rhs == '0'
         "#{cast}#{lhs} #{op} #{rhs}"
       end
 
       # Addition (+:add+): the flags reflect +lhs + rhs+, i.e. that sum compared against 0.
       def render_add(cast, lhs, rhs, op)
-        "#{cast}(#{lhs} + #{rhs}) #{op} 0"
+        "#{cast}(#{lhs} + #{rhs}) #{op} #{ZERO}"
       end
 
       # Bitwise AND (+:and+): a bitmask test; identical operands collapse to a plain zero test.
       def render_and(_cast, lhs, rhs, op)
-        lhs == rhs ? "#{lhs} #{op} 0" : "(#{lhs} & #{rhs}) #{op} 0"
+        lhs == rhs ? "#{lhs} #{op} #{ZERO}" : "(#{lhs} & #{rhs}) #{op} #{ZERO}"
       end
 
       # The address of an objdump line, used to tell whether the pending branch

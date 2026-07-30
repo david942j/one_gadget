@@ -37,15 +37,15 @@ describe OneGadget::Emulators::AArch64 do
     end
 
     it 'renders cbz / cbnz' do
-      expect(branch_constraint(nil, 'cbz x0,', 0x2000, 0x1008)).to eq ['x0 != 0'] # not taken
+      expect(branch_constraint(nil, 'cbz x0,', 0x2000, 0x1008)).to eq ['x0 != 0x0'] # not taken
       @processor = described_class.new
-      expect(branch_constraint(nil, 'cbnz x1,', 0x2000, 0x2000)).to eq ['x1 != 0'] # taken
+      expect(branch_constraint(nil, 'cbnz x1,', 0x2000, 0x2000)).to eq ['x1 != 0x0'] # taken
     end
 
     it 'renders tbz / tbnz bit tests' do
-      expect(branch_constraint(nil, 'tbz w3, #4,', 0x2000, 0x2000)).to eq ['(w3 & 0x10) == 0'] # taken
+      expect(branch_constraint(nil, 'tbz w3, #4,', 0x2000, 0x2000)).to eq ['(w3 & 0x10) == 0x0'] # taken
       @processor = described_class.new
-      expect(branch_constraint(nil, 'tbnz w3, #0,', 0x2000, 0x1008)).to eq ['(w3 & 0x1) == 0'] # not taken
+      expect(branch_constraint(nil, 'tbnz w3, #0,', 0x2000, 0x1008)).to eq ['(w3 & 0x1) == 0x0'] # not taken
     end
 
     it 'aborts a cmp-based branch with no preceding compare' do
@@ -54,10 +54,10 @@ describe OneGadget::Emulators::AArch64 do
 
     it 'uses eq/ne but rejects magnitude conditions after tst' do
       # tst x0,x0 sets ZF = (x0 == 0); b.eq taken means x0 == 0.
-      expect(branch_constraint('tst x0, x0', 'b.eq', 0x2000, 0x2000)).to eq ['x0 == 0'] # taken
+      expect(branch_constraint('tst x0, x0', 'b.eq', 0x2000, 0x2000)).to eq ['x0 == 0x0'] # taken
       # tst with distinct operands is a real bitmask test.
       @processor = described_class.new
-      expect(branch_constraint('tst x0, x1', 'b.ne', 0x2000, 0x2000)).to eq ['(x0 & x1) != 0'] # taken
+      expect(branch_constraint('tst x0, x1', 'b.ne', 0x2000, 0x2000)).to eq ['(x0 & x1) != 0x0'] # taken
       @processor = described_class.new
       expect(@processor.process('1000: tst x0, x0')).to be true
       expect(@processor.process('1004: b.lt 2000 <x>')).to be false # magnitude after tst: unsound
