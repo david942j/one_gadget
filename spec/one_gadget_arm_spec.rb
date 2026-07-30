@@ -44,7 +44,7 @@ describe 'one_gadget_arm' do
       gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
                         .find { |g| g.offset == 0x73f2c }
       expect(gadget.effect).to eq 'execve("/bin/sh", sp-0x10, r2)'
-      expect(gadget.constraints).to include('[r1] == 0')
+      expect(gadget.constraints).to include('[r1] == 0x0')
     end
 
     it 'resolves environ through the GOT base register and constrains it' do

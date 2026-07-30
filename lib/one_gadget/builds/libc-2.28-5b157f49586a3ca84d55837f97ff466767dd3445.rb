@@ -15,13 +15,13 @@ require 'one_gadget/gadget'
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 328056,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x8", "{\"sh\", \"-c\", r12, NULL} is a valid argv"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x8", "{\"sh\", \"-c\", r12, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", rsp+0x40, environ)")
 OneGadget::Gadget.add(build_id, 328063,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x8", "rcx == NULL || {rcx, \"-c\", r12, NULL} is a valid argv"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x8", "rcx == NULL || {rcx, \"-c\", r12, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", rsp+0x40, environ)")
 OneGadget::Gadget.add(build_id, 328070,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x8", "rcx == NULL || {rcx, rax, r12, NULL} is a valid argv"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x8", "rcx == NULL || {rcx, rax, r12, NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", rsp+0x40, environ)")
 OneGadget::Gadget.add(build_id, 328163,
                       constraints: ["[rsp+0x40] == NULL || {[rsp+0x40], [rsp+0x48], [rsp+0x50], [rsp+0x58], ...} is a valid argv"],

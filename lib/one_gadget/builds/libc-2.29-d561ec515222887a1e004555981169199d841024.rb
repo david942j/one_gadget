@@ -15,40 +15,40 @@ require 'one_gadget/gadget'
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 339051,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x70", "{\"sh\", \"-c\", r12, NULL} is a valid argv", "rbx == NULL || (u16)[rbx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x70", "{\"sh\", \"-c\", r12, NULL} is a valid argv", "rbx == NULL || (u16)[rbx] == 0x0"],
                       effect: "posix_spawn(rsp+0x1c, \"/bin/sh\", 0, rbx, rsp+0x60, environ)")
 OneGadget::Gadget.add(build_id, 339058,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x70", "rax == NULL || {\"sh\", rax, r12, NULL} is a valid argv", "rbx == NULL || (u16)[rbx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x70", "rax == NULL || {\"sh\", rax, r12, NULL} is a valid argv", "rbx == NULL || (u16)[rbx] == 0x0"],
                       effect: "posix_spawn(rsp+0x1c, \"/bin/sh\", 0, rbx, rsp+0x60, environ)")
 OneGadget::Gadget.add(build_id, 339072,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x70", "rcx == NULL || {rcx, rax, r12, NULL} is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rbx == NULL || (u16)[rbx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x70", "rcx == NULL || {rcx, rax, r12, NULL} is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0x0", "rbx == NULL || (u16)[rbx] == 0x0"],
                       effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rbx, rsp+0x60, environ)")
 OneGadget::Gadget.add(build_id, 339077,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x70", "[r8] == NULL || r8 is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rbx == NULL || (u16)[rbx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x70", "[r8] == NULL || r8 is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0x0", "rbx == NULL || (u16)[rbx] == 0x0"],
                       effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rbx, r8, environ)")
 OneGadget::Gadget.add(build_id, 339093,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x8", "[r8] == NULL || r8 is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rbx == NULL || (u16)[rbx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x8", "[r8] == NULL || r8 is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0x0", "rbx == NULL || (u16)[rbx] == 0x0"],
                       effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rbx, r8, environ)")
 OneGadget::Gadget.add(build_id, 339096,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x8", "[r8] == NULL || r8 is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x8", "[r8] == NULL || r8 is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0x0", "rcx == NULL || (u16)[rcx] == 0x0"],
                       effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rcx, r8, environ)")
 OneGadget::Gadget.add(build_id, 539133,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x70", "{\"sh\", \"-c\", rbp, NULL} is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "r12 == NULL || (s32)[r12+0x4] <= 0"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x70", "{\"sh\", \"-c\", rbp, NULL} is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "r12 == NULL || (s32)[r12+0x4] <= 0x0"],
                       effect: "posix_spawn(rbx+0xe0, \"/bin/sh\", r12, 0, rsp+0x60, environ)")
 OneGadget::Gadget.add(build_id, 539140,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x70", "[r8] == NULL || r8 is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "r12 == NULL || (s32)[r12+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x70", "[r8] == NULL || r8 is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "r12 == NULL || (s32)[r12+0x4] <= 0x0", "rcx == NULL || (u16)[rcx] == 0x0"],
                       effect: "posix_spawn(rbx+0xe0, \"/bin/sh\", r12, rcx, r8, environ)")
 OneGadget::Gadget.add(build_id, 539143,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x70", "[r8] == NULL || r8 is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x70", "[r8] == NULL || r8 is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "rdx == NULL || (s32)[rdx+0x4] <= 0x0", "rcx == NULL || (u16)[rcx] == 0x0"],
                       effect: "posix_spawn(rbx+0xe0, \"/bin/sh\", rdx, rcx, r8, environ)")
 OneGadget::Gadget.add(build_id, 539162,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x78", "[r8] == NULL || r8 is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x78", "[r8] == NULL || r8 is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "rdx == NULL || (s32)[rdx+0x4] <= 0x0", "rcx == NULL || (u16)[rcx] == 0x0"],
                       effect: "posix_spawn(rbx+0xe0, \"/bin/sh\", rdx, rcx, r8, environ)")
 OneGadget::Gadget.add(build_id, 539182,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x28", "[r8] == NULL || r8 is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x28", "[r8] == NULL || r8 is a valid argv", "rbx+0xe0 == NULL || writable: rbx+0xe0", "rdx == NULL || (s32)[rdx+0x4] <= 0x0", "rcx == NULL || (u16)[rcx] == 0x0"],
                       effect: "posix_spawn(rbx+0xe0, \"/bin/sh\", rdx, rcx, r8, environ)")
 OneGadget::Gadget.add(build_id, 539189,
-                      constraints: ["rsp & 0xf == 0", "writable: rsp+0x28", "[r8] == NULL || r8 is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0", "rcx == NULL || (u16)[rcx] == NULL"],
+                      constraints: ["rsp & 0xf == 0x0", "writable: rsp+0x28", "[r8] == NULL || r8 is a valid argv", "rdi == NULL || writable: rdi", "rdx == NULL || (s32)[rdx+0x4] <= 0x0", "rcx == NULL || (u16)[rcx] == 0x0"],
                       effect: "posix_spawn(rdi, \"/bin/sh\", rdx, rcx, r8, environ)")
 OneGadget::Gadget.add(build_id, 926158,
                       constraints: ["[r15] == NULL || r15 == NULL || r15 is a valid argv", "[r13] == NULL || r13 == NULL || r13 is a valid envp"],
