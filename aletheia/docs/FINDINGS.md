@@ -239,6 +239,70 @@ already had. Verified: all four gadgets went from EXEC to PASS under Aletheia. A
 harmonized a latent inconsistency: the `sp`-relative twin `0xa321c` already had the precise
 form, so the trimmer now dedups the two into one gadget.
 
+## Cross-arch strict-mode sweep
+
+With the harness reliability bugs fixed (see DESIGN.md's "Harness reliability fixes") and
+the deep-null satisfier capability in place, `--strict` was run on every arch's current
+libc for the first time (previously only run on aarch64 2.24/2.23, where it found Findings
+1/2). Near-total: 62 of 64 level-1 gadgets across five fixtures PASS clean (the other 2
+are the known-promotable aarch64 EXEC and Finding 5 below).
+
+| fixture | gadgets | result |
+| --- | --- | --- |
+| amd64 2.43 | 11 | 11 PASS |
+| i386 2.43 | 6 | 5 PASS, **1 FAIL** (Finding 5) |
+| i386 2.19 | 9 | 9 PASS |
+| arm 2.43 | 10 | 10 PASS |
+| aarch64 2.43 | 28 | 27 PASS, 1 EXEC (known-promotable, see the level-1 sweep above) |
+
+## Finding 5 — missing constraint: an uncontrolled register clobbers a later NULL-checked stack slot
+
+**Gadget:** `0xed234` (i386 libc-2.43-7a08e84a). **Status: candidate bug, not yet fixed.**
+Found via the strict-mode sweep above; three sibling entries into the same shared tail
+(`0xed237`, `0xed240`, `0xed300`) all PASS.
+
+**Constraint form:** `execve("/bin/sh", ebp-0x28, [ebp-0x30])` with
+`[[ebp-0x30]] == NULL || [ebp-0x30] == NULL || [ebp-0x30] is a valid envp` governing envp.
+**No constraint mentions `ecx`.**
+
+**Symptom (strict):** a fully-satisfied plan still FAILs -- `edx` (the syscall's real envp
+argument) reads `0xDEAD0000` (the poison fill) instead of NULL at the `execve` syscall.
+
+**Root cause (verified):** the candidate's first instruction is
+`mov %ecx, -0x30(%ebp)` -- it writes the (uncontrolled, poisoned) register `ecx` into the
+exact stack slot the envp constraint later requires to read zero. Later,
+`mov (%edx), %ebx` / the shared tail at `0xed300`+ reloads envp from that same slot into
+`edx` for the syscall. So `ecx`'s value *is* the syscall's envp, but nothing in the
+constraint list says so. Setting `ecx = 0` (NULL) makes the gadget PASS -- a real shell
+runs `ls /` (confirmed via direct register probe: `edx` reads `0x0` at the syscall instead
+of `0xDEAD0000`, and the full oracle run reports PASS with L2 satisfied).
+
+**Why one_gadget misses it:** `Fetchers::Base#check_envp` only inspects tracked stack
+content (`get_corresponding_stack`) when the envp pointer *itself* is a bare stack address
+(`deref_count.zero?`). Here envp is `[ebp-0x30]` -- a value **read from** the stack
+(`deref_count == 1`, since execve's envp argument comes from dereferencing that slot), not
+the stack address itself. `check_envp`'s stack branch requires
+`lmda.deref_count.zero? && stack_register?(lmda.obj)`, which is false here (deref_count is
+1), so it falls through to the generic "opaque pointer" fallback -- which doesn't inspect
+*what* `x86.rb`'s `bp_based_stack` already knows is stored at that slot (the Lambda for the
+unresolved register `ecx`) and so never proposes `ecx == NULL` as the real precondition.
+
+**Discriminator:** not a harness limitation -- the plan was complete, conflict-free, and
+fully satisfied every listed constraint; it failed only on an input (`ecx`) the constraint
+list never mentions. Impact: a return-to-one_gadget with an uncontrolled `ecx` reaches
+`execve("/bin/sh", ...)` with a garbage `envp` pointer instead of the advertised NULL.
+
+### Suggested fix (for review, not yet applied)
+Extend `check_envp` (and likely `check_argv`'s analogous stack-lookup, `check_stack_argv`,
+for the same shape on the argv side) to also inspect tracked stack content one level deeper
+when the pointer itself is a single dereference of a stack-relative expression -- i.e.,
+when `Lambda.parse(envp_ptr).deref_count == 1` and the *underlying* address is stack-relative,
+look up `get_corresponding_stack`'s content at that slot. If the tracked content is an
+unresolved register (not a concrete value), emit `<that register> == NULL || ...` instead of
+the opaque double-deref form. This is the same class of gap as Finding 4 (frame-relative
+writes existing but not being surfaced as constraints) applied to `bp_based_stack` reads
+instead of `x29`-relative writes.
+
 ## Reproduce
 
 ```
