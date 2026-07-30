@@ -40,7 +40,7 @@ module Aletheia
                    'gdb_arch' => 'i386' }
 
       def driver_model
-        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'i386',
+        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'i386', 'word_size' => 4,
           'sysno_reg' => 'eax', 'execve_syscalls' => [11, 358],
           'path_reg' => 'ebx', 'argv_reg' => 'ecx', 'envp_reg' => 'edx' }
       end

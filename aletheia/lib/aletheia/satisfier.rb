@@ -16,7 +16,12 @@ module Aletheia
   # string / a NULL-terminated empty argv|envp).
   class Satisfier
     # @return [Aletheia::Plan]
-    Plan = Struct.new(:offset, :effect, :constraints, :regs, :scratch_size, :sp_offset,
+    # @!attribute mem
+    #   [Hash{Integer => Integer, Hash}] scratch-relative memory writes the driver
+    #   applies before jumping (a pointer value, keyed by the scratch offset to
+    #   write it at) -- e.g. so a chained dereference like +[[sp]]+ finds a real
+    #   pointer at +[sp]+ instead of the zero-fill a single dereference relies on.
+    Plan = Struct.new(:offset, :effect, :constraints, :regs, :mem, :scratch_size, :sp_offset,
                       :benign_default, :poison_default, :null_default, :branches, :status,
                       :reason, :writable_count, keyword_init: true)
 
@@ -70,7 +75,7 @@ module Aletheia
     def satisfy(gadget)
       plan = Plan.new(
         offset: format('%#x', gadget.offset), effect: gadget.effect,
-        constraints: gadget.constraints.dup, regs: {}, scratch_size: SCRATCH_SIZE,
+        constraints: gadget.constraints.dup, regs: {}, mem: {}, scratch_size: SCRATCH_SIZE,
         sp_offset: SP_OFFSET, benign_default: !@strict, poison_default: @strict,
         branches: {}, status: 'ok', reason: nil, writable_count: 0
       )
@@ -87,8 +92,8 @@ module Aletheia
 
     # Try each disjunct of +constraint+ cheapest-first; accept the first that is
     # already satisfied by the current plan or that applies without conflict. The
-    # register map is snapshot/restored around a failed apply so a partial
-    # assignment can't leak into the next attempt.
+    # register map and memory-write map are snapshot/restored around a failed
+    # apply so a partial assignment can't leak into the next attempt.
     # @return [String, nil] the chosen disjunct, or nil if none worked.
     def satisfy_constraint(plan, constraint)
       ordered = constraint.split(' || ').map(&:strip)
@@ -97,10 +102,12 @@ module Aletheia
       ordered.each do |_, branch|
         return branch if satisfied?(plan, branch)
 
-        snapshot = plan.regs.dup
+        regs_snapshot = plan.regs.dup
+        mem_snapshot = plan.mem.dup
         return branch if apply(plan, branch)
 
-        plan.regs = snapshot
+        plan.regs = regs_snapshot
+        plan.mem = mem_snapshot
       end
       nil
     end
@@ -175,14 +182,30 @@ module Aletheia
         return nil if op.reg.nil?                  # a bare literal == NULL is fixed, not ours to set
 
         op.imm.zero? ? 0.1 : 0.3 # set reg = -imm
-      else
-        # A dereferenced value must be zero in memory. If it hangs off the stack it
-        # lands in our zeroed scratch for free; a single deref off a register can be
-        # zeroed by pointing that register at scratch; deeper derefs aren't handled.
+      elsif op.deref == 1
+        # A single dereferenced value must be zero in memory. If it hangs off the
+        # stack it lands in our zeroed scratch for free; off a register, that
+        # register can be pointed at scratch.
         return 0.05 if stack_reg?(op.reg)
 
-        op.deref == 1 && op.reg ? 0.2 : nil
+        op.reg ? 0.2 : nil
+      else
+        deep_null_cost(op)
       end
+    end
+
+    # +[[X]] == NULL+ (or deeper): X's OWN first-level target isn't guaranteed
+    # zero (only what it points AT, at the next level, needs to be) -- so unlike a
+    # single deref this needs a real pointer written into scratch at each level of
+    # the chain, terminating in the always-zero {STRING_POOL}. See {#apply_deep_null}.
+    # Costed above a single deref (one extra scratch write per extra level), and
+    # requires a settable register when X isn't the stack pointer.
+    # @return [Float, nil]
+    def deep_null_cost(op)
+      return nil unless stack_reg?(op.reg) || (op.reg && settable?(op.reg))
+
+      base = stack_reg?(op.reg) ? 0.15 : 0.25
+      base + (0.05 * (op.deref - 2))
     end
 
     # @return [Float, nil]
@@ -258,8 +281,9 @@ module Aletheia
         op = safe_parse(Regexp.last_match(1))
         if op.nil? then false
         elsif op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
-        elsif stack_reg?(op.reg) then true # sp-relative slot is already zeroed scratch
+        elsif op.deref == 1 && stack_reg?(op.reg) then true # sp-relative slot is already zeroed scratch
         elsif op.deref == 1 && op.reg then set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm })
+        elsif op.deref >= 2 then apply_deep_null(plan, op)
         else false
         end
       when /\A\{(.*)\} is a valid (?:argv|envp)\z/ then apply_argv_list(plan, Regexp.last_match(1))
@@ -273,9 +297,41 @@ module Aletheia
     # Satisfy a dereferenced +== 0+ by pointing the register at zeroed scratch
     # (an sp-relative slot is already zero); cf. the +== NULL+ deref handling.
     def apply_deref_null(plan, op)
-      return true if stack_reg?(op.reg)
+      return true if op.deref == 1 && stack_reg?(op.reg)
+      return apply_deep_null(plan, op) if op.deref >= 2
 
-      op.deref == 1 ? set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm }) : false
+      op.reg ? set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm }) : false
+    end
+
+    # Build a chain of scratch pointers so a chained dereference (+[[X]] == NULL+,
+    # or deeper) is genuinely valid at every level, not just the last: unlike a
+    # single dereference, +[X]+ (the first level) is NOT already guaranteed zero,
+    # so it must hold a real pointer for the next level to read -- terminating in
+    # the always-zero {STRING_POOL} so the final read is 0.
+    # @param [Aletheia::Operand] op A parsed operand with +op.deref >= 2+.
+    # @example +[[sp]] == NULL+ (deref 2): one write, sp's own scratch slot -> STRING_POOL
+    # @example +[[r5+8]] == NULL+ (deref 2, register): r5 is pointed at a fresh
+    #   slot, and that slot -> STRING_POOL
+    # @example deref 3: X -> slot_1 -> STRING_POOL (two writes, one extra slot)
+    def apply_deep_null(plan, op)
+      addr_off =
+        if stack_reg?(op.reg)
+          SP_OFFSET + op.imm
+        elsif op.reg && settable?(op.reg)
+          slot = scratch_slot(plan, op.imm)
+          return false unless set_reg(plan, xreg(op.reg), slot)
+
+          slot['scratch_off'] + op.imm
+        end
+      return false unless addr_off
+
+      (op.deref - 1).times do |i|
+        target_off = i == op.deref - 2 ? STRING_POOL : scratch_slot(plan, 0)['scratch_off']
+        return false unless set_mem(plan, addr_off, { 'scratch_off' => target_off })
+
+        addr_off = target_off
+      end
+      true
     end
 
     # Set the base register to the libc GOT, +base + PLTGOT offset+; the driver
@@ -417,6 +473,16 @@ module Aletheia
       return false if existing && existing != value
 
       plan.regs[reg] = value
+      true
+    end
+
+    # As {#set_reg}, but for a scratch-relative memory write (+plan.mem+): false
+    # on a conflicting write to an already-assigned offset.
+    def set_mem(plan, off, value)
+      existing = plan.mem[off]
+      return false if existing && existing != value
+
+      plan.mem[off] = value
       true
     end
 

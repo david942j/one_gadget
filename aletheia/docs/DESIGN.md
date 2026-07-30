@@ -104,10 +104,22 @@ takes the cheapest satisfiable branch. Memory model: one zeroed scratch region, 
 to `scratch + sp_offset`, so sp-relative NULL/writable requirements are free.
 
 Categories handled today: `writable: <reg+imm>` (point the register into a scratch
-write-area), `<op> == NULL` / `<op> <= 0` (bare reg -> 0; sp+imm -> unsatisfiable, so the
-other branch wins; sp-relative deref -> free via zero-fill). `is a valid argv/envp` is
-scored expensive and not yet built (the native-2.43 and older-execve sets always have a
-cheaper NULL branch); building it is the next satisfier task.
+write-area), `<op> == NULL` / `<op> <= 0x0` (bare reg -> 0; sp+imm -> unsatisfiable, so the
+other branch wins; a *single* sp-relative deref -> free via zero-fill). `is a valid
+argv/envp` (the full array-literal/content builder) is scored expensive and not built --
+every fixture so far always has a cheaper branch available.
+
+**Chained dereferences** (`[[X]] == NULL`, or deeper -- posix_spawn's argv/envp when
+passed as a pointer-to-pointer, e.g. `argv=[sp]` with `[[sp]] == NULL` meaning "argv[0] is
+NULL") are NOT automatically free like a single deref: `[X]` (the first level) is
+zero-filled, so dereferencing it *again* reads through NULL and faults. `apply_deep_null`
+builds a real pointer chain instead -- one `plan.mem` scratch write per extra level of
+indirection, terminating in the always-zero `STRING_POOL` -- so every level is a genuine,
+valid pointer. Costed above a single deref (it needs a scratch write the free case
+doesn't), so it's only chosen when no cheaper branch exists. `plan.mem` is applied by
+`driver.py` (a `write_memory` call per entry, arch-width via `word_size`) and by
+`park_stub.c`'s self-injection (a `mem <off> <val>` directive, arm-only, 4-byte writes) --
+see `Transport::SelfInject#plan_text` and `self_inject()`'s grammar comment in park_stub.c.
 
 ## Benign vs poison (the completeness test)
 
@@ -190,6 +202,5 @@ verified against in the commit that introduced this section.
   per-version sysroot (matching ld.so, cross-built stub) is fetched on demand, so 2.27 now
   verifies. A non-Ubuntu fixture (no fetchable deb, e.g. the 2.24) instead falls back to the
   host loader, which works only when it can load that libc.
-- The argv/envp builder is not implemented yet (not needed for the current fixtures).
 - `x29`/frame-chain assumptions: poison leaves x29 poisoned; if a gadget needs a valid
   frame this shows up as a fault — treat with the discovery loop before calling it a bug.

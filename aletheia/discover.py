@@ -7,6 +7,7 @@
 import gdb
 import json
 import os
+import struct
 
 plan = json.load(open(os.environ["ALETHEIA_PLAN"]))
 offset = int(plan["offset"], 0)
@@ -50,6 +51,12 @@ for reg, val in plan.get("regs", {}).items():
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
     gdb.execute("set $%s = %#x" % (reg, int(val) & 0xFFFFFFFFFFFFFFFF))
+# Scratch-relative memory writes (cf. driver.py) -- aarch64-only here, always 8 bytes.
+for off, val in plan.get("mem", {}).items():
+    off = int(off)
+    if isinstance(val, dict) and "scratch_off" in val:
+        val = scratch + val["scratch_off"]
+    gdb.selected_inferior().write_memory(scratch + off, struct.pack("<Q", int(val) & 0xFFFFFFFFFFFFFFFF))
 gdb.execute("set $sp = %#x" % (scratch + plan.get("sp_offset", 0x10000)))  # keep in sync with Satisfier::SP_OFFSET
 gdb.execute("set $pc = %#x" % gadget)
 

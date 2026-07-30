@@ -9,6 +9,7 @@ import gdb
 import json
 import os
 import re
+import struct
 
 MASK = 0xFFFFFFFFFFFFFFFF
 plan = json.load(open(os.environ["ALETHEIA_PLAN"]))
@@ -73,6 +74,19 @@ for reg, val in plan.get("regs", {}).items():
         elif "base_off" in val:
             val = base + val["base_off"]              # a libc load-base offset (i386 GOT)
     set_reg(reg, int(val))
+
+# Scratch-relative memory writes (a pointer value, keyed by the offset to write
+# it at) -- built by the satisfier for a chained dereference like `[[sp]]`,
+# where the first level needs a real pointer rather than the zero-fill a single
+# dereference relies on. See Satisfier#apply_deep_null.
+word_size = arch.get("word_size", 8)
+word_fmt = {4: "<I", 8: "<Q"}[word_size]
+word_mask = (1 << (word_size * 8)) - 1
+for off, val in plan.get("mem", {}).items():
+    off = int(off)
+    if isinstance(val, dict) and "scratch_off" in val:
+        val = scratch + val["scratch_off"]
+    gdb.selected_inferior().write_memory(scratch + off, struct.pack(word_fmt, int(val) & word_mask))
 
 sp = scratch + plan.get("sp_offset", 0x2000)
 gdb.execute("set $%s = %#x" % (arch["sp"], sp))

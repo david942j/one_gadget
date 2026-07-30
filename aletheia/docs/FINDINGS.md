@@ -190,9 +190,12 @@ resolve a global that appears in the final effect/constraints, and emits
 `spec/one_gadget_arm_spec.rb` (one_gadget#332).
 
 **Not the GOT issue:** the other level-1 posix_spawn FAILs on this fixture (`0x3b000`,
-`0x3b002`, `0x3b004`, `0xa42c8`, `0xa4334`, `0xa4338`) do not reference `environ`; they need
-the harness to build deeper argv/envp/arg0 scratch state (double derefs like argv `= [sp]`,
-arg0 `= [sp+0x30]`) and are satisfier limitations, not one_gadget bugs.
+`0x3b002`, `0x3b004`, `0xa42c8`, `0xa4334`, `0xa4338`) did not reference `environ`; they
+were a **harness limitation, not a one_gadget bug** -- the satisfier couldn't build a
+chained dereference (`argv=[sp]` needs `[[sp]] == NULL`, i.e. argv[0]=NULL, which requires
+a real pointer at `[sp]`, not the zero-fill a *single* deref gets for free). Fixed by
+`Satisfier#apply_deep_null` (see DESIGN.md's satisfier section); all 10 of this fixture's
+level-1 gadgets now PASS, including these six.
 
 ## Finding 4 — imprecise constraint: frame-built argv hides an `argv[1]` requirement
 

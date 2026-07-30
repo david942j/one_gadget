@@ -44,7 +44,7 @@ module Aletheia
                    'gdb_arch' => 'i386:x86-64' }
 
       def driver_model
-        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'i386:x86-64',
+        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'i386:x86-64', 'word_size' => 8,
           'sysno_reg' => 'rax', 'execve_syscalls' => [59, 322],
           'path_reg' => 'rdi', 'argv_reg' => 'rsi', 'envp_reg' => 'rdx' }
       end

@@ -146,6 +146,8 @@ __attribute__((noreturn)) static void jump_inj(struct inj *g) {
 /* Apply the plan and jump. Plan grammar (one directive per line):
  *   default benign|poison|null   fill for registers the plan doesn't set
  *   reg <n> s|l|b <hex>          r<n> = scratch+hex (s) | literal (l) | base+hex (b)
+ *   mem <hex-off> <hex-val>      *(scratch+off) = scratch+val (a scratch pointer,
+ *                                for a chained dereference like [[sp]]==NULL)
  *   sp <hex>                     sp = scratch + hex
  *   pc <hex>                     pc = base + hex
  *   thumb 1                      enter the gadget in Thumb state
@@ -157,6 +159,7 @@ static void self_inject(unsigned long base, unsigned char *scratch, const char *
     char rset[13] = {0};
     unsigned long fill = (unsigned long)scratch + STRING_POOL;
     unsigned int sp = 0, pc = 0;
+    unsigned long off;
     int thumb = 0, i;
 
     memcpy(scratch + COMMAND_POOL, "ls /", 5); /* the L2 command the gadget runs */
@@ -173,6 +176,10 @@ static void self_inject(unsigned long base, unsigned char *scratch, const char *
                                  : kind == 'b' ? base + v
                                  : v);
             rset[n] = 1;
+        } else if (sscanf(line, "mem %lx %lx", &off, &v) == 2) {
+            /* A chained dereference (e.g. [[sp]]==NULL) needs a real pointer at
+             * scratch+off, not just the zero-fill a single dereference relies on. */
+            *(unsigned int *)(scratch + off) = (unsigned int)((unsigned long)scratch + v);
         } else if (sscanf(line, "sp %lx", &v) == 1) {
             sp = (unsigned int)((unsigned long)scratch + v);
         } else if (sscanf(line, "pc %lx", &v) == 1) {

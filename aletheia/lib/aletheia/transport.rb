@@ -179,6 +179,7 @@ module Aletheia
           num = name[/\d+/] or next
           lines << reg_line(num, val)
         end
+        (plan['mem'] || {}).each { |off, val| lines << mem_line(off, val) }
         lines << "sp #{hex(plan['sp_offset'] || 0x2000)}"
         lines << "pc #{hex(Integer(plan['offset']))}"
         lines << 'thumb 1' if plan.dig('arch', 'thumb')
@@ -203,6 +204,16 @@ module Aletheia
       end
 
       def hex(val) = format('0x%x', val & 0xffffffff)
+
+      # A scratch-relative pointer write the satisfier needs applied before the
+      # jump (see Satisfier#apply_deep_null): at scratch+off, write the address
+      # scratch+val['scratch_off']. The satisfier never emits any other mem value
+      # shape (always a scratch pointer, never a literal or base_off).
+      def mem_line(off, val)
+        raise ArgumentError, "unsupported mem value: #{val.inspect}" unless val.is_a?(Hash) && val.key?('scratch_off')
+
+        "mem #{hex(Integer(off))} #{hex(val['scratch_off'])}"
+      end
     end
   end
 end

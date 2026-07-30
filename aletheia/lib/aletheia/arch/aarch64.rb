@@ -47,7 +47,7 @@ module Aletheia
 
       # Register/syscall model the gdb driver needs (serialized into the plan).
       def driver_model
-        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'aarch64',
+        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'aarch64', 'word_size' => 8,
           'sysno_reg' => 'x8', 'execve_syscalls' => [221, 281],
           'path_reg' => 'x0', 'argv_reg' => 'x1', 'envp_reg' => 'x2' }
       end

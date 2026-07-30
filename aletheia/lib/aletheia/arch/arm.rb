@@ -42,7 +42,7 @@ module Aletheia
                    'gdb_arch' => 'arm' }
 
       def driver_model
-        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'arm',
+        { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'arm', 'word_size' => 4,
           'sysno_reg' => 'r7', 'execve_syscalls' => [11, 387],
           'path_reg' => 'r0', 'argv_reg' => 'r1', 'envp_reg' => 'r2',
           'thumb' => true }
