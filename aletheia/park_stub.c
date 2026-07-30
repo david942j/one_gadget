@@ -31,7 +31,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#define SCRATCH_SIZE 0x10000
+#define SCRATCH_SIZE 0x20000 /* keep in sync with Satisfier::SCRATCH_SIZE */
 #define STRING_POOL  0x100  /* benign default: a readable, zero-filled scratch slot */
 #define COMMAND_POOL 0x200  /* where the L2 "ls /" command is seeded (cf. satisfier) */
 

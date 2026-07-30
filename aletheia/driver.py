@@ -117,12 +117,18 @@ def execd_shell(pid):
 
 # L0: the deterministic "reaches a shell" signal. A straight-line execve stops at
 # the syscall entry, where we verify the "/bin/sh" path and readable argv/envp;
-# posix_spawn runs through to the new image, caught by `catch exec` (native).
+# posix_spawn runs through to the new image, caught by `catch exec` -- but only
+# natively, where the vforked child is followed (`follow-fork-mode child` above).
+# Over a qemu-user gdbstub the child is never followed, so `catch exec` can only
+# ever fire in the (non-execing) parent -- useless there, and qemu-aarch64's
+# gdbstub SIGSEGVs some straight-line execl() paths when it's armed regardless
+# (reproduced: works cleanly without it, corrupts execl with it).
 gdb.execute("catch syscall execve execveat")
-try:
-    gdb.execute("catch exec")
-except gdb.error:
-    pass
+if connect == "run":
+    try:
+        gdb.execute("catch exec")
+    except gdb.error:
+        pass
 gdb.execute("continue")
 l0 = False
 try:

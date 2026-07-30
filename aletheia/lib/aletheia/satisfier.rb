@@ -20,12 +20,20 @@ module Aletheia
                       :benign_default, :poison_default, :null_default, :branches, :status,
                       :reason, :writable_count, keyword_init: true)
 
-    SCRATCH_SIZE    = 0x10000
-    SP_OFFSET       = 0x2000
+    SCRATCH_SIZE    = 0x20000
+    # Headroom below sp: some gadgets land inside a function whose own prologue
+    # allocates its stack frame *after* we've jumped in (e.g. aarch64 execl's
+    # `sub sp, sp, #0x2000; sub sp, sp, #0xd0`, ~8.4KB) -- too little headroom lets
+    # that write run off the start of the scratch mmap. Found via Aletheia itself:
+    # a too-tight sp_offset (0x2000) let exactly this happen, silently absorbed by
+    # an adjacent mapping under native ASLR but faulting reliably under qemu-user's
+    # stricter layout -- a harness bug, not a one_gadget one. 64KB comfortably
+    # covers any observed gadget's local stack usage.
+    SP_OFFSET       = 0x10000
     STRING_POOL     = 0x100    # readable+writable zeroed bytes: a valid "" / [NULL] array
     COMMAND_POOL    = 0x200    # the "ls /" L2 command the driver seeds here
     COMMAND_RESERVED = 0x40    # generous window at COMMAND_POOL treated as non-zero
-    WRITABLE_BASE   = 0x4000   # write-areas live above the stack region (sp is at SP_OFFSET)
+    WRITABLE_BASE   = 0x12000  # write-areas live above the stack region (sp is at SP_OFFSET)
     WRITABLE_STRIDE = 0x800
     WORD            = 8        # conservative pointer width for a "reads zero" check
     MASK64          = (1 << 64) - 1

@@ -33,7 +33,7 @@ target_base = os.path.basename(os.environ.get("ALETHEIA_TARGET", ""))
 base = base_of(target_base) or base_of("libc.so.6")
 gadget = base + offset
 
-scratch = int(gdb.parse_and_eval("(void*)mmap(0, 0x10000, 3, 0x22, -1, 0)")) & 0xFFFFFFFFFFFFFFFF
+scratch = int(gdb.parse_and_eval("(void*)mmap(0, 0x20000, 3, 0x22, -1, 0)")) & 0xFFFFFFFFFFFFFFFF  # keep in sync with Satisfier::SCRATCH_SIZE
 gdb.selected_inferior().write_memory(scratch + 0x200, b"ls /\x00")
 
 # Fill uncontrolled registers the same way the driver does for this plan.
@@ -50,7 +50,7 @@ for reg, val in plan.get("regs", {}).items():
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
     gdb.execute("set $%s = %#x" % (reg, int(val) & 0xFFFFFFFFFFFFFFFF))
-gdb.execute("set $sp = %#x" % (scratch + plan.get("sp_offset", 0x2000)))
+gdb.execute("set $sp = %#x" % (scratch + plan.get("sp_offset", 0x10000)))  # keep in sync with Satisfier::SP_OFFSET
 gdb.execute("set $pc = %#x" % gadget)
 
 gdb.write("BASE=%#x GADGET=%#x SCRATCH=%#x\n" % (base, gadget, scratch))

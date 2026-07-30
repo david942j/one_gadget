@@ -136,6 +136,46 @@ A FAIL is a one_gadget bug only if the plan was **complete, conflict-free, and f
 satisfied**. A SKIP / conflict / unsatisfiable-branch / environment error (e.g. a libc
 that won't `dlopen`) is a harness limitation, not a verdict on the gadget.
 
+## Harness reliability fixes
+
+Bugs in Aletheia itself, not in one_gadget -- found the same way as a real finding (a
+result that looked wrong until traced to ground), but the defect was in the harness's own
+model. Recorded because `--strict` is only a trustworthy verdict on one_gadget once the
+harness underneath it is trusted; a harness bug here would otherwise get misread as a
+one_gadget bug there.
+
+- **`catch exec` corrupted qemu-aarch64 execution.** Landing mid-function via the gdbstub
+  with an exec catchpoint armed made some straight-line `execve`/`execl` gadgets SIGSEGV
+  inside libc under the qemu transport (reproduced: clean without the catchpoint, corrupts
+  with it). It was only ever useful natively anyway (it exists to catch a vforked
+  `posix_spawn` child's exec, and the qemu transport deliberately never follows the
+  child -- `follow-fork-mode parent` -- so the catchpoint could never usefully fire there).
+  Fixed: only armed when `connect == "run"` (native).
+- **Scratch headroom below `sp` was too tight.** `SP_OFFSET` (0x2000) left only 8KB below
+  `sp` before the scratch mmap's start. A gadget landing inside a function whose *own*
+  prologue allocates a large frame after the jump (aarch64 `execl`'s
+  `sub sp,sp,#0x2000; sub sp,sp,#0xd0`, ~8.4KB) could write past that boundary. Silently
+  absorbed by an adjacent mapping under native ASLR (so it never showed up natively), but
+  qemu-user's stricter layout faulted reliably -- and inconsistently across runs, since it
+  hinged on ASLR luck either way. Fixed: `SCRATCH_SIZE`/`SP_OFFSET`/`WRITABLE_BASE` widened
+  (128KB scratch, 64KB headroom below `sp`); `park_stub.c` and `discover.py`'s standalone
+  mmap kept in sync (see the "keep in sync" comments at each).
+- **Per-version sysroot stubs went stale silently.** A per-version sysroot's `park_stub` is
+  a cross-compile of `park_stub.c` cached under `sysroots/<arch>-<version>/`. `stub_built?`
+  only checked existence, not currency -- so editing `park_stub.c` (e.g. the `SCRATCH_SIZE`
+  fix above) left every already-built sysroot stub running the *old* layout while the
+  satisfier computed offsets against the *new* one, a silent mismatch that manifested as
+  seemingly random SIGSEGVs on exactly the arches/versions with a cached sysroot. Fixed:
+  `stub_built?` also compares mtimes and rebuilds when `park_stub.c` is newer.
+
+Net effect of the three together (they compounded, which is why this took real digging to
+untangle): an aarch64-2.23 `execl` gadget was flaky under qemu — passed once, then failed
+consistently — purely from ASLR luck on the headroom bug, misleadingly close to "looks like
+qemu itself is unreliable." It was two harness bugs plus a stale-cache issue, not qemu, not
+one_gadget. All three are now covered by rerunning every fixture (native + `ALETHEIA_FORCE_QEMU=1`)
+after any `park_stub.c`/`satisfier.rb` change -- see the per-arch counts these fixes were
+verified against in the commit that introduced this section.
+
 ## Known limitations
 
 - **qemu-arm can't verify `posix_spawn` gadgets.** glibc 2.43's `posix_spawn` forks with

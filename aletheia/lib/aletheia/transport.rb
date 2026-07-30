@@ -77,7 +77,17 @@ module Aletheia
         libc && File.binread(libc)[/GLIBC (\d+\.\d+)/, 1]
       end
 
-      def stub_built?(dir) = File.file?(File.join(dir, 'park_stub'))
+      # Built, and not stale: a per-version stub is a cross-compile of park_stub.c
+      # baked with the memory-layout constants (SCRATCH_SIZE etc.) current when it
+      # was built. If park_stub.c has since changed, a cached stub silently drifts
+      # out of sync with the driver/satisfier's current layout -- e.g. a stub built
+      # before a SCRATCH_SIZE bump still only mmaps the old (smaller) size, so a
+      # plan computed against the new size writes past its actual mapping and
+      # faults. Rebuild whenever the source is newer than the cached binary.
+      def stub_built?(dir)
+        stub = File.join(dir, 'park_stub')
+        File.file?(stub) && File.mtime(stub) >= File.mtime(File.join(ROOT, 'park_stub.c'))
+      end
 
       # Build the per-version sysroot from the fixture's own Ubuntu package version
       # (Ubuntu-sourced fixtures only). Returns whether its park_stub now exists.
