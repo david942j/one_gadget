@@ -262,6 +262,31 @@ module OneGadget
         end
       end
 
+      # If +ptr+ is a single dereference of a tracked stack slot (e.g. an earlier
+      # +mov ecx, -0x30(%ebp)+ recorded what +[ebp-0x30]+ holds), resolve it to
+      # that slot's own tracked value -- e.g. +"ecx"+ -- so the rest of argv/envp
+      # resolution can treat it exactly like a bare register instead of an opaque
+      # pointer. Only substitutes when the tracked value is itself fully resolved
+      # (no further indirection): an untracked slot's placeholder is just +ptr+
+      # again, so substituting would be a no-op, not a simplification.
+      # @param [OneGadget::Emulators::Processor] processor
+      # @param [String] ptr An argv_ptr/envp_ptr expression, e.g. +"[ebp-0x30]"+.
+      # @return [String] +ptr+, or the resolved expression when it simplifies.
+      # @example A stack slot holding an unresolved register
+      #   # mov ecx, -0x30(%ebp)   (earlier in the same candidate)
+      #   resolve_stack_deref(processor, '[ebp-0x30]') #=> 'ecx'
+      def resolve_stack_deref(processor, ptr)
+        lmda = OneGadget::Emulators::Lambda.parse(ptr)
+        return ptr unless lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.deref_count == 1 &&
+                          OneGadget::ABI.stack_register?(lmda.obj)
+
+        stack = processor.get_corresponding_stack(lmda.obj)
+        tracked = stack && stack[lmda.immi]
+        return ptr unless tracked.is_a?(OneGadget::Emulators::Lambda) && tracked.deref_count.zero?
+
+        tracked.to_s
+      end
+
       # Generate the +envp+-related constraint for an +exec*+ call.
       #
       # Mirrors the +argv+ terminology from {#check_argv}: +envp_ptr+ is the *pointer to* the envp array
@@ -278,6 +303,7 @@ module OneGadget
         # If it starts with [[ but not a global var, drop it.
         return global_var?(envp_ptr) if envp_ptr.start_with?('[[')
 
+        envp_ptr = resolve_stack_deref(processor, envp_ptr)
         lmda = OneGadget::Emulators::Lambda.parse(envp_ptr)
         # A concrete integer or a stack register we don't track a stack for
         # (the frame pointer) both fall through to the opaque-pointer case.
