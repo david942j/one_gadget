@@ -109,12 +109,10 @@ crashes in `sigprocmask` instead of spawning a shell.
 **Not affected:** `0x3c970`/`0x3d718` (`execve("/bin/sh", x22, environ)`) jump in *after*
 the `sigprocmask` call, so they carry no such dependency and PASS under poison.
 
-### Suggested fix (for review, not yet applied)
-Model `sigprocmask`'s `set` argument in `arm_family.rb`'s `inst_bl` checker so a readable
-pointer (or the appropriate NULL/validity condition) is emitted as a constraint, instead
-of treating the call as argument-agnostic. Add a regression expectation to
-`spec/one_gadget_aarch64_spec.rb` for the affected offsets. Per the batch-triage strategy,
-this is filed here for joint review before a focused fix PR.
+### Fix applied (PR #323)
+`sigprocmask`'s `set` argument is modelled in `arm_family.rb`'s `inst_bl` checker, emitting
+`<set> == NULL` when it isn't provably mapped, instead of treating the call as
+argument-agnostic. Regression expectations added to `spec/one_gadget_aarch64_spec.rb`.
 
 ## Finding 2 — missing constraint: __sigaction `act` pointer (subtler)
 
@@ -148,8 +146,7 @@ the emitted set is complete. Same shape on libc-2.23 (`0x3d6dc` → `0x3d6d8`).
 
 ## Finding 3 — missing constraint: arm GOT-base register (environ gadgets)
 
-**Gadgets:** `0x3afdc`, `0x543d2` (arm libc-2.43-8c7af7f2). **Status: candidate bug,
-not yet fixed.**
+**Gadgets:** `0x3afdc`, `0x543d2` (arm libc-2.43-8c7af7f2). **Status: fixed**, one_gadget#331.
 
 **Constraint form:** `posix_spawn(..., environ)` — the envp argument is the libc global
 `environ`. Listed constraints govern only the argv/attrp (e.g. `{"sh","-c","--",r9,...}
@@ -184,11 +181,13 @@ listed constraint and failed only on an input the list omits. Impact: a return-t
 attempt with an uncontrolled GOT-base register crashes before `posix_spawn` instead of
 spawning a shell.
 
-### Suggested fix (for review, not yet applied)
-In `Fetchers::Arm`, record which seeded GOT-base register(s) were actually dereferenced to
-resolve a global that appears in the final effect/constraints, and emit
-`"<reg> is the GOT address of libc"` for each (mirroring i386, and reusing the existing
-`Satisfier` support for that constraint). Add a regression expectation to the arm spec.
+### Fix applied (one_gadget#331)
+`Fetchers::Arm` now records which seeded GOT-base register(s) were actually dereferenced to
+resolve a global that appears in the final effect/constraints, and emits
+`"<reg> is the GOT address of libc"` for each (mirroring i386, reusing the existing
+`Satisfier` support for that constraint). Verified: both gadgets PASS with the fix applied
+(Aletheia re-run after the code change). Locked in by `arm-libc-2.43-8c7af7f2` in
+`spec/one_gadget_arm_spec.rb` (one_gadget#332).
 
 **Not the GOT issue:** the other level-1 posix_spawn FAILs on this fixture (`0x3b000`,
 `0x3b002`, `0x3b004`, `0xa42c8`, `0xa4334`, `0xa4338`) do not reference `environ`; they need
@@ -198,7 +197,8 @@ arg0 `= [sp+0x30]`) and are satisfier limitations, not one_gadget bugs.
 ## Finding 4 — imprecise constraint: frame-built argv hides an `argv[1]` requirement
 
 **Gadgets:** `0xa3234`, `0xa3238`, `0xa3240`, `0xa32e8` (aarch64 libc-2.27, in `execvpe`).
-**Status: candidate imprecision, not yet fixed.** Surfaced now that 2.27 is loadable under qemu.
+**Status: fixed**, one_gadget#333. Surfaced once 2.27 became loadable under qemu
+(`ALETHEIA_FORCE_QEMU=1`, see Known limitations).
 
 **Constraint form:** `execve("/bin/sh", x29+0x40, <envp>)` with argv reported only as
 `[x29+0x40] == NULL || x29+0x40 == NULL || x29+0x40 is a valid argv`. **No constraint on the
@@ -227,11 +227,14 @@ though the code overwrites that memory. The `argv[1] = x0` requirement is lost.
 gadget still yields a broken shell; adding the unlisted `x0 == NULL` fixes it. Impact: a
 return-to-one_gadget with an uncontrolled `x0` gets a shell that immediately exits.
 
-### Suggested fix (for review, not yet applied)
-Track frame-pointer-relative argv construction (or recognise the `execvpe` rebuild) so the
-emitted constraint names `argv[1]`'s source register — mirroring the existing `sp`-relative
-argv handling (`x0 == NULL || {"/bin/sh", x0, ...} is a valid argv`). Harder than Finding 3:
-it needs the emulator to model `x29`-relative writes, so filed for review before a fix.
+### Fix applied (one_gadget#333)
+Frame-pointer-relative stores are now tracked (mirroring x86's existing `bp_based_stack`,
+added as a shared `arm_family.rb` facility so any arch can opt in; aarch64 enables it with
+`x29`), so the emitted constraint names `argv[1]`'s source register:
+`x0 == NULL || {"/bin/sh", x0, NULL} is a valid argv` — the same shape the `sp`-relative case
+already had. Verified: all four gadgets went from EXEC to PASS under Aletheia. Also
+harmonized a latent inconsistency: the `sp`-relative twin `0xa321c` already had the precise
+form, so the trimmer now dedups the two into one gadget.
 
 ## Reproduce
 
