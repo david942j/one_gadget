@@ -38,6 +38,12 @@ module Aletheia
     WORD            = 8        # conservative pointer width for a "reads zero" check
     MASK64          = (1 << 64) - 1
     IMM             = /-?(?:0x[0-9a-fA-F]+|\d+)/
+    # A literal zero, in whichever form one_gadget renders it for that context:
+    # decimal +0+ (a bare register's "== NULL" branch) or hex +0x0+ (a sized value
+    # comparison, e.g. +(s32)[..] <= 0x0+). Use in place of a hardcoded +0+ so a
+    # rendering choice on the one_gadget side can't silently stop the satisfier
+    # from recognising a branch it already knows how to solve.
+    ZERO            = /(?:0|0x0+)/
     # Bare +reg & mask == want+ (no parens): a low-bits/alignment constraint. The
     # parenthesised +(reg & mask) == want+ is a settable-register relation instead
     # (see {#parse_relation}).
@@ -112,7 +118,7 @@ module Aletheia
       case disjunct
       when /\Awritable: (.+)\z/
         (op = safe_parse(Regexp.last_match(1))) && writable_cost(op)
-      when /\A(.+?) == NULL\z/, /\A(.+?) <= 0\z/
+      when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
         (op = safe_parse(Regexp.last_match(1))) && null_cost(op)
       when /\A\{.*\} is a valid (?:argv|envp)\z/ then 0.5 # array literal: element builder
       when /is a valid (?:argv|envp)\z/         then 0.4 # pointer form: point it at scratch
@@ -126,7 +132,7 @@ module Aletheia
     # +[X] == NULL+. A bare +reg == 0+ is a settable relation handled elsewhere,
     # so only the dereferenced form is returned here.
     def deref_zero(disjunct)
-      m = disjunct.match(/\A(.+?) == (?:0|0x0+)\z/) or return nil # decimal or hex zero
+      m = disjunct.match(/\A(.+?) == #{ZERO}\z/) or return nil
       op = safe_parse(m[1])
       op if op&.reg && op.deref.positive?
     end
@@ -195,7 +201,7 @@ module Aletheia
       when ALIGN
         reg, _mask, want = parse_alignment(branch)
         (stack_reg?(reg) && want.zero?) || (want.zero? && scratch?(plan, reg))
-      when /\A(.+?) == NULL\z/, /\A(.+?) <= 0\z/
+      when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
         (op = safe_parse(Regexp.last_match(1))) && deref_reads_zero?(plan, op)
       when GOT
         base_relative?(plan.regs[branch[GOT, 1]])
@@ -248,7 +254,7 @@ module Aletheia
       case disjunct
       when /\Awritable: (.+)\z/
         (op = safe_parse(Regexp.last_match(1))) ? apply_writable(plan, op) : false
-      when /\A(.+?) == NULL\z/, /\A(.+?) <= 0\z/
+      when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
         op = safe_parse(Regexp.last_match(1))
         if op.nil? then false
         elsif op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
