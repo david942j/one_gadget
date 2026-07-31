@@ -88,8 +88,8 @@ describe 'one_gadget_aarch64' do
     it 'resolves a gadget guarded by a conditional branch' do
       path = data_path('aarch64-libc-2.43.so')
       gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
-                        .find { |g| g.offset == 0xc7a40 }
-      expect(gadget.effect).to eq 'execve("/bin/sh", x4, x6)'
+                        .find { |g| g.offset == 0xc7a3c }
+      expect(gadget.effect).to eq 'execve("/bin/sh", sp+0x10, x6)'
       expect(gadget.constraints).to include('x2 == 0x1')
     end
   end

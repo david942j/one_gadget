@@ -175,11 +175,33 @@ module OneGadget
       def check_argv(processor, argv_ptr, allow_null)
         lmda = OneGadget::Emulators::Lambda.parse(argv_ptr)
 
-        if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
+        if lmda.deref_count.zero? && resolvable_stack(processor, lmda)
           return check_stack_argv(processor, argv_ptr, lmda, allow_null)
         end
 
         check_nonstack_argv(argv_ptr, allow_null)
+      end
+
+      # Whether resolving +lmda+'s target via tracked memory is worth attempting,
+      # as opposed to the plain opaque "==NULL || is a valid .." form
+      # ({#check_nonstack_argv}/the envp equivalent). Always true for the arch's
+      # dedicated stack/frame pointer. For any other register, only when element
+      # 0 -- what {#argv_already_valid?}/{#generate_argv_with_sh} branch on --
+      # was actually written within this candidate.
+      # @example element 0 tracked -- resolvable
+      #   reg tracked (element 0), reg+0x8 tracked (element 1) => resolvable
+      # @example a later, unrelated write must not trigger array resolution
+      #   reg+0x10 (element 2) tracked, reg/reg+0x8 (elements 0/1) untracked
+      #   => not resolvable; falls back to the opaque form instead of a garbled array
+      # @param [OneGadget::Emulators::Processor] processor
+      # @param [OneGadget::Emulators::Lambda] lmda A zero-deref pointer operand.
+      # @return [Hash{Integer => OneGadget::Emulators::Lambda}, nil]
+      def resolvable_stack(processor, lmda)
+        stack = processor.get_corresponding_stack(lmda.obj)
+        return nil unless stack
+        return stack if OneGadget::ABI.stack_register?(lmda.obj)
+
+        stack if stack.key?(lmda.immi)
       end
 
       # Handle the case where +argv_ptr+ points into the stack, so the +argv+ entries can be read off it.
@@ -305,11 +327,10 @@ module OneGadget
 
         envp_ptr = resolve_stack_deref(processor, envp_ptr)
         lmda = OneGadget::Emulators::Lambda.parse(envp_ptr)
-        # A concrete integer or a stack register we don't track a stack for
-        # (the frame pointer) both fall through to the opaque-pointer case.
+        # A concrete integer, or a register with nothing useful tracked for it,
+        # falls through to the opaque-pointer case (see {#resolvable_stack}).
         stack = lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.deref_count.zero? &&
-                OneGadget::ABI.stack_register?(lmda.obj) &&
-                processor.get_corresponding_stack(lmda.obj)
+                resolvable_stack(processor, lmda)
         if stack
           # I haven't see this case after some tests, but just in case :)
           envp = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
