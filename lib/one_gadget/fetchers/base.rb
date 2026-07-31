@@ -188,6 +188,8 @@ module OneGadget
       # dedicated stack/frame pointer. For any other register, only when element
       # 0 -- what {#argv_already_valid?}/{#generate_argv_with_sh} branch on --
       # was actually written within this candidate.
+      # @example element 0 tracked -- resolvable
+      #   reg tracked (element 0), reg+0x8 tracked (element 1) => resolvable
       # @example a later, unrelated write must not trigger array resolution
       #   reg+0x10 (element 2) tracked, reg/reg+0x8 (elements 0/1) untracked
       #   => not resolvable; falls back to the opaque form instead of a garbled array
