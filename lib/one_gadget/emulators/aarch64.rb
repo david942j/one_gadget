@@ -122,13 +122,17 @@ module OneGadget
         dst_l = arg_to_lambda(dst).ref!
         stack = dst_l.deref_count.zero? ? get_corresponding_stack(dst_l.obj) : nil
         if stack
-          cur_top = dst_l.evaluate(eval_dict)
+          cur_top = dst_l.immi
           stack[cur_top] = registers[reg1]
           stack[cur_top + size_t] = registers[reg2]
-        else
-          # Don't know where it points; just require it be writable (as inst_str does).
-          add_writable(dst_l)
         end
+        # sp/bp are always writable (the gadget's own stack/frame): no constraint
+        # needed. Any OTHER register (a tracked write history, or none at all)
+        # might not be, so still record the requirement even when the write IS
+        # also tracked for later precise resolution -- the fetcher drops this if
+        # that resolution ends up superseding it (see base.rb's resolvable_stack
+        # callers), same as it already does for the frame pointer's own case.
+        add_writable(dst_l) unless [sp_based_stack, bp_based_stack].include?(stack)
 
         registers[sp] += arg_to_lambda(dst).immi if dst.end_with?('!')
       end
@@ -138,16 +142,15 @@ module OneGadget
         raise_unsupported('str', src, dst, index) unless OneGadget::Helper.integer?(index)
 
         dst_l = arg_to_lambda(dst).ref!
-        # Only stores on stack (sp- or frame-pointer-relative).
+        # A tracked register: sp/bp, or any other register a write has been
+        # staged through this candidate (see Processor#reg_based_stack).
         stack = dst_l.deref_count.zero? ? get_corresponding_stack(dst_l.obj) : nil
-        if stack
-          cur_top = dst_l.evaluate(eval_dict)
-          stack[cur_top] = registers[src]
-        else
-          # Unlike the stack case, don't know where to save the value.
-          # Simply add a constraint.
-          add_writable(dst_l)
-        end
+        stack[dst_l.immi] = registers[src] if stack
+        # sp/bp are always writable: no constraint needed. Any OTHER register
+        # might not be, so still record the requirement even when the write IS
+        # also tracked for later precise resolution -- the fetcher drops this if
+        # that resolution ends up superseding it.
+        add_writable(dst_l) unless [sp_based_stack, bp_based_stack].include?(stack)
 
         index = Integer(index)
         return unless dst.end_with?('!') || index.nonzero?

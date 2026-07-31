@@ -175,11 +175,36 @@ module OneGadget
       def check_argv(processor, argv_ptr, allow_null)
         lmda = OneGadget::Emulators::Lambda.parse(argv_ptr)
 
-        if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
+        if lmda.deref_count.zero? && resolvable_stack(processor, lmda)
           return check_stack_argv(processor, argv_ptr, lmda, allow_null)
         end
 
         check_nonstack_argv(argv_ptr, allow_null)
+      end
+
+      # Whether resolving +lmda+'s target via tracked memory (an array of entries
+      # read off a stack) is worth attempting, as opposed to the plain opaque
+      # "==NULL || is a valid .." form {#check_nonstack_argv}/the envp equivalent
+      # produce. Always true for the arch's dedicated stack/frame pointer (the
+      # existing, established behaviour: unconditionally array-shaped even with
+      # nothing tracked there yet). For any *other* register -- one a candidate
+      # merely happens to write through and reuse, e.g. an argv array staged via
+      # an incoming register that isn't sp/bp -- only when the *first* entry
+      # (element 0, what {#argv_already_valid?}/{#generate_argv_with_sh} branch
+      # on) was actually written within this candidate. Checking "any element"
+      # instead would trigger on an unrelated later write (e.g. a `writable:`
+      # store at +reg+0x10+ while +reg+/+reg+8+ -- elements 0/1 -- are still
+      # untracked placeholders), producing a worse, garbled array instead of the
+      # plain opaque form that's actually accurate there.
+      # @param [OneGadget::Emulators::Processor] processor
+      # @param [OneGadget::Emulators::Lambda] lmda A zero-deref pointer operand.
+      # @return [Hash{Integer => OneGadget::Emulators::Lambda}, nil]
+      def resolvable_stack(processor, lmda)
+        stack = processor.get_corresponding_stack(lmda.obj)
+        return nil unless stack
+        return stack if OneGadget::ABI.stack_register?(lmda.obj)
+
+        stack if stack.key?(lmda.immi)
       end
 
       # Handle the case where +argv_ptr+ points into the stack, so the +argv+ entries can be read off it.
@@ -279,11 +304,10 @@ module OneGadget
         return global_var?(envp_ptr) if envp_ptr.start_with?('[[')
 
         lmda = OneGadget::Emulators::Lambda.parse(envp_ptr)
-        # A concrete integer or a stack register we don't track a stack for
-        # (the frame pointer) both fall through to the opaque-pointer case.
+        # A concrete integer, or a register with nothing useful tracked for it,
+        # falls through to the opaque-pointer case (see {#resolvable_stack}).
         stack = lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.deref_count.zero? &&
-                OneGadget::ABI.stack_register?(lmda.obj) &&
-                processor.get_corresponding_stack(lmda.obj)
+                resolvable_stack(processor, lmda)
         if stack
           # I haven't see this case after some tests, but just in case :)
           envp = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
