@@ -39,7 +39,7 @@ describe 'one_gadget_i386' do
       expect(OneGadget.gadgets(file: path)).to eq [0xed300, 0x18a495, 0x18a496]
     end
 
-    # 0xed234's own first instruction (mov ecx, -0x30(%ebp)) writes ecx into the
+    # 0xed234's own first instruction (mov [ebp-0x30], ecx) writes ecx into the
     # exact stack slot the envp check later requires to be NULL, so ecx itself is
     # the real precondition -- not the opaque "[[ebp-0x30]] == NULL" form its
     # sibling 0xed237 (whose window starts after that write) still gets.

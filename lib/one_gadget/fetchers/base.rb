@@ -284,19 +284,17 @@ module OneGadget
         end
       end
 
-      # If +ptr+ is a single dereference of a tracked stack slot (e.g. an earlier
-      # +mov ecx, -0x30(%ebp)+ recorded what +[ebp-0x30]+ holds), resolve it to
-      # that slot's own tracked value -- e.g. +"ecx"+ -- so the rest of argv/envp
-      # resolution can treat it exactly like a bare register instead of an opaque
-      # pointer. Only substitutes when the tracked value is itself fully resolved
-      # (no further indirection): an untracked slot's placeholder is just +ptr+
-      # again, so substituting would be a no-op, not a simplification.
+      # If +ptr+ is a single dereference of a tracked stack slot, resolve it to
+      # that slot's own tracked value so the rest of argv/envp resolution can
+      # treat it like a bare register instead of an opaque pointer.
       # @param [OneGadget::Emulators::Processor] processor
-      # @param [String] ptr An argv_ptr/envp_ptr expression, e.g. +"[ebp-0x30]"+.
+      # @param [String] ptr An argv_ptr/envp_ptr expression.
       # @return [String] +ptr+, or the resolved expression when it simplifies.
-      # @example A stack slot holding an unresolved register
-      #   # mov ecx, -0x30(%ebp)   (earlier in the same candidate)
+      # @example a tracked slot resolves to its source register
+      #   # mov [ebp-0x30], ecx   (earlier in the same candidate)
       #   resolve_stack_deref(processor, '[ebp-0x30]') #=> 'ecx'
+      # @example an untracked slot is a no-op
+      #   resolve_stack_deref(processor, '[ebp-0x40]') #=> '[ebp-0x40]'
       def resolve_stack_deref(processor, ptr)
         lmda = OneGadget::Emulators::Lambda.parse(ptr)
         return ptr unless lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.deref_count == 1 &&
