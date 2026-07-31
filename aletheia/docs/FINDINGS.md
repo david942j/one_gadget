@@ -303,6 +303,81 @@ the opaque double-deref form. This is the same class of gap as Finding 4 (frame-
 writes existing but not being surfaced as constraints) applied to `bp_based_stack` reads
 instead of `x29`-relative writes.
 
+## Finding 6 — imprecise constraint: an untracked write through an "incoming" register hides an argv-content requirement
+
+**Gadgets:** `0xc7a40` (aarch64 libc-2.43, `execve("/bin/sh", x4, x6)`); `0x9b9e4`
+(aarch64 libc-2.23, `execve("/bin/sh", x1, x20)`); `0x9bc5c` (aarch64 libc-2.23,
+`execve("/bin/sh", x0, x20)`). **Status: candidate imprecision, scoped but not yet fixed
+(see fix plan below) -- pending review.** All three are the "3 EXEC*" already counted in
+the Level-1 sweep summary above (found before this investigation named the mechanism);
+this documents *why* they're EXEC* and what a real fix would need.
+
+**Severity, and how this differs from Findings 1/3/5:** those were true false positives --
+a *fully satisfied* plan still crashed before ever reaching a shell. Here, the gadget
+genuinely **does** reach `execve("/bin/sh", ...)` and spawn a real shell (L0 passes, a
+process image gets replaced) under every listed constraint; the gap is that the shell
+isn't reliably *interactive* unless an unlisted register also happens to be NULL. Aletheia
+already flags this honestly as EXEC* (promotable under attacker control), not PASS -- so
+no one is misled into thinking these gadgets are unconditionally safe. It's the same
+*class* of gap as Finding 4 (a real precondition for reliable use isn't surfaced), not the
+same severity as Findings 1/3/5.
+
+**Constraint form (0xc7a40):** `writable: x4`, `x2 == 0x1`,
+`[x4] == NULL || x4 == NULL || x4 is a valid argv`, envp similarly on `x6`. **No mention of `x0`.**
+
+**Root cause (verified):** the candidate's own code writes the argv array through `x4`:
+```
+c7a40: adrp x5, ...
+c7a44: add  x7, x5, #0x258   ; x7 = "/bin/sh" pointer
+c7a48: stp  x7, x0, [x4]     ; argv[0] = x7, argv[1] = x0
+...
+c7a64: bl   execve
+```
+`argv[1]` is the **uncontrolled register `x0`**, written moments before the call. Under
+benign fill `x0` is a readable-but-garbage pointer (not NULL), so `sh` treats it as a
+script filename and exits non-interactively -- exactly the "reaches a shell but isn't
+drivable" EXEC signature. Confirmed empirically: setting **only** `x0 = NULL` (nothing
+else touched) flips the result to PASS with full L2. The other two gadgets are the
+identical shape (`x1`/`x0` as the argv pointer, an adjacent register as the untracked
+`argv[1]` write).
+
+**Why one_gadget misses it:** `x4` (or `x1`/`x0` in the siblings) is set to its real value
+(`sp`, in `0x9b9e4`'s case -- see below) **outside** the analyzed candidate window; one_gadget's
+fetcher does a backward, per-candidate walk, so within `0xc7a40`'s own window `x4` is just an
+opaque "incoming register" (`Lambda.new('x4')`, unresolved). The emulator's write-tracking
+(`sp_based_stack`, and since Finding 4, a named frame-pointer `bp_based_stack`) is keyed to
+exactly two *special-cased* registers. A write through any *other* register --
+`stp x7, x0, [x4]` here -- falls into the generic `add_writable` path, which records "x4
+must be writable" but discards *what* got written, so `argv[1]`'s true source (`x0`) is
+invisible by the time the fetcher resolves the call's arguments.
+
+(Verified this isn't secretly a "the window should include the assignment" case: in
+`0x9b9e4`'s sibling window, `x1` really is set via `mov x1, sp` one instruction before the
+window starts -- if that instruction were in-window, the *existing* sp-tracking would
+already get this right. It's specifically the window boundary that hides it, not a gap in
+the sp-tracking itself.)
+
+**Discriminator:** an imprecision, not a false positive (see Severity above) -- but the
+constraint list still doesn't name the real precondition for a reliably-interactive shell.
+
+### Suggested fix (for review, not yet applied -- larger than Findings 4/5)
+Generalize write-tracking from the two special-cased registers (`sp`, and the named frame
+pointer) to *any* register: a per-register-name write history (`Hash.new { |h,r| h[r] = {} }`),
+populated by every `str`/`stp`, consulted the same way `check_argv`/`check_envp` already
+consult `sp_based_stack`/`bp_based_stack`. The added complexity Findings so far haven't
+needed: **invalidation**. `sp`/frame-pointer are safe to track globally because they're
+essentially never reassigned to something else mid-function; an arbitrary register can be
+(`mov x4, x9` later in the same window would make old `x4`-keyed entries stale and wrong to
+reuse). Register writes happen at several call sites across each arch's emulator (`inst_mov`,
+`inst_add`, `inst_adrp`, `inst_ldr`, post-index writeback), not one chokepoint, so a safe
+implementation needs either routing all of them through a shared setter that clears that
+register's write history on reassignment, or an equivalent invalidation hook. Cross-arch
+(aarch64.rb, arm.rb, x86.rb all have their own register-write sites). Given the severity is
+"imprecise, not false-positive" and all three known instances are already correctly flagged
+EXEC* (not silently trusted), this is lower urgency than Findings 1-5 were -- worth doing for
+completeness, but with real design/review needed before implementation given the
+cross-cutting change and the new invalidation-correctness requirement.
+
 ## Reproduce
 
 ```
