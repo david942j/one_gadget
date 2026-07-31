@@ -182,20 +182,15 @@ module OneGadget
         check_nonstack_argv(argv_ptr, allow_null)
       end
 
-      # Whether resolving +lmda+'s target via tracked memory (an array of entries
-      # read off a stack) is worth attempting, as opposed to the plain opaque
-      # "==NULL || is a valid .." form {#check_nonstack_argv}/the envp equivalent
-      # produce. Always true for the arch's dedicated stack/frame pointer (the
-      # existing, established behaviour: unconditionally array-shaped even with
-      # nothing tracked there yet). For any *other* register -- one a candidate
-      # merely happens to write through and reuse, e.g. an argv array staged via
-      # an incoming register that isn't sp/bp -- only when the *first* entry
-      # (element 0, what {#argv_already_valid?}/{#generate_argv_with_sh} branch
-      # on) was actually written within this candidate. Checking "any element"
-      # instead would trigger on an unrelated later write (e.g. a `writable:`
-      # store at +reg+0x10+ while +reg+/+reg+8+ -- elements 0/1 -- are still
-      # untracked placeholders), producing a worse, garbled array instead of the
-      # plain opaque form that's actually accurate there.
+      # Whether resolving +lmda+'s target via tracked memory is worth attempting,
+      # as opposed to the plain opaque "==NULL || is a valid .." form
+      # ({#check_nonstack_argv}/the envp equivalent). Always true for the arch's
+      # dedicated stack/frame pointer. For any other register, only when element
+      # 0 -- what {#argv_already_valid?}/{#generate_argv_with_sh} branch on --
+      # was actually written within this candidate.
+      # @example a later, unrelated write must not trigger array resolution
+      #   reg+0x10 (element 2) tracked, reg/reg+0x8 (elements 0/1) untracked
+      #   => not resolvable; falls back to the opaque form instead of a garbled array
       # @param [OneGadget::Emulators::Processor] processor
       # @param [OneGadget::Emulators::Lambda] lmda A zero-deref pointer operand.
       # @return [Hash{Integer => OneGadget::Emulators::Lambda}, nil]
