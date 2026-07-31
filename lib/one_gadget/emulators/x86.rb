@@ -98,8 +98,9 @@ module OneGadget
       # @param [String | Lambda] obj
       #  A lambda object or its string.
       # @return [Hash{Integer => Lambda}, nil]
-      #  The corresponding stack (based on esp/rsp or ebp/rbp) that +obj+ used,
-      #  or nil if +obj+ doesn't use the stack.
+      #  The corresponding stack (based on esp/rsp or ebp/rbp), or a per-register
+      #  write history (see {Processor#reg_based_stack}) for any other register
+      #  the candidate has written through.
       # @example
       #   get_corresponding_stack('rsp+0x10')
       #   #=> sp_based_stack
@@ -108,12 +109,22 @@ module OneGadget
       #   get_corresponding_stack('[rbp-0x10]')
       #   #=> bp_based_stack
       #   get_corresponding_stack('rax')
-      #   #=> nil
+      #   #=> nil, or a write history if rax was written through
       def get_corresponding_stack(obj)
+        # A compound base (a nested Lambda -- the address is itself "[reg]+imm",
+        # one more indirection than a simple register+offset) isn't something any
+        # of sp/bp/reg_based_stack model correctly: their imm is always "an
+        # offset from a *named register*", not "an offset from a dereferenced
+        # value". Matching it via a substring check on its rendered form (e.g.
+        # "[rbp-0x78]" contains "rbp") would silently mistrack it as bp-relative.
+        return nil if obj.is_a?(OneGadget::Emulators::Lambda)
+
         if obj.to_s.include?(sp)
           sp_based_stack
         elsif obj.to_s.include?(bp)
           bp_based_stack
+        else
+          reg_based_stack(obj.to_s)
         end
       end
 
@@ -160,13 +171,18 @@ module OneGadget
         end
         dst = arg_to_lambda(dst)
         add_writable(dst.to_s)
-        # TODO: Is it possible that only considering sp and bp is not enough?
-        # If it is, we need to record every memory access
-        stack = get_corresponding_stack(dst)
-        return if stack.nil? || dst.deref_count != 1
+        return if dst.deref_count != 1
+
+        # get_corresponding_stack takes a base (obj), not the whole pointer
+        # Lambda -- consistent with every other call site (aarch64.rb, base.rb).
+        stack = get_corresponding_stack(dst.obj)
+        return if stack.nil?
 
         dst.ref!
-        stack[dst.evaluate(eval_dict)] = src
+        # dst's base is a tracked register (sp/bp always resolve to 0 in
+        # eval_dict, and any other tracked register is offset-only the same
+        # way -- see Processor#reg_based_stack), so the immediate IS the offset.
+        stack[dst.immi] = src
       end
 
       # This instruction moves 128bits.

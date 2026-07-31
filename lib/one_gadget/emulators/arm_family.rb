@@ -51,20 +51,29 @@ module OneGadget
         end
       end
 
-      # The stack that +obj+ addresses -- +sp+-based, {#bp}-based, or +nil+ when
-      # +obj+ isn't stack-relative.
+      # The stack that +obj+ addresses -- +sp+-based, {#bp}-based, or a
+      # per-register write history (see {Processor#reg_based_stack}) for any
+      # other register the candidate has written through.
       # @param [String, Lambda] obj A lambda object or its string.
       # @return [Hash{Integer => Lambda}, nil]
       # @example
       #   get_corresponding_stack('sp+0x10') #=> sp_based_stack
       #   get_corresponding_stack('x29+0x40') #=> bp_based_stack (aarch64)
-      #   get_corresponding_stack('x21')     #=> nil
+      #   get_corresponding_stack('x21') #=> nil, or a write history if x21 was written through
       def get_corresponding_stack(obj)
+        # A compound base (a nested Lambda, e.g. the address is itself "[reg]+imm"
+        # -- one more indirection than a simple register+offset) isn't something
+        # any of sp/bp/reg_based_stack model correctly: their imm is always "an
+        # offset from a *named register*", not "an offset from a dereferenced
+        # value". Matching it via a substring check on its rendered form (e.g.
+        # "[rbp-0x78]" contains "rbp") would silently mistrack it as bp-relative.
+        return nil if obj.is_a?(OneGadget::Emulators::Lambda)
+
         s = obj.to_s
         return sp_based_stack if s.include?(sp)
         return bp_based_stack if bp && s.include?(bp)
 
-        nil
+        reg_based_stack(s)
       end
 
       # Resolve +sp+- and (when tracked) {#bp}-relative operands to their offset;
