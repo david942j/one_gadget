@@ -149,6 +149,38 @@ module OneGadget
       def get_corresponding_stack(obj); raise NotImplementedError
       end
 
+      # A per-register write history for a register that ISN'T the arch's
+      # dedicated stack/frame pointer (those get an always-on tracked stack; see
+      # the +get_corresponding_stack+ overrides in {ArmFamily}/{X86}). Lets a
+      # subclass's +get_corresponding_stack+ fall back to this for any other
+      # register a candidate happens to write through and immediately reuse
+      # (e.g. an argv array staged via an incoming register, not sp/bp).
+      #
+      # Valid only while +reg+'s CURRENT value is the exact object it was when
+      # the tracked writes happened: a later reassignment (e.g. +mov x4, x9+)
+      # transparently starts a fresh, empty history instead of returning stale
+      # content. sp/bp never needed this because they're essentially never
+      # reassigned mid-candidate; an arbitrary register can be.
+      # @param [String] reg A register name; returns +nil+ if it isn't a real one.
+      # @return [Hash{Integer => Lambda}, nil]
+      def reg_based_stack(reg)
+        return nil unless reg.is_a?(String) && registers.key?(reg)
+
+        identity = registers[reg]
+        @reg_stacks ||= {}
+        cached = @reg_stacks[reg]
+        return cached[:mem] if cached && cached[:identity].equal?(identity)
+
+        mem = Hash.new do |h, k|
+          h[k] = OneGadget::Emulators::Lambda.new(reg).tap do |l|
+            l.immi = k
+            l.deref!
+          end
+        end
+        @reg_stacks[reg] = { identity:, mem: }
+        mem
+      end
+
       private
 
       def check_register!(reg)
@@ -213,13 +245,20 @@ module OneGadget
         mapped_pointer?(val.obj.to_s)
       end
 
-      # Whether +val+ points into memory a +writable+ constraint already covers, i.e.
-      # its base register was recorded as a writable store target during emulation.
+      # Whether +val+ points into memory already known mapped from a store
+      # through its base register during emulation -- either an explicit
+      # +writable+ constraint (a store {#get_corresponding_stack} couldn't
+      # place, e.g. a compound destination), or a tracked write history (see
+      # {#reg_based_stack}; a store the emulator *could* place -- the same
+      # evidence, a different bookkeeping path).
       def writable_pointer?(val)
         return false unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count.zero?
 
         base = val.obj.to_s
-        @constraints.any? { |type, obj| type == :writable && obj.obj.to_s == base }
+        return true if @constraints.any? { |type, obj| type == :writable && obj.obj.to_s == base }
+
+        stack = reg_based_stack(base)
+        !!stack && !stack.empty?
       end
 
       # Whether an address expression names memory known to be mapped: a stack slot

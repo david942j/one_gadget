@@ -195,7 +195,11 @@ describe OneGadget::Emulators::Arm do
 
     it 'get_corresponding_stack' do
       expect(@processor.get_corresponding_stack('sp+0x10')).to be(@processor.sp_based_stack)
-      expect(@processor.get_corresponding_stack('r4')).to be_nil
+      # A real register with nothing written through it yet: a usable (empty)
+      # write history, not nil -- so the FIRST write through it can still be
+      # captured (see Processor#reg_based_stack).
+      expect(@processor.get_corresponding_stack('r4')).to eq({})
+      expect(@processor.get_corresponding_stack('not_a_register')).to be_nil
     end
 
     it 'is 32-bit' do
