@@ -53,6 +53,18 @@ describe 'one_gadget_i386' do
         .to include('[[ebp-0x30]] == NULL || [ebp-0x30] == NULL || [ebp-0x30] is a valid envp')
     end
 
+    # 0xbda64's argv pointer is a `lea eax, [ebp-0x28]` alias: the array it builds
+    # on the stack is {"/bin/sh", eax, NULL}, with eax an untracked incoming
+    # register -- so the same resolve_stack_deref used for envp above applies to
+    # argv too, surfacing `eax == NULL` instead of the opaque "[ebp-0x2c] is a
+    # valid argv" form.
+    it 'resolves argv through a lea-computed alias into the stack frame' do
+      path = data_path('libc-2.26-f65648a832414f2144ce795d75b6045a1ec2e252.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, details: true, level: 1)
+                        .find { |g| g.offset == 0xbda64 }
+      expect(gadget.constraints).to include('eax == NULL || {"/bin/sh", eax, NULL} is a valid argv')
+    end
+
     it 'special filename' do
       expect(OneGadget.gadgets(file: data_path('filename$with+special&keys'))).not_to be_empty
     end

@@ -173,6 +173,7 @@ module OneGadget
       #   Whether +argv_ptr+ itself may be +NULL+ (true for +execve+, false for +posix_spawn+).
       # @return [String, nil] The constraint string, or +nil+ when no constraint is needed.
       def check_argv(processor, argv_ptr, allow_null)
+        argv_ptr = resolve_stack_deref(processor, argv_ptr)
         lmda = OneGadget::Emulators::Lambda.parse(argv_ptr)
 
         if lmda.deref_count.zero? && resolvable_stack(processor, lmda)
