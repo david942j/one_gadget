@@ -47,6 +47,16 @@ describe 'one_gadget_arm' do
       expect(gadget.constraints).to include('[r1] == 0x0')
     end
 
+    it 'constrains a GOT base register even when its load is for something other than environ' do
+      path = data_path('arm-libc-2.27.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+                        .find { |g| g.offset == 0x73f2c }
+      # 0x73f2c reads a libc global (the stack-protector guard) via r3 as the GOT
+      # base, not environ -- the constraint must still surface: a wrong r3 faults
+      # on that load regardless of what it was for.
+      expect(gadget.constraints).to include('r3 is the GOT address of libc')
+    end
+
     it 'resolves environ through the GOT base register and constrains it' do
       path = data_path('arm-libc-2.23.so')
       gadgets = OneGadget.gadgets(file: path, force_file: true, details: true)
@@ -55,6 +65,19 @@ describe 'one_gadget_arm' do
       # Reaching environ needs the GOT base in a register (loaded in the prologue,
       # outside the window); it must be pinned, like i386's GOT-base constraint.
       expect(gadget.constraints).to include('r8 is the GOT address of libc')
+    end
+
+    it 'resolves argv through a register written via str, not just sp/bp' do
+      path = data_path('arm-libc-2.27.so')
+      gadgets = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+      # 0x73f3a/0x73f96 build argv on the stack via `str reg, [r7, #imm]`; the
+      # array's first element (r7's own target) must be tracked so r0 -- an
+      # untracked entry the code writes into the array too -- surfaces as a
+      # real precondition, not an opaque "r7 is a valid argv".
+      [0x73f3a, 0x73f96].each do |offset|
+        gadget = gadgets.find { |g| g.offset == offset }
+        expect(gadget.constraints).to include('r0 == NULL || {"/bin/sh", r0, NULL} is a valid argv')
+      end
     end
 
     it 'finds posix_spawn (do_system) gadgets with stack-passed argv/envp' do

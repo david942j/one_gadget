@@ -109,15 +109,18 @@ module OneGadget
         cmds.each_with_object(emu) { |cmd, obj| break obj unless obj.process(cmd) }
       end
 
-      # A GOT base register seeded from the prologue is a runtime precondition: it
-      # must hold the libc GOT base for the candidate to reach +environ+. Surface
-      # that as a constraint (mirroring i386's +<reg> is the GOT address of libc+)
-      # whenever a GOT-resolved global actually made it into the effect. Seeding
-      # only ever primes registers set up *before* the window, so a gadget that
-      # establishes the base itself carries no such constraint.
+      # A GOT base register seeded from the prologue is a runtime precondition,
+      # independent of what its load is *for*: the +[rB, rX]+ dereference itself
+      # faults on a wrong base, whether the value it fetches is +environ+ or
+      # something unrelated to the effect entirely (e.g. a stack-protector guard
+      # read). Surface it as a constraint (mirroring i386's +<reg> is the GOT
+      # address of libc+) whenever the candidate actually walked past such a
+      # dereference. Seeding only ever primes registers set up *before* the
+      # window, so a gadget that establishes the base itself carries no such
+      # constraint.
       def resolve(processor)
         res = super
-        return res if res.nil? || !res[:effect].include?('environ')
+        return res if res.nil? || @got_base_regs.empty?
 
         @got_base_regs.each do |reg|
           res[:constraints].unshift("#{reg} is the GOT address of libc")
