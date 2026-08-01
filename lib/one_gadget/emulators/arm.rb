@@ -177,15 +177,7 @@ module OneGadget
         raise_unsupported('str', src, dst, index) unless OneGadget::Helper.integer?(index)
 
         dst_l = arg_to_lambda(resolve_int_regs(dst)).ref!
-        # A tracked register: sp/bp, or any other register a write has been
-        # staged through this candidate (see Processor#reg_based_stack).
-        stack = dst_l.deref_count.zero? ? get_corresponding_stack(dst_l.obj) : nil
-        stack[dst_l.immi] = registers[src] if stack
-        # sp/bp are always writable: no constraint needed. Any OTHER register
-        # might not be, so still record the requirement even when the write IS
-        # also tracked for later precise resolution -- the fetcher drops this if
-        # that resolution ends up superseding it.
-        add_writable(dst_l) unless [sp_based_stack, bp_based_stack].include?(stack)
+        track_write(dst_l, registers[src])
 
         index = Integer(index)
         return unless dst.end_with?('!') || index.nonzero?
@@ -239,8 +231,8 @@ module OneGadget
         ops = operands(rest)
         case mnem
         when 'b' then true # unconditional: control handled by the stitched path
-        when 'cbz' then branch_on_zero(ops[1].to_i(16), operand_str(ops[0]), negate: false)
-        when 'cbnz' then branch_on_zero(ops[1].to_i(16), operand_str(ops[0]), negate: true)
+        when 'cbz' then handle_cbz(ops, negate: false)
+        when 'cbnz' then handle_cbz(ops, negate: true)
         else branch_on_compare(COND[mnem[1..]], ops[0].to_i(16))
         end
       end
