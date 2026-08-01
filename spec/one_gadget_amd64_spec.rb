@@ -64,6 +64,16 @@ describe 'one_gadget_amd64' do
       expect(gadget.constraints).to include('{"sh", "-c", rbx, NULL} is a valid argv')
     end
 
+    # 0x51df8 enters before the posix_spawnattr_setsigmask/setsigdefault calls,
+    # which copy *from* their second argument unconditionally, so r12/r13 must be
+    # readable pointers (poisoning them faults the parent before execve).
+    it 'libc-2.31 requires the setsigmask/setsigdefault pointers be readable' do
+      path = data_path('libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+                        .find { |g| g.offset == 0x51df8 }
+      expect(gadget.constraints).to include('r12 is a valid pointer', 'r13 is a valid pointer')
+    end
+
     it 'libc-2.43' do
       path = data_path('libc-2.43-90ebd03ae9d9f42b23b4eb82fdf70352cf744198.so')
       expect(OneGadget.gadgets(file: path, force_file: true,
