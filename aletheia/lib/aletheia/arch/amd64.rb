@@ -21,9 +21,14 @@ module Aletheia
 
       def native_on?(host_machine) = host_machine == 'x86_64'
 
-      # amd64's loader tolerates a version-mismatched libc, so the default cross
-      # sysroot loads every fixture; no per-version sysroot is needed (cf. i386).
-      def version_strict? = false
+      # A big enough version gap breaks dlopen just like the other arches (cf.
+      # i386): the default cross sysroot's own ld.so is glibc 2.43, and dlopen-ing
+      # a libc as old as 2.19/2.26 as a *secondary* object crashes -- an ifunc
+      # resolver (compiled against that old glibc's internal CPU-feature-detection
+      # ABI) gets invoked by the much-newer host ld.so and jumps to garbage
+      # (observed: SIGSEGV at a bogus 0x500000000, even with no gdb involved at
+      # all). A version-matched sysroot avoids the whole ABI gap.
+      def version_strict? = true
 
       def gdb_reg(name) = "$#{name}"
 

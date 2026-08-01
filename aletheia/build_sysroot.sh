@@ -21,6 +21,7 @@ case "$arch" in
   i386)    deb_arch=i386;  triplet=i386-linux-gnu;      cc=i686-linux-gnu-gcc;      ldso=ld-linux.so.2 ;;
   arm)     deb_arch=armhf; triplet=arm-linux-gnueabihf; cc=arm-linux-gnueabihf-gcc; ldso=ld-linux-armhf.so.3 ;;
   aarch64) deb_arch=arm64; triplet=aarch64-linux-gnu;   cc=aarch64-linux-gnu-gcc;   ldso=ld-linux-aarch64.so.1 ;;
+  amd64)   deb_arch=amd64; triplet=x86_64-linux-gnu;    cc=x86_64-linux-gnu-gcc;    ldso=ld-linux-x86-64.so.2 ;;
   *) echo "unsupported arch $arch" >&2; exit 2 ;;
 esac
 dl=-l:libdl.so.2
@@ -56,8 +57,25 @@ else
   ln -sfn usr/lib "$root/lib"
 fi
 
-# qemu resolves the stub's interpreter (/lib/$ldso) against QEMU_LD_PREFIX=$root.
-[ -e "$root/lib/$ldso" ] || ln -sf "$triplet/$ldso" "$root/lib/$ldso"
+# qemu resolves the stub's interpreter (its own PT_INTERP path) against
+# QEMU_LD_PREFIX=$root. The conventional path is /lib/$ldso, but amd64 .debs use
+# /lib64/$ldso, and a fixture built by a nonstandard toolchain/prefix has been
+# seen using /usr/lib/$ldso directly (no triplet dir) -- symlink all three; they're
+# cheap, and only the one path a given target's PT_INTERP actually names matters.
+mkdir -p "$root/usr/lib"
+[ -e "$root/usr/lib/$ldso" ] || ln -sf "$triplet/$ldso" "$root/usr/lib/$ldso"
+
+# /lib and /lib64 as alternate interpreter locations: skip /lib when it's
+# already the merged-usr symlink to usr/lib (from the layout step above) --
+# usr/lib/$ldso just above already covers /lib/$ldso transparently through it,
+# and a *fresh* real symlink here, one level short, would point at the wrong
+# place (relative to where it actually lands once the kernel follows /lib).
+if [ ! -L "$root/lib" ]; then
+  mkdir -p "$root/lib"
+  [ -e "$root/lib/$ldso" ] || ln -sf "../usr/lib/$triplet/$ldso" "$root/lib/$ldso"
+fi
+mkdir -p "$root/lib64"
+[ -e "$root/lib64/$ldso" ] || ln -sf "../usr/lib/$triplet/$ldso" "$root/lib64/$ldso"
 
 libdir="$root/usr/lib/$triplet"
 # -nostdinc: use ONLY the sysroot's headers (plus gcc's own builtins), so an old
