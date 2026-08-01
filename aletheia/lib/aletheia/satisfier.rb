@@ -157,7 +157,11 @@ module Aletheia
       when /is a valid (?:argv|envp)\z/         then 0.4 # pointer form: point it at scratch
       when ALIGN                                then alignment_cost(disjunct)
       when GOT                                  then got_cost(disjunct)
-      else (op = deref_zero(disjunct)) ? null_cost(op) : relational_cost(disjunct)
+      else
+        if (op = deref_zero(disjunct)) then null_cost(op)
+        elsif (parsed = deref_literal(disjunct)) then literal_cost(parsed[0])
+        else relational_cost(disjunct)
+        end
       end
     end
 
@@ -168,6 +172,23 @@ module Aletheia
       m = disjunct.match(/\A(.+?) == #{ZERO}\z/) or return nil
       op = safe_parse(m[1])
       op if op&.reg && op.deref.positive?
+    end
+
+    # A dereferenced value required to equal an arbitrary (possibly nonzero)
+    # literal, e.g. +[rbp-0x50] == 0x1+ -- a value read from tracked memory that a
+    # later comparison in the *same* candidate requires to hold a specific
+    # constant, not just "readable" or "zero" ({#deref_zero} handles the zero
+    # case first, so only a genuinely nonzero target reaches here). Only a single
+    # dereference is modeled -- a chained +[[X]] == <imm>+ would need the same
+    # deep-pointer machinery as {#apply_deep_null}, not yet needed by any known
+    # gadget.
+    # @return [(Aletheia::Operand, Integer), nil]
+    def deref_literal(disjunct)
+      m = disjunct.match(/\A(.+?) == (#{IMM})\z/) or return nil
+      op = safe_parse(m[1])
+      return nil unless op&.reg && op.deref == 1
+
+      [op, Integer(m[2])]
     end
 
     # +<reg> is the GOT address of libc+: settable when we know the PLTGOT offset
@@ -234,6 +255,16 @@ module Aletheia
       base + (0.05 * (op.deref - 2))
     end
 
+    # Unlike a zero target ({#null_cost}), a nonzero literal is never already
+    # sitting in zeroed scratch for free -- it always needs a real write, so
+    # this costs above the zero case at each tier.
+    # @return [Float, nil]
+    def literal_cost(op)
+      return 0.15 if stack_reg?(op.reg)
+
+      op.reg && settable?(op.reg) ? 0.3 : nil
+    end
+
     # @return [Float, nil]
     def relational_cost(disjunct)
       parse_relation(disjunct) ? 0.4 : nil
@@ -259,6 +290,8 @@ module Aletheia
       else
         if (op = deref_zero(branch))
           deref_reads_zero?(plan, op)
+        elsif (parsed = deref_literal(branch))
+          literal_satisfied?(plan, *parsed)
         else
           reg, value = parse_relation(branch)
           current = reg && plan.regs[reg]
@@ -267,6 +300,12 @@ module Aletheia
           end
         end
       end
+    end
+
+    # Whether a +[X] == <imm>+ operand's tracked memory already reads +literal+.
+    def literal_satisfied?(plan, op, literal)
+      addr_off = mem_addr_off(plan, op)
+      addr_off && plan.mem[addr_off] == literal
     end
 
     # Whether a +== NULL+ / +<= 0+ operand already reads zero under the current
@@ -320,8 +359,30 @@ module Aletheia
       when /is a valid (?:argv|envp)\z/            then apply_pointer(plan, pointer_form(disjunct))
       when ALIGN                                   then apply_alignment(plan, disjunct)
       when GOT                                     then apply_got(plan, disjunct)
-      else (op = deref_zero(disjunct)) ? apply_deref_null(plan, op) : apply_relation(plan, disjunct)
+      else
+        if (op = deref_zero(disjunct)) then apply_deref_null(plan, op)
+        elsif (parsed = deref_literal(disjunct)) then apply_literal(plan, *parsed)
+        else apply_relation(plan, disjunct)
+        end
       end
+    end
+
+    # Satisfy a dereferenced +== <imm>+ (nonzero) by pinning +op.reg+ to a fresh
+    # scratch slot (unless it's already resolvable -- sp, or a register some
+    # other constraint in this candidate already pinned) and writing +literal+
+    # there. Unlike a zero target, there's no already-correct region to point
+    # at, so this always needs a real write.
+    def apply_literal(plan, op, literal)
+      addr_off = mem_addr_off(plan, op)
+      if addr_off.nil?
+        return false unless op.reg && settable?(op.reg)
+
+        slot = scratch_slot(plan, op.imm)
+        return false unless set_reg(plan, xreg(op.reg), slot)
+
+        addr_off = slot['scratch_off'] + op.imm
+      end
+      set_mem(plan, addr_off, literal)
     end
 
     # Satisfy a dereferenced +== 0+ by pointing the register at zeroed scratch

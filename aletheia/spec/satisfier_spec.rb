@@ -154,6 +154,18 @@ RSpec.describe Aletheia::Satisfier do
       expect(plan.regs['rbx']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
     end
 
+    # libc-2.23's 0xcc610 reads a mode flag off the stack (`mov esi,[rbp-0x50]`,
+    # never overwritten within the window) that a later branch requires to be
+    # exactly 1 -- unlike a zero target, there's no pre-zeroed region to point
+    # at, so this needs rbp pinned to a *fresh* scratch slot (rbp is otherwise
+    # unconstrained by this gadget) with the literal actually written there.
+    it 'pins an unconstrained register and writes a nonzero literal for "[reg+imm] == <imm>"' do
+      plan = satisfier.satisfy(gadget(['[rbp-0x50] == 0x1']))
+      expect(plan.status).to eq('ok')
+      rbp_off = plan.regs['rbp']['scratch_off']
+      expect(plan.mem[rbp_off - 0x50]).to eq(1)
+    end
+
     # A "writable: [base]+imm" compound base (base is dereferenced, not a bare
     # register -- a store through a pointer read off the stack, e.g. libc-2.27's
     # 0xe5887) can't be resolved until `base`'s own argv/envp constraint has run,
