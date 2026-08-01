@@ -18,8 +18,21 @@ offset = int(plan["offset"], 0)
 
 gdb.execute("set pagination off")
 gdb.execute("set confirm off")
+# A version-matched sysroot run execs the stub via its own ld.so, so the stub's
+# symbols (aletheia_park included) aren't known until the loader maps it after
+# `run` starts -- "pending" defers resolving the breakpoint to that point,
+# instead of erroring out immediately for want of a defined symbol.
+gdb.execute("set breakpoint pending on")
 if arch.get("gdb_arch"):
     gdb.execute("set architecture %s" % arch["gdb_arch"])
+# A remote (qemu-user gdbstub) target's libraries live locally too (the same
+# path qemu resolved them from via QEMU_LD_PREFIX); reading their symbols over
+# the remote protocol instead of straight from disk is slow and, for some old
+# binaries, has been observed to corrupt gdb's own state entirely (a bogus
+# jump target and SIGSEGV before the plan is ever injected). `set sysroot`
+# points gdb at the local copies it already has.
+if os.environ.get("ALETHEIA_SYSROOT"):
+    gdb.execute("set sysroot %s" % os.environ["ALETHEIA_SYSROOT"])
 
 # Park at the stub's marker, then bring the inferior to it (native runs it;
 # a remote target is already running and just needs `continue`).

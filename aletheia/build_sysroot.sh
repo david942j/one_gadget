@@ -59,4 +59,22 @@ gcc_inc=$("$cc" -print-file-name=include)
   -isystem "$root/usr/include/$triplet" \
   -O0 -g park_stub.c -o "$root/park_stub" \
   -Wl,-Bdynamic,-rpath-link,"$root/lib/$triplet" $dl
-echo "built $root (glibc $short) + park_stub"
+
+# A second, natively-invokable copy. The park_stub above keeps a generic
+# interpreter path that qemu-user redirects into this sysroot via
+# QEMU_LD_PREFIX; a real (non-qemu) execve has no such redirection, so on a
+# host whose own arch matches this sysroot's, dlopen-ing the target libc
+# through the HOST's ld.so hits glibc-private, version-sensitive symbols
+# (_dl_exception_create and friends) -- the exact mismatch this sysroot exists
+# to avoid. This copy instead embeds the sysroot's OWN ld.so as its
+# interpreter and a matching runtime rpath, so the kernel loads it directly
+# with no redirection needed (see Transport::Native).
+abs_root=$(cd "$root" && pwd)
+"$cc" --sysroot="$root" -B"$libdir" -L"$libdir" -L"$root/lib/$triplet" \
+  -nostdinc -isystem "$gcc_inc" -isystem "$root/usr/include" \
+  -isystem "$root/usr/include/$triplet" \
+  -O0 -g park_stub.c -o "$root/park_stub_native" \
+  -Wl,-Bdynamic,--dynamic-linker,"$abs_root/lib/$ldso" \
+  -Wl,-rpath,"$abs_root/lib/$triplet:$abs_root/usr/lib/$triplet" $dl
+
+echo "built $root (glibc $short) + park_stub + park_stub_native"

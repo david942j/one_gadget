@@ -41,18 +41,23 @@ module Aletheia
       def driver = File.join(ROOT, 'driver.py')
 
       # A per-version sysroot for this fixture (under +sysroots/<arch>-<major.minor>/+),
-      # or nil. Used for a foreign libc too old to dlopen under the default cross
-      # sysroot -- it carries the matching ld.so and a park_stub linked against that
-      # libc. Built on demand (and cached) when missing, so the git-ignored
+      # or nil. Used for a libc too far from the runtime's own version to dlopen
+      # directly -- it carries the matching ld.so and a park_stub linked against
+      # that libc. Built on demand (and cached) when missing, so the git-ignored
       # +sysroots/+ can be deleted anytime to reclaim disk.
+      #
+      # Needed under a *native* transport too, not just qemu: dlopen-ing a full
+      # libc.so.6 as a secondary shared object binds glibc-private, ld.so-internal
+      # symbols (e.g. +_dl_exception_create+, +__tunable_get_val+) that aren't
+      # ABI-stable across versions -- found via a native aarch64 host (glibc 2.43)
+      # SIGILLing inside its own ld.so while calling a libc-2.27 fixture's init,
+      # a version gap plenty of *qemu* runs already carry safely. A version match
+      # is the only thing that's actually safe to assume needs nothing extra.
       def sysroot
         return @sysroot if defined?(@sysroot)
 
         ver = File.basename(@target)[/(\d+\.\d+)/, 1]
-        # Only a qemu run needs a matched ld.so; a native run loads the fixture with
-        # the host loader directly. Otherwise: a DIFFERENT version than the runtime
-        # libc, on a version-strict arch, needs a per-version sysroot.
-        need = qemu_transport? && ver && @arch.version_strict? && ver != default_libc_version
+        need = ver && @arch.version_strict? && ver != default_libc_version
         dir = need && File.join(ROOT, 'sysroots', "#{@arch.name}-#{ver}")
         @sysroot = (dir && (stub_built?(dir) || build_sysroot(dir))) ? dir : nil
       end
@@ -85,8 +90,11 @@ module Aletheia
       # plan computed against the new size writes past its actual mapping and
       # faults. Rebuild whenever the source is newer than the cached binary.
       def stub_built?(dir)
-        stub = File.join(dir, 'park_stub')
-        File.file?(stub) && File.mtime(stub) >= File.mtime(File.join(ROOT, 'park_stub.c'))
+        src_mtime = File.mtime(File.join(ROOT, 'park_stub.c'))
+        %w[park_stub park_stub_native].all? do |name|
+          stub = File.join(dir, name)
+          File.file?(stub) && File.mtime(stub) >= src_mtime
+        end
       end
 
       # Build the per-version sysroot from the fixture's own Ubuntu package version
@@ -114,6 +122,23 @@ module Aletheia
                '-x', driver, '--args', stub, @target]
         [spawn(env, *cmd, out: log, err: log, pgroup: true)]
       end
+
+      private
+
+      # A version-matched sysroot's normal park_stub keeps a generic interpreter
+      # path (qemu's QEMU_LD_PREFIX redirects it into the sysroot) -- a real
+      # execve has no such redirection, so it would still load through the
+      # HOST's system ld.so, the exact mismatch {#sysroot} exists to avoid.
+      # +park_stub_native+ (build_sysroot.sh) has the sysroot's own ld.so baked
+      # into its interpreter via +--dynamic-linker+, so the kernel loads the
+      # right one directly, and GDB still sees a normal, immediately-symboled
+      # primary executable (no pending-breakpoint dance for a stub loaded only
+      # via a hand-invoked interpreter).
+      def stub
+        return super unless sysroot && !ENV['ALETHEIA_STUB']
+
+        File.join(sysroot, 'park_stub_native')
+      end
     end
 
     # Qemu-user: the emulator runs the stub with the guest's stdio on the tty and
@@ -131,7 +156,7 @@ module Aletheia
                      in: slave, out: slave, err: log, pgroup: true)
         sleep 0.8 # let the gdbstub come up (don't pre-connect: it accepts one client)
         genv = { 'ALETHEIA_PLAN' => plan_path, 'ALETHEIA_STUB_OUT' => stub_out,
-                 'ALETHEIA_CONNECT' => "localhost:#{port}" }
+                 'ALETHEIA_CONNECT' => "localhost:#{port}", 'ALETHEIA_SYSROOT' => ld_prefix }
         gpid = spawn(genv, 'gdb-multiarch', '-nx', '-q', '-batch', '-x', driver, stub,
                      out: log, err: log, pgroup: true)
         [gpid, qpid]
