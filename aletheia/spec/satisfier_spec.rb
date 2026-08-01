@@ -154,6 +154,15 @@ RSpec.describe Aletheia::Satisfier do
       expect(plan.regs['rbx']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
     end
 
+    # "reg is a valid pointer" (a libc call dereferences reg, e.g. libc-2.31
+    # 0xdf8's posix_spawnattr_setsigmask/setsigdefault reading r12/r13): point the
+    # register at readable scratch, like the bare-pointer argv/envp form.
+    it 'points a register at readable scratch for "reg is a valid pointer"' do
+      plan = satisfier.satisfy(gadget(['r12 is a valid pointer']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['r12']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
+    end
+
     # libc-2.23's 0xcc610 reads a mode flag off the stack (`mov esi,[rbp-0x50]`,
     # never overwritten within the window) that a later branch requires to be
     # exactly 1 -- unlike a zero target, there's no pre-zeroed region to point
