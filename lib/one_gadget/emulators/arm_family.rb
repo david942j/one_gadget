@@ -107,6 +107,33 @@ module OneGadget
         dispatch_safe_call(addr, SAFE_CALLS)
       end
 
+      # A store's destination, tracked into whichever stack {#get_corresponding_stack}
+      # resolves it to (sp/bp, or a register write history -- see
+      # {Processor#reg_based_stack}), one word per entry of +values+ starting at
+      # +dst_l+. Also records the "must be writable" requirement unless the
+      # destination is sp/bp (always writable, no constraint needed) -- recorded
+      # even when the write IS also tracked, so the fetcher has it to fall back on
+      # if that resolution ends up superseded (see base.rb's resolvable_stack
+      # callers). Shared by +str+ (one value) and aarch64's +stp+ (two).
+      # @param [OneGadget::Emulators::Lambda] dst_l The destination, zero-deref
+      #   (already +ref!+'d).
+      # @param [Array<OneGadget::Emulators::Lambda, Integer>] values One value per
+      #   word, starting at +dst_l+.
+      # @return [void]
+      def track_write(dst_l, *values)
+        stack = dst_l.deref_count.zero? ? get_corresponding_stack(dst_l.obj) : nil
+        values.each_with_index { |v, i| stack[dst_l.immi + size_t * i] = v } if stack
+        add_writable(dst_l) unless [sp_based_stack, bp_based_stack].include?(stack)
+      end
+
+      # +cbz+/+cbnz+ (compare-and-branch-on-zero): identical decoding in ARM and
+      # AArch64. +ops+ is +[register, target-address-hex]+, as {#operands} splits it.
+      # @param [Array<String>] ops The branch's operands.
+      # @param [Boolean] negate +false+ for +cbz+, +true+ for +cbnz+.
+      def handle_cbz(ops, negate:)
+        branch_on_zero(ops[1].to_i(16), operand_str(ops[0]), negate:)
+      end
+
       # Libc-relative addresses are known-mapped too; they carry the +$base+ marker
       # rather than a +pc+-relative one.
       def mapped_pointer?(obj)
