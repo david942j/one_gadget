@@ -153,6 +153,29 @@ RSpec.describe Aletheia::Satisfier do
       expect(plan.status).to eq('ok')
       expect(plan.regs['rbx']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
     end
+
+    # A "writable: [base]+imm" compound base (base is dereferenced, not a bare
+    # register -- a store through a pointer read off the stack, e.g. libc-2.27's
+    # 0xe5887) can't be resolved until `base`'s own argv/envp constraint has run,
+    # and that constraint must not pick base == NULL: with base == NULL,
+    # "[base]+imm" is a fixed low address (a real unmapped-page write), not
+    # merely untracked. The deferred pass (order_compound_writable_last) plus the
+    # NULL-branch block (@null_unsafe_bases) together force "[rbp-0x78] is a
+    # valid argv" instead of the cheaper "[rbp-0x78] == NULL".
+    it 'defers a compound "writable: [base]+imm" until base resolves to a real pointer' do
+      plan = satisfier.satisfy(gadget([
+                                        'writable: [rbp-0x78]+0x10',
+                                        'writable: rbp-0x80',
+                                        '[[rbp-0x78]] == NULL || [rbp-0x78] == NULL || [rbp-0x78] is a valid argv',
+                                        '[[rbp-0x70]] == NULL || [rbp-0x70] == NULL || [rbp-0x70] is a valid envp'
+                                      ], effect: 'execve("/bin/sh", [rbp-0x78], [rbp-0x70])'))
+      expect(plan.status).to eq('ok')
+      expect(plan.branches.values).to include('[rbp-0x78] is a valid argv')
+      expect(plan.branches.values).not_to include('[rbp-0x78] == NULL')
+
+      rbp_off = plan.regs['rbp']['scratch_off']
+      expect(plan.mem[rbp_off - 0x78]).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
+    end
   end
 
   context 'i386 backend' do

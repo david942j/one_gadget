@@ -58,6 +58,13 @@ module Aletheia
     # libc GOT base, i.e. +base + PLTGOT offset+.
     GOT = /\A(\w+) is the GOT address of libc\z/
 
+    # +writable: [base]+imm+ (a compound base -- offset from a *dereferenced*
+    # value, not a bare register, e.g. a store through a pointer read off the
+    # stack). +base+'s own content is only pinned by a *later* argv/envp
+    # constraint, so this is handled by deferring it (see {#satisfy}) rather
+    # than by {#writable_cost}/{#apply_writable}, which assume a bare register.
+    WRITABLE_COMPOUND = /\Awritable: (\[.+\])[+-]#{IMM}\z/
+
     # @param arch an arch backend (e.g. {Arch::AArch64})
     # @param [Integer, nil] got_offset the libc PLTGOT file offset, for i386's
     #   "+<reg> is the GOT address of libc+" constraint (see {GOT}).
@@ -79,7 +86,14 @@ module Aletheia
         sp_offset: SP_OFFSET, benign_default: !@strict, poison_default: @strict,
         branches: {}, status: 'ok', reason: nil, writable_count: 0
       )
-      gadget.constraints.each_with_index do |constraint, i|
+      # A `writable: [base]+imm` constraint can only be checked once `base`'s own
+      # content is pinned by its own (argv/envp) constraint -- deferred to run
+      # last. That constraint must not pick its NULL branch for `base`: with
+      # base == NULL, `[base]+imm` is a fixed low address (e.g. 0x10), an
+      # unmapped-page write in reality, not a merely-untracked one.
+      ordered = order_compound_writable_last(gadget.constraints)
+      @null_unsafe_bases = ordered.grep(WRITABLE_COMPOUND) { Regexp.last_match(1) }
+      ordered.each_with_index do |constraint, i|
         chosen = satisfy_constraint(plan, constraint)
         return skip(plan, "unsupported-or-unsat: #{constraint}") unless chosen
 
@@ -118,15 +132,27 @@ module Aletheia
       plan
     end
 
+    # A `writable: [base]+imm` constraint (see {WRITABLE_COMPOUND}) moved after
+    # everything else, so by the time it runs, `base`'s own constraint has
+    # already picked (and applied) its resolution.
+    def order_compound_writable_last(constraints)
+      compound, rest = constraints.partition { |c| c.match?(WRITABLE_COMPOUND) }
+      rest + compound
+    end
+
     # Cost of satisfying a single disjunct (lower = easier); nil = unsatisfiable
     # or a category this satisfier doesn't handle.
     # @return [Float, nil]
     def evaluate(disjunct)
       case disjunct
+      when WRITABLE_COMPOUND then 0.9 # deferred; see #order_compound_writable_last
       when /\Awritable: (.+)\z/
         (op = safe_parse(Regexp.last_match(1))) && writable_cost(op)
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
-        (op = safe_parse(Regexp.last_match(1))) && null_cost(op)
+        base = Regexp.last_match(1)
+        return nil if @null_unsafe_bases&.include?(base)
+
+        (op = safe_parse(base)) && null_cost(op)
       when /\A\{.*\} is a valid (?:argv|envp)\z/ then 0.5 # array literal: element builder
       when /is a valid (?:argv|envp)\z/         then 0.4 # pointer form: point it at scratch
       when ALIGN                                then alignment_cost(disjunct)
@@ -216,11 +242,13 @@ module Aletheia
     # Whether +branch+ already holds under the current register assignment.
     def satisfied?(plan, branch)
       case branch
+      when WRITABLE_COMPOUND
+        compound_writable_satisfied?(plan, Regexp.last_match(1))
       when /\Awritable: (.+)\z/
         op = Operand_.parse(Regexp.last_match(1))
         op.deref.zero? && op.reg && (stack_reg?(op.reg) || scratch?(plan, op.reg))
       when /is a valid (?:argv|envp)\z/
-        (ptr = pointer_form(branch)) && scratch?(plan, ptr)
+        (op = pointer_form(branch)) && pointer_resolved?(plan, op)
       when ALIGN
         reg, _mask, want = parse_alignment(branch)
         (stack_reg?(reg) && want.zero?) || (want.zero? && scratch?(plan, reg))
@@ -275,6 +303,8 @@ module Aletheia
     # Mutate +plan+ to satisfy +disjunct+; false on an irreconcilable conflict.
     def apply(plan, disjunct)
       case disjunct
+      when WRITABLE_COMPOUND
+        compound_writable_satisfied?(plan, Regexp.last_match(1))
       when /\Awritable: (.+)\z/
         (op = safe_parse(Regexp.last_match(1))) ? apply_writable(plan, op) : false
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
@@ -362,6 +392,32 @@ module Aletheia
       set_reg(plan, op.reg, scratch_slot(plan, op.imm))
     end
 
+    # +writable: [base]+imm+ (see {WRITABLE_COMPOUND}): satisfied once +base+'s
+    # own content -- pinned by its own constraint, which {#order_compound_writable_last}
+    # guarantees ran first -- is a scratch pointer. Nothing further to write:
+    # +imm+ always lands comfortably inside that region (an argv/envp element
+    # offset, never close to {STRING_POOL}/{WRITABLE_STRIDE}'s size).
+    def compound_writable_satisfied?(plan, base_text)
+      op = safe_parse(base_text)
+      return false unless op && op.deref == 1 && op.reg
+
+      addr_off = mem_addr_off(plan, op)
+      return false unless addr_off
+
+      target = plan.mem[addr_off]
+      target.is_a?(Hash) && target.key?('scratch_off')
+    end
+
+    # The scratch-relative offset a single-deref operand's memory lives at (an
+    # +sp+-relative slot, or off a register the plan already points at scratch),
+    # or +nil+ when neither -- +base+ isn't resolved (yet).
+    def mem_addr_off(plan, op)
+      return SP_OFFSET + op.imm if stack_reg?(op.reg)
+      return plan.regs[op.reg]['scratch_off'] + op.imm if scratch?(plan, op.reg)
+
+      nil
+    end
+
     # +{e0, e1, ...}+ argv/envp contents: point every controllable register
     # element at a readable scratch string so the array is fully valid. Literals,
     # NULL, libc globals and stack slots are handled by the code or zero-fill.
@@ -388,10 +444,21 @@ module Aletheia
 
     # +<ptr> is a valid argv/envp+: point the pointer at scratch (a zero-filled,
     # hence NULL-terminated empty array).
-    def apply_pointer(plan, ptr)
-      return false unless ptr
+    def apply_pointer(plan, op)
+      return false unless op
+      return set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL }) if op.deref.zero?
 
-      set_reg(plan, ptr, { 'scratch_off' => STRING_POOL })
+      addr_off = mem_addr_off(plan, op)
+      addr_off && set_mem(plan, addr_off, { 'scratch_off' => STRING_POOL })
+    end
+
+    # Whether a pointer-form +X is a valid argv/envp+ operand already resolves to
+    # scratch: +X+ itself (deref 0), or the memory +X+ dereferences (deref 1).
+    def pointer_resolved?(plan, op)
+      return scratch?(plan, op.reg) if op.deref.zero?
+
+      addr_off = mem_addr_off(plan, op)
+      addr_off && plan.mem[addr_off].is_a?(Hash) && plan.mem[addr_off].key?('scratch_off')
     end
 
     def apply_relation(plan, disjunct)
@@ -436,9 +503,18 @@ module Aletheia
       { 'scratch_off' => WRITABLE_BASE + slot * WRITABLE_STRIDE - imm }
     end
 
+    # +X+ in +X is a valid argv/envp+ (the bare-pointer form, not an array
+    # literal): either +X+ itself is the pointer (deref 0 -- point the register
+    # at scratch), or +X+ is +[base]+ (deref 1 -- a store through a pointer read
+    # off the stack, e.g. Finding 6's shape; write the scratch pointer into
+    # +base+'s own memory instead, via {#mem_addr_off}).
+    # @return [Aletheia::Operand, nil]
     def pointer_form(branch)
       ptr = branch[/\A(\S+) is a valid (?:argv|envp)\z/, 1]
-      ptr && !ptr.start_with?('{') ? (op = safe_parse(ptr)) && op.reg && op.deref.zero? && op.reg : nil
+      return nil unless ptr && !ptr.start_with?('{')
+
+      op = safe_parse(ptr)
+      op if op&.reg && op.deref <= 1
     end
 
     def safe_parse(str)
