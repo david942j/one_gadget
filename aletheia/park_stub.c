@@ -201,8 +201,9 @@ static void self_inject(unsigned long base, unsigned char *scratch, const char *
 }
 #endif /* __arm__ */
 
-/* Load base of the first mapping whose file basename starts with +name+, or 0. */
-static unsigned long map_base(const char *name) {
+/* Load base of the first mapping whose file basename starts with +name+, or 0.
+ * When +path_out+ is non-NULL it receives that mapping's full file path. */
+static unsigned long map_base_path(const char *name, char *path_out, size_t path_sz) {
     FILE *f = fopen("/proc/self/maps", "r");
     char line[1024];
     unsigned long base = 0;
@@ -210,11 +211,39 @@ static unsigned long map_base(const char *name) {
         char *slash = strrchr(line, '/');
         if (slash && strncmp(slash + 1, name, strlen(name)) == 0) {
             base = strtoul(line, NULL, 16);
+            if (path_out) {
+                char *p = strchr(line, '/');
+                size_t n = strcspn(p, "\n");
+                if (n < path_sz) { memcpy(path_out, p, n); path_out[n] = 0; }
+                else if (path_sz) path_out[0] = 0;
+            }
             break;
         }
     }
     if (f) fclose(f);
     return base;
+}
+
+static unsigned long map_base(const char *name) {
+    return map_base_path(name, NULL, 0);
+}
+
+/* Whether two files have identical contents (used to confirm the target IS the
+ * already-loaded libc). */
+static int files_identical(const char *a, const char *b) {
+    FILE *fa = fopen(a, "rb"), *fb = fopen(b, "rb");
+    int same = fa && fb;
+    char ba[65536], bb[65536];
+    size_t na, nb;
+    while (same) {
+        na = fread(ba, 1, sizeof ba, fa);
+        nb = fread(bb, 1, sizeof bb, fb);
+        if (na != nb || memcmp(ba, bb, na) != 0) { same = 0; break; }
+        if (na == 0) break;
+    }
+    if (fa) fclose(fa);
+    if (fb) fclose(fb);
+    return same;
 }
 
 int main(int argc, char **argv) {
@@ -230,18 +259,27 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    /* dlopen the target to map it at a known base. This can fail when the target
+     * is a full libc.so.6 that imports an ld.so-private symbol coupled only to
+     * the PRIMARY libc (e.g. glibc >= 2.35's __nptl_change_stack_perm) -- such a
+     * symbol can't be resolved for a dlopen'd SECONDARY libc. But a version-matched
+     * sysroot links this stub against a libc byte-identical to the target, so the
+     * target is ALREADY mapped as our primary libc; when its file matches the
+     * loaded libc.so.6, fall back to that mapping instead of erroring. */
+    char loaded[1024] = "";
+    unsigned long libc_base = map_base_path("libc.so.6", loaded, sizeof loaded);
     void *h = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
-    if (!h) {
+    if (!h && !(loaded[0] && files_identical(argv[1], loaded))) {
         fprintf(stderr, "dlopen failed: %s\n", dlerror());
         return 1;
     }
 
-    /* The target's own mapping, or the host libc when dlopen deduped the target
-     * to the already-loaded system libc (target == system libc). */
+    /* The target's own mapping, or the loaded libc when the target == it (dlopen
+     * deduped, or we fell back above). */
     const char *bn = strrchr(argv[1], '/');
     bn = bn ? bn + 1 : argv[1];
     unsigned long base = map_base(bn);
-    if (!base) base = map_base("libc.so.6");
+    if (!base) base = libc_base ? libc_base : map_base("libc.so.6");
 
     const char *outpath = getenv("ALETHEIA_STUB_OUT");
     if (outpath) {

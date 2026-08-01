@@ -37,18 +37,27 @@ for pkg in libc6 libc6-dev; do
 done
 rm -rf "$tmp"
 
+# Normalise split-usr vs merged-usr layouts so both /lib/$triplet and
+# /usr/lib/$triplet resolve to the runtime libs no matter which the .deb used.
+# A native arch's ld.so (running under qemu on a host of the same arch) may probe
+# /usr/lib/$triplet before /lib/$triplet, while the target's baked interpreter
+# path is /lib/$ldso -- both must land inside the sysroot or qemu falls back to
+# the HOST's newer libc and the versions clash.
+if [ -d "$root/lib/$triplet" ]; then
+  # Split-usr (older debs): libs in /lib; mirror them under /usr/lib.
+  mkdir -p "$root/usr/lib/$triplet"
+  for so in "$root/lib/$triplet"/*.so*; do
+    [ -e "$so" ] && ln -sf "../../../lib/$triplet/$(basename "$so")" \
+                          "$root/usr/lib/$triplet/$(basename "$so")"
+  done
+else
+  # Merged-usr (newer debs, e.g. glibc >= ~2.36): libs live only in /usr/lib;
+  # point /lib at it (as a real merged-usr root does) so /lib paths resolve too.
+  ln -sfn usr/lib "$root/lib"
+fi
+
 # qemu resolves the stub's interpreter (/lib/$ldso) against QEMU_LD_PREFIX=$root.
 [ -e "$root/lib/$ldso" ] || ln -sf "$triplet/$ldso" "$root/lib/$ldso"
-
-# Mirror the runtime libs under /usr/lib/$triplet too. A native arch's ld.so
-# (running under qemu on a host of the same arch) may probe /usr/lib/$triplet
-# before /lib/$triplet; without the libs there, qemu falls back to the HOST's
-# newer libc and the versions clash. This keeps every standard path in-sysroot.
-mkdir -p "$root/usr/lib/$triplet"
-for so in "$root/lib/$triplet"/*.so*; do
-  [ -e "$so" ] && ln -sf "../../../lib/$triplet/$(basename "$so")" \
-                        "$root/usr/lib/$triplet/$(basename "$so")"
-done
 
 libdir="$root/usr/lib/$triplet"
 # -nostdinc: use ONLY the sysroot's headers (plus gcc's own builtins), so an old
