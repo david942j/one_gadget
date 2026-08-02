@@ -91,7 +91,7 @@ module Aletheia
       # last. That constraint must not pick its NULL branch for `base`: with
       # base == NULL, `[base]+imm` is a fixed low address (e.g. 0x10), an
       # unmapped-page write in reality, not a merely-untracked one.
-      ordered = order_compound_writable_last(gadget.constraints)
+      ordered = order_constraints(gadget.constraints)
       @null_unsafe_bases = ordered.grep(WRITABLE_COMPOUND) { Regexp.last_match(1) }
       ordered.each_with_index do |constraint, i|
         chosen = satisfy_constraint(plan, constraint)
@@ -132,12 +132,18 @@ module Aletheia
       plan
     end
 
-    # A `writable: [base]+imm` constraint (see {WRITABLE_COMPOUND}) moved after
-    # everything else, so by the time it runs, `base`'s own constraint has
-    # already picked (and applied) its resolution.
-    def order_compound_writable_last(constraints)
+    # Order constraints so each runs once its inputs are settled and so a
+    # register-pinning constraint wins over a mere bound on the same register:
+    # * a plain `writable: reg+imm` runs FIRST -- it pins `reg` to a (nonzero,
+    #   mapped) scratch pointer, which then already satisfies a co-occurring bound
+    #   like `reg != 0` (see {#scratch_satisfies_relation?}); applying the bound
+    #   first would pin `reg` to a bare literal and block the writable.
+    # * a compound `writable: [base]+imm` (see {WRITABLE_COMPOUND}) runs LAST, once
+    #   `base`'s own constraint has picked and applied its resolution.
+    def order_constraints(constraints)
       compound, rest = constraints.partition { |c| c.match?(WRITABLE_COMPOUND) }
-      rest + compound
+      writable, others = rest.partition { |c| c.start_with?('writable: ') }
+      writable + others + compound
     end
 
     # Cost of satisfying a single disjunct (lower = easier); nil = unsatisfiable

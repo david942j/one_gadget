@@ -163,6 +163,17 @@ RSpec.describe Aletheia::Satisfier do
       expect(plan.regs['r12']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
     end
 
+    # A "writable: reg" and a "reg != 0" on the SAME register must not conflict
+    # (libc-2.19 0xc1ca7 builds argv in place at rax and also branches on rax != 0):
+    # the writable pins rax to a scratch pointer, which -- applied first -- already
+    # satisfies the != 0. Applying the relation first would pin rax to a bare 1 and
+    # leave the writable unsatisfiable.
+    it 'satisfies "writable: reg" and "reg != 0" together by pinning the pointer' do
+      plan = satisfier.satisfy(gadget(['rax != 0x0', 'writable: rax+0x8']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['rax']).to be_a(Hash) # a scratch pointer, not the literal 1
+    end
+
     # libc-2.23's 0xcc610 reads a mode flag off the stack (`mov esi,[rbp-0x50]`,
     # never overwritten within the window) that a later branch requires to be
     # exactly 1 -- unlike a zero target, there's no pre-zeroed region to point
