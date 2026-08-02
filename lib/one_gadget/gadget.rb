@@ -89,12 +89,12 @@ module OneGadget
       # Identity: [<Identity>]
       # Expr: <REG> is the GOT address of libc
       # Expr: writable: <Identity>
+      # Expr: readable: <Identity>
       # Expr: <CAST>?<Identity> == NULL
       # Expr: <REG> & 0xf == <IMM>
       # Expr: (s32)[<Identity>] <= 0
       # Expr: .+ is a valid argv
       # Expr: .+ is a valid envp
-      # Expr: <REG> is a valid pointer
       # Expr: <Expr> || <Expr>
       def calculate_score(expr)
         return expr.split(' || ').map(&method(:calculate_score)).max if expr.include?(' || ')
@@ -108,7 +108,9 @@ module OneGadget
         # is an easy "must be zero" like a NULL pointer, not a generic branch relation.
         when /\A\([su]\d+\).+ == 0x0$/ then calculate_null_score(expr.sub(' == 0x0', ''))
         when / <= 0x0$/ then calculate_null_score(expr.sub(' <= 0x0', ''))
-        when / is a valid (argv|envp|pointer)$/ then 0.2 # This usually means the register has to be a readable pointer.
+        # A register that just has to be a readable pointer -- a "readable: <reg>"
+        # (a dereferenced call arg) or a valid argv/envp element -- is easy.
+        when /^readable/, / is a valid (argv|envp)$/ then 0.2
         when / (==|!=|<=|>=|<|>) / then calculate_relation_score(expr) # a branch condition
         end
       end
