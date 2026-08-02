@@ -61,14 +61,15 @@ describe 'one_gadget_aarch64' do
     it 'libc-2.43' do
       path = data_path('aarch64-libc-2.43.so')
       expect(OneGadget.gadgets(file: path, force_file: true))
-        .to eq [0x4bc00, 0x4bc04, 0x4bc08, 0x4bc0c, 0x4bc10, 0x4bc14, 0x4bc18, 0x4bc1c]
+        .to eq [0x4bc00, 0x4bc04, 0x4bc08, 0x4bc0c, 0x4bc10, 0x4bc14, 0x4bc18, 0x4bc1c, 0xc7b00]
     end
 
     it 'resolves posix_spawn (do_system) gadgets' do
       path = data_path('aarch64-libc-2.43.so')
       gadgets = OneGadget.gadgets(file: path, force_file: true, details: true)
       expect(gadgets.map(&:effect).uniq)
-        .to eq ['posix_spawn(sp+0xc, "/bin/sh", 0, sp+0x218, sp+0x50, environ)']
+        .to eq ['posix_spawn(sp+0xc, "/bin/sh", 0, sp+0x218, sp+0x50, environ)',
+                'execve("/bin/sh", x29-0x20, x6)']
     end
 
     # do_system passes {"sh", "-c", "--", <command>, NULL}; the "-c" and "--"
@@ -82,15 +83,25 @@ describe 'one_gadget_aarch64' do
       expect(gadget.constraints.join).not_to include('$base') # no unresolved global
     end
 
-    # The execve("/bin/sh") gadget in 2.43's execvp is split across a
-    # `cmp x2, #1; b.ne`, so it only appears once the not-taken branch is
-    # expressed as the constraint `x2 == 0x1`.
+    # 2.23's execvpe reaches this execve only on the taken edge of a
+    # `cmp w21, #1; b.eq`, so the gadget carries that branch as `w21 == 0x1`.
     it 'resolves a gadget guarded by a conditional branch' do
-      path = data_path('aarch64-libc-2.43.so')
+      path = data_path('aarch64-libc-2.23.so')
       gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
-                        .find { |g| g.offset == 0xc7a3c }
-      expect(gadget.effect).to eq 'execve("/bin/sh", sp+0x10, x6)'
-      expect(gadget.constraints).to include('x2 == 0x1')
+                        .find { |g| g.offset == 0x9b9e0 }
+      expect(gadget.effect).to eq 'execve("/bin/sh", sp, x20)'
+      expect(gadget.constraints).to include('w21 == 0x1')
+    end
+
+    # 0xc7b00 stages argv at `sub x4, x29, #0x20`; without sub support the whole
+    # candidate aborts. It dominates the cmp-guarded 0xc7a3c (same execve, but no
+    # `x2 == 0x1`), so it is the one that surfaces (here as a top-level gadget).
+    it 'resolves an execve gadget reachable only through a sub' do
+      path = data_path('aarch64-libc-2.43.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, details: true)
+                        .find { |g| g.offset == 0xc7b00 }
+      expect(gadget.effect).to eq 'execve("/bin/sh", x29-0x20, x6)'
+      expect(gadget.constraints).not_to include('x2 == 0x1')
     end
   end
 

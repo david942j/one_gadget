@@ -43,7 +43,8 @@ module OneGadget
           Instruction.new('ldr', 2..3),
           Instruction.new('mov', 2),
           Instruction.new('stp', 3),
-          Instruction.new('str', 2..3)
+          Instruction.new('str', 2..3),
+          Instruction.new('sub', 3..4)
         ]
       end
 
@@ -78,13 +79,24 @@ module OneGadget
       end
 
       def inst_add(dst, src, op2, mode = 'sxtw')
+        arith('add', dst, src, op2, mode) { |a, b| a + b }
+      end
+
+      def inst_sub(dst, src, op2, mode = 'sxtw')
+        arith('sub', dst, src, op2, mode) { |a, b| a - b }
+      end
+
+      # Shared add/sub. Only the plain (default +sxtw+) form with an immediate
+      # +op2+ is modelled; a shifted/extended register operand aborts. The block
+      # combines the resolved source and immediate.
+      def arith(name, dst, src, op2, mode)
         check_register!(dst)
 
         src = arg_to_lambda(src)
         op2 = arg_to_lambda(op2)
-        raise_unsupported('add', dst, src, op2) unless op2.is_a?(Integer) && mode == 'sxtw'
+        raise_unsupported(name, dst, src, op2) unless op2.is_a?(Integer) && mode == 'sxtw'
 
-        registers[dst] = src + op2
+        registers[dst] = yield(src, op2)
       end
 
       def inst_adrp(dst, imm)
