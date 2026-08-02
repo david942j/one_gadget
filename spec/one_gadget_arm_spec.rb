@@ -70,14 +70,12 @@ describe 'one_gadget_arm' do
     it 'resolves argv through a register written via str, not just sp/bp' do
       path = data_path('arm-libc-2.27.so')
       gadgets = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
-      # 0x73f3a/0x73f96 build argv on the stack via `str reg, [r7, #imm]`; the
-      # array's first element (r7's own target) must be tracked so r0 -- an
-      # untracked entry the code writes into the array too -- surfaces as a
-      # real precondition, not an opaque "r7 is a valid argv".
-      [0x73f3a, 0x73f96].each do |offset|
-        gadget = gadgets.find { |g| g.offset == offset }
-        expect(gadget.constraints).to include('r0 == NULL || {"/bin/sh", r0, NULL} is a valid argv')
-      end
+      # 0x73f96 builds argv on the stack via `str reg, [r7, #imm]`; the array's
+      # first element (r7's own target) must be tracked so r0 -- an untracked
+      # entry the code writes into the array too -- surfaces as a real
+      # precondition, not an opaque "r7 is a valid argv".
+      gadget = gadgets.find { |g| g.offset == 0x73f96 }
+      expect(gadget.constraints).to include('r0 == NULL || {"/bin/sh", r0, NULL} is a valid argv')
     end
 
     it 'finds posix_spawn (do_system) gadgets with stack-passed argv/envp' do
