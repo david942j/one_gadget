@@ -134,6 +134,20 @@ module OneGadget
         branch_on_zero(ops[1].to_i(16), operand_str(ops[0]), negate:)
       end
 
+      # Replace register tokens that currently hold a concrete integer with that
+      # integer, so a register-indexed memory operand becomes an offset one the
+      # Lambda parser handles.
+      # @example
+      #   # with the index register currently holding 0xd8
+      #   resolve_int_regs('[r8, r2]')  #=> '[r8, 0xd8]'
+      #   resolve_int_regs('[x8, x2]')  #=> '[x8, 0xd8]'
+      def resolve_int_regs(str)
+        str.gsub(/[a-z]+\d*/) do |tok|
+          v = registers[tok] if register?(tok)
+          v.is_a?(Integer) ? OneGadget::Helper.hex(v) : tok
+        end
+      end
+
       # Libc-relative addresses are known-mapped too; they carry the +$base+ marker
       # rather than a +pc+-relative one.
       def mapped_pointer?(obj)
