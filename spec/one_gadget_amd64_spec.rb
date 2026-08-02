@@ -17,6 +17,17 @@ describe 'one_gadget_amd64' do
                 0xe668f, 0xe6697, 0xe669e, 0xe66bd]
     end
 
+    # 0xc1ca7 builds argv in place at the malloc'd buffer rax (mov [rsi],rax with
+    # rsi==rax), so rax must be writable. The store target was previously lost:
+    # add_writable re-parsed "[rax]" after an intervening lea reassigned rax to a
+    # libc $base address, dropping the constraint (kept only the weaker rax != 0).
+    it 'libc-2.19 requires the in-place argv buffer (rax) be writable' do
+      path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+                        .find { |g| g.offset == 0xc1ca7 }
+      expect(gadget.constraints).to include('writable: rax+0x8')
+    end
+
     # Regression: a candidate that ran past its terminal execve into the stack-guard
     # epilogue used to yield spurious gadgets whose fs:/[rax-8] constraints crashed
     # score computation at the default level. Halting at the terminal call drops them.

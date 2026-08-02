@@ -176,7 +176,14 @@ module OneGadget
           return
         end
         dst = arg_to_lambda(dst)
-        add_writable(dst.to_s)
+        # The store target's own address must be writable. Pass the resolved
+        # destination Lambda (a fresh, dereferenced copy) rather than its string:
+        # re-parsing the string would re-bind its base register to whatever that
+        # register holds *now*, which is wrong once an intervening instruction has
+        # reassigned it -- e.g. a store through a register aliasing an earlier,
+        # since-overwritten pointer would resolve to the overwritten (fixed) value
+        # and silently drop the constraint.
+        add_writable(dst.dup.ref!)
         return if dst.deref_count != 1
 
         # get_corresponding_stack takes a base (obj), not the whole pointer
@@ -317,8 +324,10 @@ module OneGadget
         dispatch_safe_call(addr, SAFE_CALLS)
       end
 
-      def add_writable(dst)
-        lmda = arg_to_lambda(dst).ref!
+      # Record a "must be writable" constraint for a store's target address.
+      # @param [OneGadget::Emulators::Lambda] lmda The destination address,
+      #   zero-deref (already +ref!+'d by the caller).
+      def add_writable(lmda)
         @constraints << [:writable, lmda] if needs_writable?(lmda)
       end
 
