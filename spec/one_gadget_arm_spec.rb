@@ -73,8 +73,7 @@ describe 'one_gadget_arm' do
       # 0x73f96 builds argv on the stack via `str reg, [r7, #imm]`; the array's
       # first element (r7's own target) must be tracked so r0 -- an untracked
       # entry the code writes into the array too -- surfaces as a real
-      # precondition, not an opaque "r7 is a valid argv". (Its sibling 0x73f3a is
-      # the same shape plus an extra `r4 == 0x0`, so it's dominated and trimmed.)
+      # precondition, not an opaque "r7 is a valid argv".
       gadget = gadgets.find { |g| g.offset == 0x73f96 }
       expect(gadget.constraints).to include('r0 == NULL || {"/bin/sh", r0, NULL} is a valid argv')
     end

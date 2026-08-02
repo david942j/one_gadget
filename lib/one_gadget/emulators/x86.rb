@@ -176,13 +176,7 @@ module OneGadget
           return
         end
         dst = arg_to_lambda(dst)
-        # The store target's own address must be writable. Pass the resolved
-        # destination Lambda (a fresh, dereferenced copy) rather than its string:
-        # re-parsing the string would re-bind its base register to whatever that
-        # register holds *now*, which is wrong once an intervening instruction has
-        # reassigned it -- e.g. a store through a register aliasing an earlier,
-        # since-overwritten pointer would resolve to the overwritten (fixed) value
-        # and silently drop the constraint.
+        # dup: add_writable ref!s its argument, and dst is reused below.
         add_writable(dst.dup.ref!)
         return if dst.deref_count != 1
 
