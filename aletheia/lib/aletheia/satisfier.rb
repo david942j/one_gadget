@@ -154,13 +154,15 @@ module Aletheia
       when WRITABLE_COMPOUND then 0.9 # deferred; see #order_compound_writable_last
       when /\Awritable: (.+)\z/
         (op = safe_parse(Regexp.last_match(1))) && writable_cost(op)
+      when /\Areadable: (.+)\z/
+        (op = safe_parse(Regexp.last_match(1))) && op.reg && 0.4 # point it at scratch
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
         base = Regexp.last_match(1)
         return nil if @null_unsafe_bases&.include?(base)
 
         (op = safe_parse(base)) && null_cost(op)
       when /\A\{.*\} is a valid (?:argv|envp)\z/ then 0.5 # array literal: element builder
-      when /is a valid (?:argv|envp|pointer)\z/ then 0.4 # pointer form: point it at scratch
+      when /is a valid (?:argv|envp)\z/         then 0.4 # pointer form: point it at scratch
       when ALIGN                                then alignment_cost(disjunct)
       when GOT                                  then got_cost(disjunct)
       else
@@ -284,7 +286,9 @@ module Aletheia
       when /\Awritable: (.+)\z/
         op = Operand_.parse(Regexp.last_match(1))
         op.deref.zero? && op.reg && (stack_reg?(op.reg) || scratch?(plan, op.reg))
-      when /is a valid (?:argv|envp|pointer)\z/
+      when /\Areadable: (.+)\z/
+        (op = safe_parse(Regexp.last_match(1))) && pointer_resolved?(plan, op)
+      when /is a valid (?:argv|envp)\z/
         (op = pointer_form(branch)) && pointer_resolved?(plan, op)
       when ALIGN
         reg, _mask, want = parse_alignment(branch)
@@ -352,6 +356,8 @@ module Aletheia
         compound_writable_satisfied?(plan, Regexp.last_match(1))
       when /\Awritable: (.+)\z/
         (op = safe_parse(Regexp.last_match(1))) ? apply_writable(plan, op) : false
+      when /\Areadable: (.+)\z/
+        (op = safe_parse(Regexp.last_match(1))) ? apply_pointer(plan, op) : false
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
         op = safe_parse(Regexp.last_match(1))
         if op.nil? then false
@@ -362,7 +368,7 @@ module Aletheia
         else false
         end
       when /\A\{(.*)\} is a valid (?:argv|envp)\z/ then apply_argv_list(plan, Regexp.last_match(1))
-      when /is a valid (?:argv|envp|pointer)\z/    then apply_pointer(plan, pointer_form(disjunct))
+      when /is a valid (?:argv|envp)\z/            then apply_pointer(plan, pointer_form(disjunct))
       when ALIGN                                   then apply_alignment(plan, disjunct)
       when GOT                                     then apply_got(plan, disjunct)
       else
@@ -570,16 +576,15 @@ module Aletheia
       { 'scratch_off' => WRITABLE_BASE + slot * WRITABLE_STRIDE - imm }
     end
 
-    # +X+ in +X is a valid argv/envp/pointer+ (the bare-pointer form, not an array
+    # +X+ in +X is a valid argv/envp+ (the bare-pointer form, not an array
     # literal): either +X+ itself is the pointer (deref 0 -- point the register
     # at scratch), or +X+ is +[base]+ (deref 1 -- a store through a pointer read
     # off the stack, e.g. Finding 6's shape; write the scratch pointer into
-    # +base+'s own memory instead, via {#mem_addr_off}). +is a valid pointer+ (a
-    # register a libc call dereferences, e.g. posix_spawnattr_setsigmask's sigset)
-    # only ever takes the deref-0 register form.
+    # +base+'s own memory instead, via {#mem_addr_off}). A bare +readable: <reg>+
+    # is handled directly in {#apply} via {#apply_pointer}, not here.
     # @return [Aletheia::Operand, nil]
     def pointer_form(branch)
-      ptr = branch[/\A(\S+) is a valid (?:argv|envp|pointer)\z/, 1]
+      ptr = branch[/\A(\S+) is a valid (?:argv|envp)\z/, 1]
       return nil unless ptr && !ptr.start_with?('{')
 
       op = safe_parse(ptr)
