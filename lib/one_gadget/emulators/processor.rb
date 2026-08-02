@@ -131,7 +131,13 @@ module OneGadget
         # we have these types:
         # * :writable
         # * :raw
-        cons = @constraints.uniq do |type, obj|
+        # A writable is keyed by its base register (deref-0) or full expression
+        # (compound); several stores through one base (e.g. reg+0x0 and reg+0x8)
+        # impose the same "reg is writable" requirement, so keep just the smallest
+        # offset (sort ascending, then uniq keeps that first). Raw constraints key
+        # on themselves.
+        cons = @constraints.sort_by { |type, obj| type == :writable && obj.deref_count.zero? ? obj.immi : 0 }
+                           .uniq do |type, obj|
           next obj unless type == :writable
 
           obj.deref_count.zero? ? obj.obj.to_s : obj.to_s

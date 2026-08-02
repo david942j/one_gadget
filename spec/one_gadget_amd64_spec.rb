@@ -29,7 +29,7 @@ describe 'one_gadget_amd64' do
       path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
       gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
                         .find { |g| g.offset == 0xc1ca7 }
-      expect(gadget.constraints).to include('writable: rax+0x8')
+      expect(gadget.constraints).to include('writable: rax')
       expect(gadget.constraints).not_to include('rax != 0x0')
     end
 
@@ -66,8 +66,8 @@ describe 'one_gadget_amd64' do
                                level: 1)).to eq [0x51df8, 0x51e2b, 0x51e32, 0x51e39, 0x51e40, 0x51e45, 0x51e55, 0x51e5a,
                                                  0x51e5d, 0x51e62, 0x84165, 0x8416c, 0x84173, 0x84176, 0x8417b, 0x84180,
                                                  0x8418c, 0x84192, 0x84199, 0x841a0, 0xe3b2e, 0xe3b31, 0xe3b34, 0xe3d23,
-                                                 0xe3d26, 0xe3d88, 0xe3d92, 0xe3d99, 0xe3da0, 0xe3dd7, 0xe3de1, 0xe3de5,
-                                                 0xe3ded, 0x1075e7, 0x1075f1, 0x107cea]
+                                                 0xe3d26, 0xe3d88, 0xe3d92, 0xe3d99, 0xe3da0, 0xe3dd7, 0xe3de1,
+                                                 0x1075e7, 0x1075f1, 0x107cea]
       expect(OneGadget.gadgets(file: path)).to eq [0xe3b2e, 0xe3b31, 0xe3b34]
     end
 
