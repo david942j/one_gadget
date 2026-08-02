@@ -277,19 +277,6 @@ module OneGadget
         list.tr('{}', '').split(',').map(&:strip)
       end
 
-      # Replace register tokens that currently hold a concrete integer with that
-      # integer, so memory operands like +[r8, r2]+ (r2 == 0xd8) become +[r8, 0xd8]+.
-      # @example
-      #   # with r2 currently holding 0xd8
-      #   resolve_int_regs('[r8, r2]')
-      #   #=> '[r8, 0xd8]'
-      def resolve_int_regs(str)
-        str.gsub(/[a-z]+\d*/) do |tok|
-          v = registers[tok] if register?(tok)
-          v.is_a?(Integer) ? OneGadget::Helper.hex(v) : tok
-        end
-      end
-
       class << self
         # ARM (32-bit) is 32-bit.
         def bits
