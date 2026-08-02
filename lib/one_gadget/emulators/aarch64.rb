@@ -96,8 +96,8 @@ module OneGadget
       def inst_ldr(dst, src, index = 0)
         check_register!(dst)
 
-        src_l = arg_to_lambda(src)
-        registers[dst] = src_l
+        src = resolve_int_regs(src)
+        registers[dst] = arg_to_lambda(src)
         raise_unsupported('ldr', dst, src, index) unless OneGadget::Helper.integer?(index)
 
         index = Integer(index)
@@ -119,6 +119,7 @@ module OneGadget
       def inst_stp(reg1, reg2, dst)
         raise_unsupported('stp', reg1, reg2, dst) unless reg64?(reg1) && reg64?(reg2)
 
+        dst = resolve_int_regs(dst)
         dst_l = arg_to_lambda(dst).ref!
         track_write(dst_l, registers[reg1], registers[reg2])
 
@@ -129,6 +130,7 @@ module OneGadget
         check_register!(src)
         raise_unsupported('str', src, dst, index) unless OneGadget::Helper.integer?(index)
 
+        dst = resolve_int_regs(dst)
         dst_l = arg_to_lambda(dst).ref!
         track_write(dst_l, registers[src])
 
