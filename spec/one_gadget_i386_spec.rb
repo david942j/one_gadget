@@ -11,7 +11,7 @@ describe 'one_gadget_i386' do
     it 'libc-2.19' do
       path = data_path('libc-2.19-fd51b20e670e9a9f60dc3b06dc9761fb08c9358b.so')
       expect(OneGadget.gadgets(file: path,
-                               force_file: true)).to eq [0x3fd27, 0x64c60, 0x64c64, 0x64c6a, 0x64c6e]
+                               force_file: true)).to eq [0x3fd27, 0x64c64, 0x64c6a, 0x64c6e]
     end
 
     it 'libc-2.23' do
@@ -35,21 +35,21 @@ describe 'one_gadget_i386' do
     it 'libc-2.43' do
       path = data_path('libc-2.43-7a08e84aa7f1e0bd80a7da6227c3a006c3ff327d.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
-        .to eq [0xed234, 0xed237, 0xed240, 0xed300, 0x18a495, 0x18a496]
+        .to eq [0xed234, 0xed300, 0x18a495, 0x18a496]
       expect(OneGadget.gadgets(file: path)).to eq [0xed300, 0x18a495, 0x18a496]
     end
 
     # 0xed234's own first instruction (mov [ebp-0x30], ecx) writes ecx into the
     # exact stack slot the envp check later requires to be NULL, so ecx itself is
     # the real precondition -- not the opaque "[[ebp-0x30]] == NULL" form its
-    # sibling 0xed237 (whose window starts after that write) still gets.
+    # sibling 0xed300 (whose window starts after that write) still gets.
     it 'resolves envp through a tracked stack slot to the register that fills it' do
       path = data_path('libc-2.43-7a08e84aa7f1e0bd80a7da6227c3a006c3ff327d.so')
       gadgets = OneGadget.gadgets(file: path, force_file: true, details: true, level: 1)
       by_offset = gadgets.to_h { |g| [g.offset, g] }
       expect(by_offset[0xed234].constraints)
         .to include('[ecx] == NULL || ecx == NULL || ecx is a valid envp')
-      expect(by_offset[0xed237].constraints)
+      expect(by_offset[0xed300].constraints)
         .to include('[[ebp-0x30]] == NULL || [ebp-0x30] == NULL || [ebp-0x30] is a valid envp')
     end
 

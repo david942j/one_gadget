@@ -122,21 +122,70 @@ module OneGadget
       def argument(_idx); raise NotImplementedError
       end
 
+      # Constraint types whose payload is an address {Lambda} asserting the target
+      # is mapped -- +:writable+ (a store target) and +:readable+ (an unconditional
+      # dereference, see {#finalize_deferred_reads}). Both are keyed, offset-
+      # normalised, and imply non-NULL identically; they differ only in how they
+      # render (see {#render_constraint}). The remaining type, +:raw+, carries a
+      # ready-made constraint string that keys on itself.
+      ADDRESS_TYPES = %i[writable readable].freeze
+
       # @return [Array<String>]
       #   Extra constraints found during execution.
       def constraints
         finalize_deferred_reads
         return [] if @constraints.empty?
 
-        # we have these types:
-        # * :writable
-        # * :raw
-        cons = @constraints.uniq do |type, obj|
-          next obj unless type == :writable
+        # An address constraint is keyed by its base register (deref-0) or full
+        # expression (compound); several through one base (e.g. stores at reg+0x0
+        # and reg+0x8) impose the same requirement, so keep just the smallest
+        # offset (sort ascending, then uniq keeps that first).
+        cons = @constraints.sort_by { |type, obj| address_deref0?(type, obj) ? obj.immi : 0 }
+                           .uniq { |type, obj| constraint_key(type, obj) }
+        cons = drop_implied_nonzero(cons)
+        cons.map { |type, obj| render_constraint(type, obj) }.sort
+      end
 
-          obj.deref_count.zero? ? obj.obj.to_s : obj.to_s
+      # Whether +(type, obj)+ is an address constraint on a bare (deref-0) target,
+      # i.e. one carrying a base register and offset to normalise.
+      def address_deref0?(type, obj)
+        ADDRESS_TYPES.include?(type) && obj.deref_count.zero?
+      end
+
+      # De-duplication key: an address constraint collapses per (type, base) so
+      # constraints of different types on the same register stay distinct; a raw
+      # constraint keys on its own text.
+      def constraint_key(type, obj)
+        return obj unless ADDRESS_TYPES.include?(type)
+
+        [type, obj.deref_count.zero? ? obj.obj.to_s : obj.to_s]
+      end
+
+      # Render a constraint to its output string.
+      def render_constraint(type, obj)
+        case type
+        when :writable then "writable: #{obj}"
+        when :readable then "#{obj} is a valid pointer"
+        else obj
         end
-        cons.map { |type, obj| type == :writable ? "writable: #{obj}" : obj }.sort
+      end
+
+      # Drop a "<reg> != 0x0" branch constraint that another constraint already
+      # implies: an address constraint (+writable: <reg>+imm+ store target, or
+      # +<reg> is a valid pointer+) forces <reg> to be a valid (mapped, non-NULL)
+      # pointer, so a NULL-check branch on the same register adds nothing. Keeps
+      # the emitted set minimal.
+      # @param [Array<[Symbol, Object]>] cons The de-duplicated constraint list.
+      # @return [Array<[Symbol, Object]>]
+      def drop_implied_nonzero(cons)
+        nonzero_regs = cons.filter_map do |type, obj|
+          obj.obj.to_s if address_deref0?(type, obj)
+        end
+        return cons if nonzero_regs.empty?
+
+        cons.reject do |type, obj|
+          type == :raw && (m = /\A(\S+) != 0x0\z/.match(obj)) && nonzero_regs.include?(m[1])
+        end
       end
 
       # Method need to be implemented in inheritors.
@@ -232,16 +281,17 @@ module OneGadget
 
       # Now that emulation is complete and the full writable set is known, record
       # the residual constraint for each deferred pointer argument, unless it is
-      # already known to reference mapped memory. A +:nullable+ deref becomes
-      # +<arg> == NULL+ (take the skip-the-dereference path); a +:readable+ deref
-      # becomes +<arg> is a valid pointer+ (NULL can't satisfy an unconditional
-      # dereference). Idempotent: the queue is cleared once resolved.
+      # already known to reference mapped memory. A +:nullable+ deref becomes a
+      # +:raw+ +<arg> == NULL+ (take the skip-the-dereference path); a +:readable+
+      # deref becomes a +:readable+ constraint (NULL can't satisfy an unconditional
+      # dereference) -- a typed address constraint handled like +:writable+ (see
+      # {#constraints}). Idempotent: the queue is cleared once resolved.
       def finalize_deferred_reads
         @deferred_reads.each do |arg, kind|
           if kind == :readable
             next if mapped_nonnull_pointer?(arg) || writable_pointer?(arg)
 
-            @constraints << [:raw, "#{arg} is a valid pointer"]
+            @constraints << [:readable, arg]
           else
             next if deref_safe_pointer?(arg) || writable_pointer?(arg)
 
