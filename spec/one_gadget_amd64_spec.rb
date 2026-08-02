@@ -11,8 +11,11 @@ describe 'one_gadget_amd64' do
 
     it 'libc-2.19' do
       path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
+      # 0xc1c2c is trimmed: 0xc1ca7 has the same effect and a strict subset of its
+      # constraints (once the redundant `rax != 0x0`, implied by `writable: rax+0x8`,
+      # is dropped), so it dominates.
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
-        .to eq [0x461fb, 0x46421, 0x46428, 0x4647c, 0xc18d1, 0xc18d8, 0xc1ba3, 0xc1bf2, 0xc1c2c, 0xc1ca7,
+        .to eq [0x461fb, 0x46421, 0x46428, 0x4647c, 0xc18d1, 0xc18d8, 0xc1ba3, 0xc1bf2, 0xc1ca7,
                 0xe4968, 0xe5765, 0xe5771, 0xe654d, 0xe6552, 0xe6557, 0xe6670, 0xe6677, 0xe6685, 0xe668a,
                 0xe668f, 0xe6697, 0xe669e, 0xe66bd]
     end
@@ -21,11 +24,13 @@ describe 'one_gadget_amd64' do
     # rsi==rax), so rax must be writable. The store target was previously lost:
     # add_writable re-parsed "[rax]" after an intervening lea reassigned rax to a
     # libc $base address, dropping the constraint (kept only the weaker rax != 0).
+    # With the writable recorded, the weaker `rax != 0x0` it implies is dropped.
     it 'libc-2.19 requires the in-place argv buffer (rax) be writable' do
       path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
       gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
                         .find { |g| g.offset == 0xc1ca7 }
       expect(gadget.constraints).to include('writable: rax+0x8')
+      expect(gadget.constraints).not_to include('rax != 0x0')
     end
 
     # Regression: a candidate that ran past its terminal execve into the stack-guard

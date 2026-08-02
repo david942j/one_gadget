@@ -136,7 +136,25 @@ module OneGadget
 
           obj.deref_count.zero? ? obj.obj.to_s : obj.to_s
         end
+        cons = drop_implied_nonzero(cons)
         cons.map { |type, obj| type == :writable ? "writable: #{obj}" : obj }.sort
+      end
+
+      # Drop a "<reg> != 0x0" branch constraint that another constraint already
+      # implies: a "writable: <reg>+imm" store target forces <reg> to be a valid
+      # (mapped, non-NULL) pointer, so a NULL-check branch on the same register
+      # adds nothing. Keeps the emitted set minimal.
+      # @param [Array<[Symbol, Object]>] cons The de-duplicated constraint list.
+      # @return [Array<[Symbol, Object]>]
+      def drop_implied_nonzero(cons)
+        nonzero_regs = cons.filter_map do |type, obj|
+          obj.obj.to_s if type == :writable && obj.deref_count.zero?
+        end
+        return cons if nonzero_regs.empty?
+
+        cons.reject do |type, obj|
+          type == :raw && (m = /\A(\S+) != 0x0\z/.match(obj)) && nonzero_regs.include?(m[1])
+        end
       end
 
       # Method need to be implemented in inheritors.
