@@ -204,11 +204,15 @@ module OneGadget
       #   isn't already known to be mapped, +<arg> == NULL+ is recorded so the
       #   callee takes the skip-the-dereference path. Only tag an argument this way
       #   after confirming the callee both NULL-checks it and still reaches the
-      #   terminal call on the NULL path; an argument dereferenced unconditionally
-      #   cannot be made safe by forcing it NULL (gate it with +:global_var?+, or
-      #   drop the candidate, instead). The check is deferred to
-      #   {#finalize_deferred_reads} because a +<reg>+<imm>+ pointer may only become
-      #   known-mapped once a later store marks +<reg>+ writable.
+      #   terminal call on the NULL path.
+      # * +:deref+ - the callee dereferences this argument *unconditionally* (no
+      #   NULL guard), so it can't be made safe by forcing it NULL. When the pointer
+      #   isn't already known to be mapped, +<arg> is a valid pointer+ is recorded so
+      #   the attacker knows it must reference readable memory.
+      #   @example +posix_spawnattr_setsigmask(attr, set)+ runs +attr->__ss = *set+
+      # Both deref checks are deferred to {#finalize_deferred_reads} because a
+      # +<reg>+<imm>+ pointer may only become known-mapped once a later store marks
+      # +<reg>+ writable.
       # @return [nil, :fail] +nil+ = call accepted, +:fail+ = abort the candidate.
       def dispatch_safe_call(addr, checker)
         func = checker.keys.find { |n| addr.include?(n) }
@@ -216,7 +220,9 @@ module OneGadget
 
         checker[func].each do |idx, req|
           if req == :nullable_deref
-            @deferred_reads << argument(idx)
+            @deferred_reads << [argument(idx), :nullable]
+          elsif req == :deref
+            @deferred_reads << [argument(idx), :readable]
           elsif !check_argument(idx, req)
             return :fail
           end
@@ -224,14 +230,23 @@ module OneGadget
         nil
       end
 
-      # Now that emulation is complete and the full writable set is known, require
-      # each deferred pointer argument to be NULL unless it is already known to
-      # reference mapped memory. Idempotent: the queue is cleared once resolved.
+      # Now that emulation is complete and the full writable set is known, record
+      # the residual constraint for each deferred pointer argument, unless it is
+      # already known to reference mapped memory. A +:nullable+ deref becomes
+      # +<arg> == NULL+ (take the skip-the-dereference path); a +:readable+ deref
+      # becomes +<arg> is a valid pointer+ (NULL can't satisfy an unconditional
+      # dereference). Idempotent: the queue is cleared once resolved.
       def finalize_deferred_reads
-        @deferred_reads.each do |arg|
-          next if deref_safe_pointer?(arg) || writable_pointer?(arg)
+        @deferred_reads.each do |arg, kind|
+          if kind == :readable
+            next if mapped_nonnull_pointer?(arg) || writable_pointer?(arg)
 
-          @constraints << [:raw, "#{arg} == NULL"]
+            @constraints << [:raw, "#{arg} is a valid pointer"]
+          else
+            next if deref_safe_pointer?(arg) || writable_pointer?(arg)
+
+            @constraints << [:raw, "#{arg} == NULL"]
+          end
         end
         @deferred_reads = []
       end
@@ -240,6 +255,15 @@ module OneGadget
       # to reference mapped memory (see {#mapped_pointer?}).
       def deref_safe_pointer?(val)
         return true if val.is_a?(Integer) && val.zero?
+        return false unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count.zero?
+
+        mapped_pointer?(val.obj.to_s)
+      end
+
+      # Whether +val+ is already known to be a non-NULL pointer into mapped memory
+      # -- the safety bar for an *unconditional* dereference, which (unlike
+      # {#deref_safe_pointer?}) NULL cannot clear.
+      def mapped_nonnull_pointer?(val)
         return false unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count.zero?
 
         mapped_pointer?(val.obj.to_s)

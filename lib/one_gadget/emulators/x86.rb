@@ -18,12 +18,18 @@ module OneGadget
       # +sigprocmask+ dereferences its +set+ argument (arg 1) unless it is NULL (which
       # it NULL-checks), so +set+ is marked +:nullable_deref+; +__sigaction+'s
       # dereferenced +act+ (arg 1) is required to be a libc global instead.
-      # See {Processor#dispatch_safe_call}.
+      # Two +posix_spawnattr_+ setters copy *from* their second argument
+      # unconditionally (no NULL guard), so it must be a readable pointer
+      # (+:deref+); they are listed before the generic +posix_spawnattr_+ prefix so
+      # the specific requirement wins. See {Processor#dispatch_safe_call}.
+      # @example +posix_spawnattr_setsigmask(attr, set)+ runs +attr->__ss = *set+
       SAFE_CALLS = {
         'sigprocmask' => { 1 => :nullable_deref },
         '__close' => {},
         'unsetenv' => { 0 => :global_var? },
         '__sigaction' => { 1 => :global_var?, 2 => :zero? },
+        'posix_spawnattr_setsigmask' => { 1 => :deref },
+        'posix_spawnattr_setsigdefault' => { 1 => :deref },
         'posix_spawnattr_' => {},
         'posix_spawn_file_actions_' => {}
       }.freeze
