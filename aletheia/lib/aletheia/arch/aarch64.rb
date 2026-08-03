@@ -13,9 +13,11 @@ module Aletheia
       # General-purpose registers the satisfier may assign.
       def gprs = (0..30).map { |i| "x#{i}" }
 
-      # Registers that name the stack; an equality-to-NULL on +sp+imm+ (imm!=0)
-      # is unsatisfiable because the value is a live stack address.
-      def stack_regs = %w[sp x29]
+      # Only +sp+ invariantly names a live stack address that can't be NULL; the
+      # frame pointer +x29+ is a general register the attacker controls in these
+      # gadgets (like amd64's +rbp+), so a store through it carries an explicit
+      # +writable: x29+imm+ constraint rather than being assumed valid.
+      def stack_regs = %w[sp]
 
       def sp = 'sp'
       def pc = 'pc'
