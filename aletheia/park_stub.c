@@ -86,17 +86,45 @@ static void emit_movw_movt(unsigned char *p, int rd, unsigned long val) {
     }
 }
 
+/* End address of the mapping that starts at +base+ in /proc/self/maps, or 0.
+ * The target libc's first LOAD (the R E text) starts at +base+, so this bounds
+ * the region to scan for a code signature. */
+static unsigned long region_end(unsigned long base) {
+    FILE *f = fopen("/proc/self/maps", "r");
+    char line[1024];
+    unsigned long end = 0;
+    while (f && fgets(line, sizeof line, f)) {
+        unsigned long s, e;
+        if (sscanf(line, "%lx-%lx", &s, &e) == 2 && s == base) { end = e; break; }
+    }
+    if (f) fclose(f);
+    return end;
+}
+
+/* Locate the +__clone3+ syscall site by scanning the *loaded* target libc (from
+ * +base+, the mapping posix_spawn actually calls into -- correct whether the
+ * fixture is the primary libc or a dlopen'd secondary) for its unique byte
+ * signature. @return the base-relative offset of the site, or -1. */
+static long find_clone3_site(unsigned long base, const unsigned char *sig, size_t siglen) {
+    unsigned long end = region_end(base);
+    if (!end) return -1;
+    for (unsigned long p = base; p + siglen <= end; p++) {
+        if (memcmp((const void *)p, sig, siglen) == 0) return (long)(p - base);
+    }
+    return -1;
+}
+
 /* Redirect the libc's __clone3 to shim_clone3 (an absolute Thumb branch via
  * movw/movt/bx). Returns 1 if the patch was applied. */
 static int patch_clone3(unsigned long base) {
     /* push {r7}; movw r7,#435; svc 0 -- the wrapper's syscall site, little-endian */
     static const unsigned char sig[] = {0x80, 0xb4, 0x40, 0xf2, 0xb3, 0x17, 0x00, 0xdf};
-    static const unsigned long OFFSET = 0xb695e; /* fixture-specific (libc-2.43-8c7af7f2) */
-    unsigned char *site = (unsigned char *)(base + OFFSET);
-    if (memcmp(site, sig, sizeof sig) != 0) {
-        fprintf(stderr, "aletheia: clone3 hack signature mismatch; not applied\n");
+    long off = find_clone3_site(base, sig, sizeof sig);
+    if (off < 0) {
+        fprintf(stderr, "aletheia: clone3 hack signature not found; not applied\n");
         return 0;
     }
+    unsigned char *site = (unsigned char *)(base + off);
 
     unsigned long page = (unsigned long)site & ~0xfffUL;
     if (mprotect((void *)page, 0x2000, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {

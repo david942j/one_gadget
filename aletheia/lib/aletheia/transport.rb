@@ -190,10 +190,11 @@ module Aletheia
     # clean): it lets the oracle see when qemu can't emulate a syscall the gadget
     # needs and report SKIP instead of FAIL.
     #
-    # @example A limitation this surfaces
-    #   glibc 2.43 posix_spawn forks via clone3, which qemu-arm doesn't implement
-    #   ("Unknown syscall 435"); no child spawns, so posix_spawn gadgets can't be
-    #   L2-verified here. execve gadgets (a plain syscall) verify fine.
+    # @example A limitation and its workaround
+    #   glibc >= 2.34 posix_spawn forks via clone3, which qemu-arm doesn't
+    #   implement ("Unknown syscall 435"). +ALETHEIA_CLONE3_HACK+ redirects the
+    #   libc's __clone3 to legacy clone (see park_stub.c patch_clone3), so these
+    #   spawn and L2-verify; without it they SKIP on syscall 435.
     class SelfInject < Base
       def launch(plan_path:, stub_out:, slave:, log:)
         q = @arch.qemu
