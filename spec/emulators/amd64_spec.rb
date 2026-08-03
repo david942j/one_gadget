@@ -58,6 +58,16 @@ describe OneGadget::Emulators::Amd64 do
       expect(cons).to include('readable: r12')
       expect(cons).not_to include('r12 != 0x0')
     end
+
+    # The stack is always writable, so a pure stack-pointer store needs no
+    # "writable" constraint; a store through any other register still does.
+    it 'omits "writable" for a stack-pointer store but keeps it otherwise' do
+      @processor.process('1000: mov QWORD PTR [rsp+0x30],rax')
+      @processor.process('1004: mov QWORD PTR [rbx+0x8],rax')
+      cons = @processor.constraints
+      expect(cons).not_to include('writable: rsp+0x30')
+      expect(cons).to include('writable: rbx+0x8')
+    end
   end
 
   describe 'process' do
