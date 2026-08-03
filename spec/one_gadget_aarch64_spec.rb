@@ -22,17 +22,19 @@ describe 'one_gadget_aarch64' do
 
     it 'libc-2.27' do
       path = data_path('aarch64-libc-2.27.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f160, 0x63e90, 0xa32e8, 0xa32ec]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f160, 0x63e90, 0xa32e8]
     end
 
-    it 'constrains argv[1] for an argv built off the frame pointer' do
+    it 'constrains argv[1] and the frame for an argv built off the frame pointer' do
       path = data_path('aarch64-libc-2.27.so')
       gadget = OneGadget.gadgets(file: path, force_file: true, details: true, level: 1)
-                        .find { |g| g.offset == 0xa3234 }
-      # execve("/bin/sh", x29+0x40, ...): the code stores x0 as argv[1] in the
-      # frame, so x0 must be NULL (or a valid arg) -- not an opaque "valid argv".
-      expect(gadget.effect).to eq 'execve("/bin/sh", x29+0x40, x2)'
+                        .find { |g| g.offset == 0xa32e8 }
+      # execve("/bin/sh", x29+0x40, ...): the code stores x0 as argv[1] into the
+      # frame, so x0 must be NULL (or a valid arg) -- not an opaque "valid argv" --
+      # and the frame pointer x29 must point at writable memory.
+      expect(gadget.effect).to eq 'execve("/bin/sh", x29+0x40, x23)'
       expect(gadget.constraints).to include('x0 == NULL || {"/bin/sh", x0, NULL} is a valid argv')
+      expect(gadget.constraints).to include('writable: x29+0x40')
     end
 
     # do_system reaches execve via a sigprocmask(set) call that dereferences its
@@ -61,15 +63,14 @@ describe 'one_gadget_aarch64' do
     it 'libc-2.43' do
       path = data_path('aarch64-libc-2.43.so')
       expect(OneGadget.gadgets(file: path, force_file: true))
-        .to eq [0x4bc00, 0x4bc04, 0x4bc08, 0x4bc0c, 0x4bc10, 0x4bc14, 0x4bc18, 0x4bc1c, 0xc7b00]
+        .to eq [0x4bc00, 0x4bc04, 0x4bc08, 0x4bc0c, 0x4bc10, 0x4bc14, 0x4bc18, 0x4bc1c]
     end
 
     it 'resolves posix_spawn (do_system) gadgets' do
       path = data_path('aarch64-libc-2.43.so')
       gadgets = OneGadget.gadgets(file: path, force_file: true, details: true)
       expect(gadgets.map(&:effect).uniq)
-        .to eq ['posix_spawn(sp+0xc, "/bin/sh", 0, sp+0x218, sp+0x50, environ)',
-                'execve("/bin/sh", x29-0x20, x6)']
+        .to eq ['posix_spawn(sp+0xc, "/bin/sh", 0, sp+0x218, sp+0x50, environ)']
     end
 
     # do_system passes {"sh", "-c", "--", <command>, NULL}; the "-c" and "--"
@@ -94,13 +95,14 @@ describe 'one_gadget_aarch64' do
     end
 
     # 0xc7b00 stages argv at `sub x4, x29, #0x20`; without sub support the whole
-    # candidate aborts. It dominates the cmp-guarded 0xc7a3c (same execve, but no
-    # `x2 == 0x1`), so it is the one that surfaces (here as a top-level gadget).
+    # candidate aborts. It builds argv in the frame, so it needs `writable:
+    # x29-0x20` (and, unlike its cmp-guarded sibling 0xc7a3c, no `x2 == 0x1`).
     it 'resolves an execve gadget reachable only through a sub' do
       path = data_path('aarch64-libc-2.43.so')
-      gadget = OneGadget.gadgets(file: path, force_file: true, details: true)
+      gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
                         .find { |g| g.offset == 0xc7b00 }
       expect(gadget.effect).to eq 'execve("/bin/sh", x29-0x20, x6)'
+      expect(gadget.constraints).to include('writable: x29-0x20')
       expect(gadget.constraints).not_to include('x2 == 0x1')
     end
   end
