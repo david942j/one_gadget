@@ -34,6 +34,14 @@ describe OneGadget::Emulators::Amd64 do
       @processor.process('1000: test eax,eax')
       expect(@processor.process('1004: jg 2000 <x>')).to be false
     end
+
+    it 'concretizes a rip-relative compare operand and drops the objdump comment' do
+      # cmp [rip+x],0 ; jle taken -> (s64)[$base+<file off>] <= 0, the offset taken
+      # from objdump's resolution comment (which must not leak into the constraint).
+      cons = branch_constraint('cmp DWORD PTR [rip+0x2dd750],0x0        # 3c3e88 <sym>',
+                               'jle', 0x2000, 0x2000)
+      expect(cons).to eq ['(s64)[$base+0x3c3e88] <= 0x0']
+    end
   end
 
   describe 'implied constraints' do

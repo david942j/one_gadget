@@ -35,33 +35,25 @@ module OneGadget
 
       private
 
-      # Resolve a data-flow line's rip-relative operand to +$base+<file offset>+
-      # (base-relative like arm's +adrp+, not instruction-relative +rip+disp+),
-      # taking the offset from objdump's resolution comment and dropping it.
-      # A compare/branch line is returned untouched, so the branch-aware search
-      # still sees exactly what objdump emitted.
+      # Resolve a rip-relative operand to +$base+<file offset>+ (base-relative like
+      # arm's +adrp+, not instruction-relative +rip+disp+), taking the offset from
+      # objdump's resolution comment and dropping it. Applies to compares too -- a
+      # +cmp [rip+x], imm+ branch condition wants the concretized global, not a raw
+      # +rip+ (and the trailing comment stripped). Only an actual branch is left
+      # untouched: the branch-aware search steers it and its target isn't a data
+      # operand.
       # @example
       #   concretize_rip('d67f1: lea rdi,[rip+0x8ab61]  # 161359 <sym>')
       #   #=> 'd67f1: lea rdi,[$base+0x161359]'
-      #   concretize_rip('51de5: cmp [rip+0x19c733],0x1  # 1ee520 <sym>')
-      #   #=> unchanged (a compare)
+      #   concretize_rip('e6731: cmp [rip+0x2dd750],0x0  # 3c3e88 <sym>')
+      #   #=> 'e6731: cmp [$base+0x3c3e88],0x0'
       def concretize_rip(cmd)
         resolved = cmd[/#\s*([0-9a-f]+)/, 1]
         return cmd unless resolved && cmd.include?('rip')
-        return cmd if compare_or_branch?(mnemonic(cmd))
+        return cmd if branch_mnem?(mnemonic(cmd))
 
         cmd.sub(/(\[?)rip[+-]0x[0-9a-f]+(\]?)/) { "#{Regexp.last_match(1)}$base+0x#{resolved}#{Regexp.last_match(2)}" }
-           .sub(/\s*#.*\z/, '')
-      end
-
-      # Whether the branch-aware search steers +mnem+, rather than {#concretize_rip}
-      # rewriting it as a data-flow instruction.
-      # @example
-      #   compare_or_branch?('cmp')  #=> true
-      #   compare_or_branch?('je')   #=> true
-      #   compare_or_branch?('lea')  #=> false
-      def compare_or_branch?(mnem)
-        COMPARES.key?(mnem) || branch_mnem?(mnem)
+           .sub(/\s*#.*/, '') # to end-of-line, not \z: the objdump line may end in "\n"
       end
 
       # The libc load base as a symbolic lambda (cf. {ArmFamily#libc_base}).
