@@ -38,8 +38,8 @@ describe OneGadget::Emulators::Amd64 do
 
   describe 'implied constraints' do
     # posix_spawnattr_setsigmask copies *rsi unconditionally, so its pointer must
-    # be readable ("r12 is a valid pointer"); the following test/jne (taken) also
-    # yields "r12 != 0x0", which the readable constraint makes redundant.
+    # be readable ("readable: r12"); the following test/jne (taken) also yields
+    # "r12 != 0x0", which the readable constraint makes redundant.
     it 'drops "reg != 0" a readable-pointer constraint already implies' do
       @processor.process('1000: mov rsi,r12')
       @processor.process('1004: call 10d0b0 <posix_spawnattr_setsigmask@@GLIBC_2.2.5>')
@@ -47,7 +47,7 @@ describe OneGadget::Emulators::Amd64 do
       @processor.process('100b: jne 2000 <x>')
       @processor.process('2000: nop') # branch taken -> r12 != 0
       cons = @processor.constraints
-      expect(cons).to include('r12 is a valid pointer')
+      expect(cons).to include('readable: r12')
       expect(cons).not_to include('r12 != 0x0')
     end
   end

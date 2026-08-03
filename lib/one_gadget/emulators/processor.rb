@@ -165,16 +165,16 @@ module OneGadget
       def render_constraint(type, obj)
         case type
         when :writable then "writable: #{obj}"
-        when :readable then "#{obj} is a valid pointer"
+        when :readable then "readable: #{obj}"
         else obj
         end
       end
 
       # Drop a "<reg> != 0x0" branch constraint that another constraint already
       # implies: an address constraint (+writable: <reg>+imm+ store target, or
-      # +<reg> is a valid pointer+) forces <reg> to be a valid (mapped, non-NULL)
-      # pointer, so a NULL-check branch on the same register adds nothing. Keeps
-      # the emitted set minimal.
+      # +readable: <reg>+) forces <reg> to be a valid (mapped, non-NULL) pointer,
+      # so a NULL-check branch on the same register adds nothing. Keeps the
+      # emitted set minimal.
       # @param [Array<[Symbol, Object]>] cons The de-duplicated constraint list.
       # @return [Array<[Symbol, Object]>]
       def drop_implied_nonzero(cons)
@@ -256,8 +256,8 @@ module OneGadget
       #   terminal call on the NULL path.
       # * +:deref+ - the callee dereferences this argument *unconditionally* (no
       #   NULL guard), so it can't be made safe by forcing it NULL. When the pointer
-      #   isn't already known to be mapped, +<arg> is a valid pointer+ is recorded so
-      #   the attacker knows it must reference readable memory.
+      #   isn't already known to be mapped, +readable: <arg>+ is recorded so the
+      #   attacker knows it must reference readable memory.
       #   @example +posix_spawnattr_setsigmask(attr, set)+ runs +attr->__ss = *set+
       # Both deref checks are deferred to {#finalize_deferred_reads} because a
       # +<reg>+<imm>+ pointer may only become known-mapped once a later store marks
