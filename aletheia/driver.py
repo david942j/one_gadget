@@ -101,6 +101,11 @@ for off, val in plan.get("mem", {}).items():
         val = scratch + val["scratch_off"]
     gdb.selected_inferior().write_memory(scratch + off, struct.pack(word_fmt, int(val) & word_mask))
 
+# Libc-global writes (keyed by base-relative offset): a constraint on a $base+off
+# memory value, e.g. `(s64)[$base+off] <= 0`, satisfied by writing that global.
+for off, val in plan.get("base_mem", {}).items():
+    gdb.selected_inferior().write_memory(base + int(off), struct.pack(word_fmt, int(val) & word_mask))
+
 sp = scratch + plan.get("sp_offset", 0x2000)
 gdb.execute("set $%s = %#x" % (arch["sp"], sp))
 gdb.execute("set $%s = %#x" % (arch["pc"], gadget))

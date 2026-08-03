@@ -143,6 +143,16 @@ RSpec.describe Aletheia::Satisfier do
       expect(plan.regs['rbx']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
     end
 
+    # A branch condition on a libc global, e.g. libc-2.19 0xe654d's
+    # `(s64)[$base+0x3c3e88] <= 0`: the driver writes 0 to base+off rather than the
+    # satisfier pinning a register (a $base address isn't settable).
+    it 'zeroes a libc global for "(s64)[$base+off] <= 0"' do
+      plan = satisfier.satisfy(gadget(['(s64)[$base+0x3c3e88] <= 0x0']))
+      expect(plan.status).to eq('ok')
+      expect(plan.base_mem[0x3c3e88]).to eq(0)
+      expect(plan.regs).to be_empty # $base is not pinned as a register
+    end
+
     it 'normalises a 32-bit view (eax) to its 64-bit register (rax)' do
       plan = satisfier.satisfy(gadget(['eax == 0']))
       expect(plan.regs['rax']).to eq(0)

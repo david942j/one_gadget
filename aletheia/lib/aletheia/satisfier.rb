@@ -21,7 +21,7 @@ module Aletheia
     #   applies before jumping (a pointer value, keyed by the scratch offset to
     #   write it at) -- e.g. so a chained dereference like +[[sp]]+ finds a real
     #   pointer at +[sp]+ instead of the zero-fill a single dereference relies on.
-    Plan = Struct.new(:offset, :effect, :constraints, :regs, :mem, :scratch_size, :sp_offset,
+    Plan = Struct.new(:offset, :effect, :constraints, :regs, :mem, :base_mem, :scratch_size, :sp_offset,
                       :benign_default, :poison_default, :null_default, :branches, :status,
                       :reason, :writable_count, keyword_init: true)
 
@@ -82,7 +82,7 @@ module Aletheia
     def satisfy(gadget)
       plan = Plan.new(
         offset: format('%#x', gadget.offset), effect: gadget.effect,
-        constraints: gadget.constraints.dup, regs: {}, mem: {}, scratch_size: SCRATCH_SIZE,
+        constraints: gadget.constraints.dup, regs: {}, mem: {}, base_mem: {}, scratch_size: SCRATCH_SIZE,
         sp_offset: SP_OFFSET, benign_default: !@strict, poison_default: @strict,
         branches: {}, status: 'ok', reason: nil, writable_count: 0
       )
@@ -325,9 +325,17 @@ module Aletheia
     # the same slot, instead of the two conflicting.
     def deref_reads_zero?(plan, op)
       return plan.regs[op.reg] == 0 if op.deref.zero? && op.reg
+      return plan.base_mem[op.imm] == 0 if op.deref == 1 && base_reg?(op) # zeroed libc global
       return false unless op.deref == 1 && op.reg && scratch?(plan, op.reg)
 
       zeroed_scratch?(plan.regs[op.reg]['scratch_off'] + op.imm)
+    end
+
+    # A +$base+<off>+ operand: a fixed libc-global address (the load base plus an
+    # offset), which the driver writes directly rather than the satisfier pinning
+    # a register.
+    def base_reg?(op)
+      op&.reg == '$base'
     end
 
     # Whether a word read at scratch offset +off+ is zero: in-bounds, and clear of
@@ -362,6 +370,7 @@ module Aletheia
         op = safe_parse(Regexp.last_match(1))
         if op.nil? then false
         elsif op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
+        elsif op.deref == 1 && base_reg?(op) then (plan.base_mem[op.imm] = 0) && true # zero the libc global
         elsif op.deref == 1 && stack_reg?(op.reg) then true # sp-relative slot is already zeroed scratch
         elsif op.deref == 1 && op.reg then set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm })
         elsif op.deref >= 2 then apply_deep_null(plan, op)
