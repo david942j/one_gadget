@@ -107,23 +107,19 @@ module OneGadget
         dispatch_safe_call(addr, SAFE_CALLS)
       end
 
-      # A store's destination, tracked into whichever stack {#get_corresponding_stack}
-      # resolves it to (sp/bp, or a register write history -- see
-      # {Processor#reg_based_stack}), one word per entry of +values+ starting at
-      # +dst_l+. Also records the "must be writable" requirement unless the
-      # destination is sp/bp (always writable, no constraint needed) -- recorded
-      # even when the write IS also tracked, so the fetcher has it to fall back on
-      # if that resolution ends up superseded (see base.rb's resolvable_stack
-      # callers). Shared by +str+ (one value) and aarch64's +stp+ (two).
-      # @param [OneGadget::Emulators::Lambda] dst_l The destination, zero-deref
-      #   (already +ref!+'d).
-      # @param [Array<OneGadget::Emulators::Lambda, Integer>] values One value per
-      #   word, starting at +dst_l+.
+      # Track a store: write +values+ (one per word from +dst_l+) into the stack
+      # {#get_corresponding_stack} resolves +dst_l+ to, and require +dst_l+
+      # writable -- unless it is a pure +sp+ store. +sp+ is invariantly the
+      # writable stack; the frame pointer only conventionally is, so a store
+      # through it stays a real precondition (like amd64's +writable: rbp+imm+).
+      # Shared by +str+ (one value) and +stp+ (two).
+      # @param [OneGadget::Emulators::Lambda] dst_l The destination, zero-deref.
+      # @param [Array<OneGadget::Emulators::Lambda, Integer>] values One per word.
       # @return [void]
       def track_write(dst_l, *values)
         stack = dst_l.deref_count.zero? ? get_corresponding_stack(dst_l.obj) : nil
         values.each_with_index { |v, i| stack[dst_l.immi + size_t * i] = v } if stack
-        add_writable(dst_l) unless [sp_based_stack, bp_based_stack].include?(stack)
+        add_writable(dst_l) unless stack.equal?(sp_based_stack)
       end
 
       # +cbz+/+cbnz+ (compare-and-branch-on-zero): identical decoding in ARM and
