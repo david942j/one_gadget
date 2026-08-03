@@ -13,8 +13,7 @@ describe 'one_gadget_amd64' do
       path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
         .to eq [0x46421, 0x46428, 0x4647c, 0xc18d1, 0xc18d8, 0xc1ba3, 0xc1bf2, 0xc1ca7,
-                0xe4968, 0xe5765, 0xe5771, 0xe654d, 0xe6552, 0xe6557, 0xe6670, 0xe6677, 0xe6685, 0xe668a,
-                0xe668f, 0xe6697, 0xe669e, 0xe66bd]
+                0xe4968, 0xe5765, 0xe5771, 0xe654d, 0xe6552, 0xe6557, 0xe669e, 0xe66bd]
     end
 
     # 0xc1ca7 builds argv in place at rax (mov [rsi],rax with rsi==rax), so rax

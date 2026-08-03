@@ -24,6 +24,20 @@ describe OneGadget::Fetchers::Base do
     end
   end
 
+  describe '#noexec_shell_argv?' do
+    # execve's program is always "/bin/sh", so argv[1] is that shell's option
+    # word. A fixed "-n" (noexec) bundle parses input but runs nothing; "-c"
+    # runs the command; a non-global (attacker-set) word imposes no such flag.
+    it 'flags a noexec option word but not -c or a non-global word' do
+      allow(fetcher).to receive(:global_str_content).and_return('-nc')
+      expect(fetcher.send(:noexec_shell_argv?, ['"sh"', 'g', 'x', '0'])).to be true
+      allow(fetcher).to receive(:global_str_content).and_return('-c')
+      expect(fetcher.send(:noexec_shell_argv?, ['"sh"', 'g', 'x', '0'])).to be false
+      allow(fetcher).to receive(:global_str_content).and_return(nil)
+      expect(fetcher.send(:noexec_shell_argv?, ['"sh"', 'rbx', 'x', '0'])).to be false
+    end
+  end
+
   describe '#check_envp' do
     # envp is a bare stack register (deref_count == 0), the "just in case"
     # branch that reads the envp array off the stack.
