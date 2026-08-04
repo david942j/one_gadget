@@ -108,6 +108,7 @@ module OneGadget
       def inst_mov(dst, src)
         src = arg_to_lambda(src)
         if register?(dst)
+          note_read(src)
           registers[dst] = src
           return
         end
@@ -233,6 +234,7 @@ module OneGadget
         check_register!(dst)
 
         src = arg_to_lambda(src)
+        note_read(src)
         registers[dst] += src
       end
 
