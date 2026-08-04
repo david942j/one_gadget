@@ -9,20 +9,11 @@ module OneGadget
   module Emulators
     # Super class for amd64 and i386 processor.
     class X86 < Processor
-      attr_reader :bp # @return [String] Stack base register.
-      attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp.
-
       # Constructor for a x86 processor.
       def initialize(registers, sp, bp, pc)
         super(registers, sp)
-        @bp = bp
         @pc = pc
-        @bp_based_stack = Hash.new do |h, k|
-          h[k] = OneGadget::Emulators::Lambda.new(bp).tap do |lmda|
-            lmda.immi = k
-            lmda.deref!
-          end
-        end
+        setup_frame_pointer(bp)
       end
 
       # Process one command.
@@ -77,39 +68,6 @@ module OneGadget
           Instruction.new('movhps', 2),
           Instruction.new('punpcklqdq', 2)
         ]
-      end
-
-      # @param [String | Lambda] obj
-      #  A lambda object or its string.
-      # @return [Hash{Integer => Lambda}, nil]
-      #  The corresponding stack (based on esp/rsp or ebp/rbp), or a per-register
-      #  write history (see {Processor#reg_based_stack}) for any other register
-      #  the candidate has written through.
-      # @example
-      #   get_corresponding_stack('rsp+0x10')
-      #   #=> sp_based_stack
-      #   get_corresponding_stack('rbp-0x10')
-      #   #=> bp_based_stack
-      #   get_corresponding_stack('[rbp-0x10]')
-      #   #=> bp_based_stack
-      #   get_corresponding_stack('rax')
-      #   #=> nil, or a write history if rax was written through
-      def get_corresponding_stack(obj)
-        # A compound base (a nested Lambda -- the address is itself "[reg]+imm",
-        # one more indirection than a simple register+offset) isn't something any
-        # of sp/bp/reg_based_stack model correctly: their imm is always "an
-        # offset from a *named register*", not "an offset from a dereferenced
-        # value". Matching it via a substring check on its rendered form (e.g.
-        # "[rbp-0x78]" contains "rbp") would silently mistrack it as bp-relative.
-        return nil if obj.is_a?(OneGadget::Emulators::Lambda)
-
-        if obj.to_s.include?(sp)
-          sp_based_stack
-        elsif obj.to_s.include?(bp)
-          bp_based_stack
-        else
-          reg_based_stack(obj.to_s)
-        end
       end
 
       private
@@ -322,10 +280,6 @@ module OneGadget
           cast = "(u#{self.class.bits})"
           OneGadget::Emulators::Lambda.new(i.zero? ? "#{cast}#{reg}" : "#{cast}(#{reg} >> #{self.class.bits * i})")
         end
-      end
-
-      def eval_dict
-        { sp => 0, bp => 0 }
       end
     end
   end
