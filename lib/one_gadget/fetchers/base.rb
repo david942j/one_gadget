@@ -171,7 +171,11 @@ module OneGadget
       # @param [String] argv_ptr The pointer to the argv array. See above.
       # @param [Boolean] allow_null
       #   Whether +argv_ptr+ itself may be +NULL+ (true for +execve+, false for +posix_spawn+).
-      # @return [String, nil] The constraint string, or +nil+ when no constraint is needed.
+      # @return [String, nil, false] How {#resolve_execve_args} should treat this argv:
+      #   a +String+ is a constraint it must add; +nil+ means the argv is already
+      #   valid so no constraint is needed; +false+ means the argv can never launch
+      #   a shell (e.g. a fixed noexec option), which it consumes as an
+      #   unsatisfiable constraint and drops the gadget.
       def check_argv(processor, argv_ptr, allow_null)
         argv_ptr = resolve_stack_deref(processor, argv_ptr)
         lmda = OneGadget::Emulators::Lambda.parse(argv_ptr)
@@ -208,6 +212,9 @@ module OneGadget
       # Handle the case where +argv_ptr+ points into the stack, so the +argv+ entries can be read off it.
       # @param [String] argv_ptr The pointer to the argv array. See {#check_argv}.
       # @param [OneGadget::Emulators::Lambda] lmda The parsed +argv_ptr+ (a stack register, zero dereference).
+      # @return [String, nil, false] The same three-way contract as {#check_argv},
+      #   which returns this value unchanged: a constraint, +nil+ (already valid),
+      #   or +false+ (drop the gadget).
       def check_stack_argv(processor, argv_ptr, lmda, allow_null)
         stack = processor.get_corresponding_stack(lmda.obj)
         # A stack register we don't track a stack for (the frame pointer):
@@ -215,6 +222,10 @@ module OneGadget
         return check_nonstack_argv(lmda.to_s, allow_null) if stack.nil?
 
         argv = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
+
+        # A shell spawned with a fixed "noexec" option never runs a command, so
+        # drop the gadget (see this method's @return for the +false+ contract).
+        return false if noexec_shell_argv?(argv)
 
         # if argv is already valid, no constraints are needed! (but probably won't happen :p)
         return if argv_already_valid?(argv)
@@ -273,6 +284,21 @@ module OneGadget
         else
           "#{argv[0]} == NULL || #{argv_cons}"
         end
+      end
+
+      # Whether +argv+ invokes the shell with a fixed option word that disables
+      # command execution. execve's program is always "/bin/sh", so +argv[1]+ is
+      # that shell's option word; a libc-global bundle carrying the noexec flag
+      # there yields a shell that reaches execve yet can never run a command --
+      # a false positive to drop.
+      # @param [Array<String>] argv The resolved argv entries. See {#check_stack_argv}.
+      # @return [Boolean]
+      # @example decided by argv[1]'s libc-global content (via global_str_content)
+      #   # content "-nc" carries bash's noexec 'n' => true;
+      #   # "-c" runs the command => false; a non-global (attacker) word => false
+      def noexec_shell_argv?(argv)
+        opt = global_str_content(argv[1])
+        !opt.nil? && opt.match?(/\A-[a-zA-Z]*n[a-zA-Z]*\z/)
       end
 
       # Handle the case where +argv_ptr+ is not a plain stack pointer (e.g. a register or global variable).
