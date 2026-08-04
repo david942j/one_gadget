@@ -91,6 +91,28 @@ describe 'one_gadget_amd64' do
       expect(OneGadget.gadgets(file: path)).to eq [0xf87a3, 0x11d7aa, 0x11d7b2, 0x11d7b7]
     end
 
+    # Level 2 keeps every distinct gadget, restoring ones level 1 trims as
+    # duplicate or harder-to-reach, while still omitting ones dropped as invalid.
+    it 'libc-2.19 level 2 restores trimmed gadgets but not invalid ones' do
+      path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
+      l1 = OneGadget.gadgets(file: path, force_file: true, level: 1)
+      l2 = OneGadget.gadgets(file: path, force_file: true, level: 2)
+      expect(l2.size).to be > l1.size
+      expect(l1).not_to include(0x461fb) # dominated by 0x46421 -> trimmed at level 1
+      expect(l2).to include(0x461fb)     # ... but kept at level 2
+      expect(l2).not_to include(0xe6670) # a "-nc" noexec argv: invalid, never emitted
+    end
+
+    # One entry point can be reached under several branch-dependent constraint
+    # sets; level 2 keeps each in detail but lists the offset once.
+    it 'libc-2.31 level 2 dedupes offsets yet keeps per-branch variants in detail' do
+      path = data_path('libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
+      offsets = OneGadget.gadgets(file: path, force_file: true, level: 2)
+      details = OneGadget.gadgets(file: path, force_file: true, level: 2, details: true)
+      expect(offsets).to eq(offsets.uniq)
+      expect(details.size).to be > offsets.size
+    end
+
     it 'not ELF' do
       expect { hook_logger { OneGadget.gadgets(file: __FILE__) } }.to output(<<-EOS).to_stdout
 [OneGadget] ArgumentError: Not an ELF file, expected glibc as input
