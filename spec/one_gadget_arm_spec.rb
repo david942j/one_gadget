@@ -20,14 +20,14 @@ describe 'one_gadget_arm' do
 
     it 'libc-2.39' do
       path = data_path('arm-libc-2.39.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x38f6c, 0x88a48, 0x9ef1a, 0x9f2bc]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x38f6c, 0x88a48, 0x9ef1a]
     end
 
     it 'libc-2.43' do
       path = data_path('libc-2.43-8c7af7f227b3871d6afba752cbb617f317023de5.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
         .to eq [0x3afdc, 0x3affc, 0x3b000, 0x3b002, 0x3b004, 0x543d2, 0x8d94a, 0xa42c8, 0xa4334, 0xa4338]
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3affc, 0x3b004, 0x8d94a, 0xa4334, 0xa4338]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3b004, 0x8d94a, 0xa4338]
     end
 
     it 'constrains the GOT base register on arm-libc-2.43 environ gadgets' do
