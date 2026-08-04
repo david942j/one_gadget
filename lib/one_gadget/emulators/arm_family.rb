@@ -1,15 +1,17 @@
 # frozen_string_literal: true
 
 require 'one_gadget/emulators/lambda'
+require 'one_gadget/emulators/processor'
 
 module OneGadget
   module Emulators
     # Behaviour shared by the two ARM-architecture emulators, {Arm} (AArch32) and
     # {AArch64}: the condition-code table plus the parts of the calling convention
-    # and memory model that are identical in 32- and 64-bit mode. Included into
-    # each; everything that genuinely differs (instruction set, register width,
-    # +pc+ handling) stays in the individual classes.
-    module ArmFamily
+    # and memory model that are identical in 32- and 64-bit mode. The common base
+    # each inherits (the ARM counterpart of {X86}); everything that genuinely
+    # differs (instruction set, register width, +pc+ handling) stays in the
+    # individual classes.
+    class ArmFamily < Processor
       # ARM condition-code suffix (the +<cc>+ in +b<cc>+ / +b.<cc>+) mapped to a
       # shared {Conditional::RELATION} predicate. Decodes the opaque mnemonics once:
       # +hs+/+cs+ and +lo+/+cc+ are aliases; +mi+/+pl+ (sign bit) act as signed
