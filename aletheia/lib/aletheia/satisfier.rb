@@ -143,7 +143,21 @@ module Aletheia
     def order_constraints(constraints)
       compound, rest = constraints.partition { |c| c.match?(WRITABLE_COMPOUND) }
       writable, others = rest.partition { |c| c.start_with?('writable: ') }
+      # A nested readable (readable: [base+imm]) resolves its base through
+      # mem_addr_off, which needs base already pointed at scratch -- done by a
+      # shallower readable/writable on that base. Apply readables shallowest
+      # first, keeping every other constraint's relative order (stable sort via
+      # the original index).
+      others = others.each_with_index.sort_by { |c, i| [readable_depth(c), i] }.map(&:first)
       writable + others + compound
+    end
+
+    # The dereference depth of a +readable:+ constraint's pointer (0 for a bare
+    # +readable: reg+imm+, 1 for +readable: [base+imm]+); 0 for any non-readable
+    # constraint, so {#order_constraints} leaves those in place.
+    def readable_depth(constraint)
+      m = constraint.match(/\Areadable: (.+)\z/) or return 0
+      (op = safe_parse(m[1])) ? op.deref : 0
     end
 
     # Cost of satisfying a single disjunct (lower = easier); nil = unsatisfiable
