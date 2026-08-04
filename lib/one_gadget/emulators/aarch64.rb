@@ -8,9 +8,7 @@ require 'one_gadget/emulators/processor'
 module OneGadget
   module Emulators
     # Emulator of aarch64.
-    class AArch64 < Processor
-      include ArmFamily
-
+    class AArch64 < ArmFamily
       # Instantiate a {AArch64} object.
       def initialize
         super(OneGadget::ABI.aarch64, 'sp')
