@@ -82,21 +82,6 @@ module OneGadget
         bp ? { sp => 0, bp => 0 } : { sp => 0 }
       end
 
-      # Libc calls the emulator accepts without executing: syscall wrappers, and
-      # +posix_spawn+'s setup helpers (matched by prefix), which precede the real
-      # call and are side-effect-free for gadget purposes.
-      # +sigprocmask+ and +__sigaction+ each dereference a pointer argument unless it
-      # is NULL (both guard the read with a NULL check and still reach the call on
-      # the NULL path), so +sigprocmask+'s +set+ and +__sigaction+'s +act+ are marked
-      # +:nullable_deref+; +__sigaction+'s +oldact+ must additionally be NULL.
-      # See {Processor#dispatch_safe_call}.
-      SAFE_CALLS = {
-        'sigprocmask' => { 1 => :nullable_deref },
-        '__sigaction' => { 1 => :nullable_deref, 2 => :zero? },
-        'posix_spawnattr_' => {},
-        'posix_spawn_file_actions_' => {}
-      }.freeze
-
       private
 
       # A +bl+/+blx+ call: record the terminal +exec*+ target, accept a known-safe
@@ -104,7 +89,7 @@ module OneGadget
       def inst_bl(addr)
         return reach_terminal_call(addr) if terminal_call?(addr)
 
-        dispatch_safe_call(addr, SAFE_CALLS)
+        dispatch_safe_call(addr)
       end
 
       # Track a store: write +values+ (one per word from +dst_l+) into the stack
@@ -160,6 +145,9 @@ module OneGadget
       def add_writable(lmda)
         # XXX: a tighter check would consult the libc's writable LOAD segments.
         return if lmda.obj == libc_base.obj
+        # The stack is invariantly writable, so a pure sp-relative target needs no
+        # constraint (cf. x86's needs_writable?, and the sp-skip in #track_write).
+        return if lmda.obj == sp
 
         @constraints << [:writable, lmda]
       end
