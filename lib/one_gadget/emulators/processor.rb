@@ -397,25 +397,13 @@ module OneGadget
         @constraints << [:writable, lmda] if needs_writable?(lmda)
       end
 
-      # Record that a load reads through +val+'s pointer, so that pointer must
-      # reference readable memory. A constraint is imposed only when the pointer
-      # is an *uncontrolled* dereference: an actual memory read whose base does
-      # not root at already-mapped memory. Records nothing for
-      # * a non-dereference (a bare register value or an immediate);
-      # * a pointer rooted at mapped memory -- the stack, the libc base, or a
-      #   libc global (see {#mapped_pointer?}). A value *read from* such memory
-      #   (the stack, or a libc-managed global) is reliably a valid pointer, so
-      #   dereferencing it further needs no attacker-facing precondition.
-      # What remains is a load through a base the candidate never set up (an
-      # incoming register), which genuinely must be a readable pointer. The
-      # requirement is deferred like a safe call's +:deref+ (see
-      # {#dispatch_safe_call}) so a later store that proves the base writable
-      # still discharges it in {#finalize_deferred_reads}.
+      # Require +val+'s pointer be readable when a load dereferences an
+      # uncontrolled base -- one that doesn't root at mapped memory (see
+      # {#mapped_pointer?}), since a value read from the stack or a libc global is
+      # reliably valid. Deferred like a safe call's +:deref+ so a later store
+      # proving the base writable still discharges it.
       # @param [Object] val The loaded value, as produced by {#arg_to_lambda}.
-      # @return [void]
-      # @example (entering mid-prologue, so +x19+ is uncontrolled)
-      #   note_read(arg_to_lambda('[x19+0xed8]'))     # records readable: x19+0xed8
-      #   note_read(arg_to_lambda('[$base+0x1bffc0]')) # records nothing (mapped root)
+      # @example note_read(arg_to_lambda('[x19+0xed8]')) records readable: x19+0xed8
       def note_read(val)
         return unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count.positive?
 
