@@ -397,6 +397,48 @@ module OneGadget
         @constraints << [:writable, lmda] if needs_writable?(lmda)
       end
 
+      # Record that a load reads through +val+'s pointer, so that pointer must
+      # reference readable memory. A constraint is imposed only when the pointer
+      # is an *uncontrolled* dereference: an actual memory read whose base does
+      # not root at already-mapped memory. Records nothing for
+      # * a non-dereference (a bare register value or an immediate);
+      # * a pointer rooted at mapped memory -- the stack, the libc base, or a
+      #   libc global (see {#mapped_pointer?}). A value *read from* such memory
+      #   (the stack, or a libc-managed global) is reliably a valid pointer, so
+      #   dereferencing it further needs no attacker-facing precondition.
+      # What remains is a load through a base the candidate never set up (an
+      # incoming register), which genuinely must be a readable pointer. The
+      # requirement is deferred like a safe call's +:deref+ (see
+      # {#dispatch_safe_call}) so a later store that proves the base writable
+      # still discharges it in {#finalize_deferred_reads}.
+      # @param [Object] val The loaded value, as produced by {#arg_to_lambda}.
+      # @return [void]
+      # @example (entering mid-prologue, so +x19+ is uncontrolled)
+      #   note_read(arg_to_lambda('[x19+0xed8]'))     # records readable: x19+0xed8
+      #   note_read(arg_to_lambda('[$base+0x1bffc0]')) # records nothing (mapped root)
+      def note_read(val)
+        return unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count.positive?
+
+        ptr = val.dup.ref!
+        root = root_base(ptr)
+        return if root && mapped_pointer?(root.to_s)
+
+        @deferred_reads << [ptr, :readable]
+      end
+
+      # The innermost base name of a (possibly nested or dereferenced) address
+      # lambda, following +obj+ through any nested lambdas.
+      # @param [OneGadget::Emulators::Lambda] lmda
+      # @return [String, nil] The root base name, or +nil+ for an absolute address.
+      # @example
+      #   root_base(arg_to_lambda('[[$base+0x10]+0x8]')) #=> '$base'
+      #   root_base(arg_to_lambda('x19+0xed8'))          #=> 'x19'
+      def root_base(lmda)
+        obj = lmda.obj
+        obj = obj.obj while obj.is_a?(OneGadget::Emulators::Lambda)
+        obj
+      end
+
       # Whether a store through +lmda+ imposes a "must be writable" constraint. It
       # lands on writable-or-fixed memory for free when the target is the stack
       # pointer (the stack is always writable), the program counter, or the libc
