@@ -56,13 +56,6 @@ module OneGadget
            .sub(/\s*#.*/, '') # to end-of-line, not \z: the objdump line may end in "\n"
       end
 
-      # The libc load base as a symbolic lambda (cf. {ArmFamily#libc_base}).
-      # @example
-      #   libc_base.to_s  #=> '$base'
-      def libc_base
-        @libc_base ||= OneGadget::Emulators::Lambda.new('$base')
-      end
-
       # Build a lambda for a concretized +$base+<off>+ operand (optionally
       # bracketed); anything else falls back to {Processor#arg_to_lambda}.
       # @example
@@ -84,13 +77,6 @@ module OneGadget
       #   global_var?('rax')          #=> false
       def global_var?(obj)
         super || obj.to_s.include?(libc_base.obj)
-      end
-
-      # A concretized libc global is a fixed target, so it needs no writable constraint.
-      # @example
-      #   needs_writable?(arg_to_lambda('$base+0x100'))  #=> false
-      def needs_writable?(lmda)
-        super && lmda.obj != libc_base.obj
       end
     end
   end
