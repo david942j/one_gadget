@@ -148,10 +148,23 @@ describe OneGadget::Emulators::Arm do
       expect(@processor.process('c: bl 24754 <__sigaction@@GLIBC_2.4>')).to be true
       @processor.process('10: mov r2, r0')
       expect(@processor.process('14: bl 24754 <__sigaction@@GLIBC_2.4>')).to be false
-      # a posix_spawn setup helper is a side-effect-free pass-through (SAFE_CALLS prefix).
+      # a posix_spawn setup helper is accepted (SAFE_CALLS prefix).
       expect(@processor.process('18: bl 10c690 <posix_spawnattr_init@@GLIBC_2.4>')).to be true
       # an unhandled call aborts the candidate.
       expect(@processor.process('1c: bl 12345 <free@@GLIBC_2.4>')).to be false
+    end
+
+    it 'constrains posix_spawn setup-call pointers (source readable, attr writable)' do
+      # setsigmask copies *arg1 into the attr: arg1 (r1) readable, attr (r0) written.
+      @processor.process('0: mov r1, r7')
+      @processor.process('4: bl 9d738 <posix_spawnattr_setsigmask@@GLIBC_2.4>')
+      expect(@processor.constraints).to include('readable: r7', 'writable: r0')
+
+      # a pure sp-relative attr is writable for free, so it needs no constraint.
+      other = described_class.new
+      other.process('0: add r0, sp, #16')
+      other.process('4: bl 10c690 <posix_spawnattr_init@@GLIBC_2.4>')
+      expect(other.constraints).not_to include(a_string_matching(/writable: sp/))
     end
 
     it 'flag-only instructions have no effect' do

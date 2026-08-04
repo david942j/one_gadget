@@ -83,6 +83,19 @@ describe OneGadget::Emulators::AArch64 do
       expect(@processor.registers['pc'].to_s).to eq '9b1b0 <execve@@GLIBC_2.17>'
     end
 
+    it 'constrains posix_spawn setup-call pointers (source readable, attr writable)' do
+      # setsigmask copies *arg1 into the attr: arg1 (x1) readable, attr (x0) written.
+      @processor.process('0: mov x1, x22')
+      @processor.process('4: bl e16e0 <posix_spawnattr_setsigmask@@GLIBC_2.17>')
+      expect(@processor.constraints).to include('readable: x22', 'writable: x0')
+
+      # a pure sp-relative attr is writable for free, so it needs no constraint.
+      other = described_class.new
+      other.process('0: add x0, sp, #0x218')
+      other.process('4: bl e1560 <posix_spawnattr_init@@GLIBC_2.17>')
+      expect(other.constraints).not_to include(a_string_matching(/writable: sp/))
+    end
+
     it 'ldr' do
       @processor.process('ldr x0, [x1, #8]!')
       expect(@processor.registers['x0'].to_s).to eq '[x1+0x8]'
