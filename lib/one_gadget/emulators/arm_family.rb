@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'one_gadget/emulators/lambda'
+require 'one_gadget/emulators/safe_calls'
 
 module OneGadget
   module Emulators
@@ -82,20 +83,13 @@ module OneGadget
         bp ? { sp => 0, bp => 0 } : { sp => 0 }
       end
 
-      # Libc calls the emulator accepts without executing: syscall wrappers, and
-      # +posix_spawn+'s setup helpers (matched by prefix), which precede the real
-      # call and are side-effect-free for gadget purposes.
-      # +sigprocmask+ and +__sigaction+ each dereference a pointer argument unless it
-      # is NULL (both guard the read with a NULL check and still reach the call on
-      # the NULL path), so +sigprocmask+'s +set+ and +__sigaction+'s +act+ are marked
-      # +:nullable_deref+; +__sigaction+'s +oldact+ must additionally be NULL.
+      # {SafeCalls::COMMON} plus one ARM-specific entry: +__sigaction+ dereferences
+      # its +act+ (arg 1) unless NULL (a nullable deref, unlike x86's global-var
+      # requirement) and must not write back through +oldact+ (arg 2 == NULL).
       # See {Processor#dispatch_safe_call}.
-      SAFE_CALLS = {
-        'sigprocmask' => { 1 => :nullable_deref },
-        '__sigaction' => { 1 => :nullable_deref, 2 => :zero? },
-        'posix_spawnattr_' => {},
-        'posix_spawn_file_actions_' => {}
-      }.freeze
+      SAFE_CALLS = SafeCalls::COMMON.merge(
+        '__sigaction' => { 1 => :nullable_deref, 2 => :zero? }
+      ).freeze
 
       private
 
@@ -160,6 +154,9 @@ module OneGadget
       def add_writable(lmda)
         # XXX: a tighter check would consult the libc's writable LOAD segments.
         return if lmda.obj == libc_base.obj
+        # The stack is invariantly writable, so a pure sp-relative target needs no
+        # constraint (cf. x86's needs_writable?, and the sp-skip in #track_write).
+        return if lmda.obj == sp
 
         @constraints << [:writable, lmda]
       end

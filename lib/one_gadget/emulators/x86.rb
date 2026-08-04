@@ -3,6 +3,7 @@
 require 'one_gadget/emulators/instruction'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/emulators/processor'
+require 'one_gadget/emulators/safe_calls'
 require 'one_gadget/error'
 
 module OneGadget
@@ -12,27 +13,15 @@ module OneGadget
       attr_reader :bp # @return [String] Stack base register.
       attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp.
 
-      # Libc calls the emulator accepts without executing: syscall wrappers, and
-      # +posix_spawn+'s setup helpers (matched by prefix), which precede the real
-      # call and are side-effect-free for gadget purposes.
-      # +sigprocmask+ dereferences its +set+ argument (arg 1) unless it is NULL (which
-      # it NULL-checks), so +set+ is marked +:nullable_deref+; +__sigaction+'s
-      # dereferenced +act+ (arg 1) is required to be a libc global instead.
-      # Two +posix_spawnattr_+ setters copy *from* their second argument
-      # unconditionally (no NULL guard), so it must be a readable pointer
-      # (+:deref+); they are listed before the generic +posix_spawnattr_+ prefix so
-      # the specific requirement wins. See {Processor#dispatch_safe_call}.
-      # @example +posix_spawnattr_setsigmask(attr, set)+ runs +attr->__ss = *set+
-      SAFE_CALLS = {
-        'sigprocmask' => { 1 => :nullable_deref },
+      # {SafeCalls::COMMON} plus x86-only entries: +__close+/+unsetenv+ appear in
+      # x86 do_system paths (arm's don't call them), and +__sigaction+ requires its
+      # dereferenced +act+ (arg 1) be a libc global here rather than the plain
+      # nullable-deref arm uses. See {Processor#dispatch_safe_call}.
+      SAFE_CALLS = SafeCalls::COMMON.merge(
         '__close' => {},
         'unsetenv' => { 0 => :global_var? },
-        '__sigaction' => { 1 => :global_var?, 2 => :zero? },
-        'posix_spawnattr_setsigmask' => { 1 => :deref },
-        'posix_spawnattr_setsigdefault' => { 1 => :deref },
-        'posix_spawnattr_' => {},
-        'posix_spawn_file_actions_' => {}
-      }.freeze
+        '__sigaction' => { 1 => :global_var?, 2 => :zero? }
+      ).freeze
 
       # Constructor for a x86 processor.
       def initialize(registers, sp, bp, pc)
