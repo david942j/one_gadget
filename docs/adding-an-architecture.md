@@ -5,8 +5,8 @@ existing example to copy is **aarch64** (`lib/one_gadget/fetchers/aarch64.rb` an
 `lib/one_gadget/emulators/aarch64.rb`).
 
 ```ruby
-OneGadget::Fetchers::<Arch>  < OneGadget::Fetchers::Base       # find candidates, describe constraints
-OneGadget::Emulators::<Arch> < OneGadget::Emulators::Processor # symbolically execute a candidate
+OneGadget::Fetchers::<Arch>  < OneGadget::Fetchers::Base   # find candidates, describe constraints
+OneGadget::Emulators::<Arch> < X86 | ArmFamily | Processor # execute a candidate: inherit a family base, or Processor for a new family
 ```
 
 The engine (candidate discovery via a control-flow walk, constraint solving,
@@ -17,14 +17,17 @@ parts that differ.
 
 **Who owns what.** Two parallel hierarchies (fetcher, emulator); the engine base
 classes carry the shared logic, and each arch subclass fills in the boxes marked
-_you implement_. `arm`/`aarch64` also mix in `ArmFamily` to share their common
-pieces; `x86` keeps its own. The fetcher reaches its emulator through `emulator()`.
+_you implement_. Arches in the same family share a base class that sits between
+`Processor` and the concrete arch: `amd64`/`i386` inherit `X86`, `arm`/`aarch64`
+inherit `ArmFamily` (each holding that family's instruction set, mnemonic tables,
+and condition codes). The fetcher reaches its emulator through `emulator()`.
 
 ```mermaid
 flowchart LR
   classDef engine fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,font-family:monospace
   classDef arch fill:#dcfce7,stroke:#16a34a,color:#14532d,font-family:monospace
   classDef mixin fill:#ede9fe,stroke:#7c3aed,color:#4c1d95,font-family:monospace
+  classDef family fill:#fef3c7,stroke:#d97706,color:#78350f,font-family:monospace
 
   subgraph FE["Fetcher side: find candidate sequences"]
     direction TB
@@ -36,16 +39,16 @@ flowchart LR
     direction TB
     EP["Emulators::Processor<br/>(engine)"]:::engine
     CO["module Conditional"]:::mixin
-    AF["module ArmFamily"]:::mixin
+    FAM["X86 / ArmFamily<br/>(family base class)"]:::family
     EA["Emulators::&lt;Arch&gt;<br/>(you implement)"]:::arch
-    EP -->|inherits| EA
+    EP -->|inherits| FAM
+    FAM -->|inherits| EA
     CO -.->|mixed into| EP
-    AF -.->|"mixed into (arm, aarch64)"| EA
   end
   FA ==>|"emulator()"| EA
 ```
 
-Legend: 🟦 engine (shared base) · 🟩 what you implement · 🟪 shared mixin.
+Legend: 🟦 engine (shared base) · 🟨 family base class · 🟩 what you implement · 🟪 shared mixin.
 
 What each box is for:
 
@@ -53,7 +56,7 @@ What each box is for:
 - **`Fetchers::<Arch>`** — the arch's disassembly, its string/branch recognition, and how to build its emulator.
 - **`Emulators::Processor`** — the engine: parse an instruction, track register/stack state, collect constraints.
 - **`module Conditional`** — shared compare/branch machinery; a crossed branch becomes a gadget constraint.
-- **`module ArmFamily`** — logic shared by arm and aarch64 (calling convention, memory model, condition codes).
+- **`X86` / `ArmFamily`** — a family base class between `Processor` and the concrete arch, holding that family's shared instruction set, mnemonic tables, and condition codes.
 - **`Emulators::<Arch>`** — emulate each instruction, plus the calling convention and register model.
 
 **Why each piece exists.** The runtime flow shows where your methods are called
@@ -119,16 +122,28 @@ Optional hooks (sensible defaults in `Base`):
 
 | Method | What it does |
 | --- | --- |
-| `initialize` | `super(OneGadget::ABI.<arch>, sp_name)`, set `@pc`, define constant registers |
+| `initialize` | `super(OneGadget::ABI.<arch>, sp_name)`, set `@pc`, define constant registers, and call `setup_frame_pointer(bp)` if the arch tracks a frame pointer |
 | `instructions` | the `Instruction`s this arch models (anything else aborts the path) |
 | `process!(cmd)` | emulate one instruction (see the pattern below) |
 | `argument(idx)` | the value of the idx-th call argument (the calling convention) |
-| `get_corresponding_stack(obj)` | the sp/bp-based stack hash `obj` addresses, or `nil` |
 | `self.bits` | `32` or `64` |
 | `operands(cmd)` | split an instruction into its operand strings |
 | `branch_mnem?(mnem)` | is `mnem` a branch this emulator handles? |
 | `handle_branch(mnem, cmd)` | turn a branch into a pending decision (via the `branch_on_*` helpers below) |
 | `inst_<name>(...)` | one handler per supported instruction |
+
+**Inherited from `Processor` — don't reimplement.** The frame-pointer/stack model
+(`get_corresponding_stack`, `setup_frame_pointer`, `eval_dict`, `reg_based_stack`),
+the writable-constraint logic (`add_writable`/`needs_writable?`, which skip `sp`,
+`pc`, and `libc_base` for free), the libc-base marker (`libc_base`,
+`mapped_pointer?`), and the table of non-terminal libc calls the emulator accepts
+without executing (`SafeCalls::COMMON`, applied by `dispatch_safe_call` — the
+`posix_spawn` setup helpers, `sigprocmask`, `__sigaction`, …) are all
+architecture-independent and live in `Processor`/`SafeCalls`. A new arch inherits
+them unchanged. **Keep it that way:** anything whose behaviour doesn't genuinely
+depend on the ISA belongs in the shared base, never copied into an arch class — a
+per-arch copy of the safe-call table once let one arch gain a constraint the
+others silently lacked.
 
 `process!` follows a fixed shape — resolve any pending branch, handle a
 compare/branch, otherwise parse and dispatch:
