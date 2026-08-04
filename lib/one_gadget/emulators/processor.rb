@@ -2,6 +2,7 @@
 
 require 'one_gadget/emulators/conditional'
 require 'one_gadget/emulators/lambda'
+require 'one_gadget/emulators/safe_calls'
 require 'one_gadget/error'
 
 module OneGadget
@@ -244,8 +245,8 @@ module OneGadget
       end
 
       # Accept a +call+ to a libc function the emulator treats as non-terminal
-      # (a syscall wrapper). +checker+ maps the function name to its per-argument
-      # requirements: an argument index paired with one of
+      # (a syscall wrapper). {SafeCalls::COMMON} maps each function name to its
+      # per-argument requirements: an argument index paired with one of
       # * +:zero?+ / +:global_var?+ - a precondition that must already hold, else
       #   the candidate is aborted (+:fail+).
       # * +:nullable_deref+ - the callee dereferences this argument *unless it is
@@ -259,19 +260,25 @@ module OneGadget
       #   isn't already known to be mapped, +readable: <arg>+ is recorded so the
       #   attacker knows it must reference readable memory.
       #   @example +posix_spawnattr_setsigmask(attr, set)+ runs +attr->__ss = *set+
+      # * +:writable+ - the callee *writes through* this argument (an out-param), so
+      #   +writable: <arg>+ is recorded (via {#add_writable}, which drops the
+      #   pc/+$base+/sp targets that are writable or fixed for free).
+      #   @example +posix_spawnattr_init(attr)+ writes +*attr+
       # Both deref checks are deferred to {#finalize_deferred_reads} because a
       # +<reg>+<imm>+ pointer may only become known-mapped once a later store marks
       # +<reg>+ writable.
       # @return [nil, :fail] +nil+ = call accepted, +:fail+ = abort the candidate.
-      def dispatch_safe_call(addr, checker)
-        func = checker.keys.find { |n| addr.include?(n) }
+      def dispatch_safe_call(addr)
+        func = SafeCalls::COMMON.keys.find { |n| addr.include?(n) }
         return :fail unless func
 
-        checker[func].each do |idx, req|
+        SafeCalls::COMMON[func].each do |idx, req|
           if req == :nullable_deref
             @deferred_reads << [argument(idx), :nullable]
           elsif req == :deref
             @deferred_reads << [argument(idx), :readable]
+          elsif req == :writable
+            add_writable(argument(idx))
           elsif !check_argument(idx, req)
             return :fail
           end
