@@ -8,34 +8,24 @@ module OneGadget
     # means). These functions -- syscall wrappers and +posix_spawn+'s setup
     # helpers -- have identical semantics on every architecture, so their
     # requirements live here once instead of being copied into each arch's
-    # emulator. Centralising them keeps the arches from drifting: a duplicated
-    # +posix_spawn+ table once let x86 gain a +setsigmask+ constraint that
-    # arm/aarch64 silently lacked, so gadgets entering before that call were
-    # emitted without the precondition they need.
+    # emulator, keeping the arches from drifting.
     #
-    # An arch merges its own extra/overriding entries on top (see
-    # {X86::SAFE_CALLS}, {ArmFamily::SAFE_CALLS}). Order matters: the specific
-    # +posix_spawnattr_setsigmask+/+setsigdefault+ keys precede the generic
-    # +posix_spawnattr_+ prefix so a substring match resolves to them first.
+    # Order matters: the first key that is a substring of the call symbol wins, so
+    # the specific +posix_spawnattr_setsigmask+/+setsigdefault+ keys precede the
+    # generic +posix_spawnattr_+ prefix.
     module SafeCalls
       # @return [Hash{String => Hash{Integer => Symbol}}]
       #   Function name (or name prefix) => argument index => requirement.
-      # @example +posix_spawnattr_setsigmask(attr, set)+ runs +attr->__ss = *set+
-      #   so +set+ (arg 1) must be readable and +attr+ (arg 0) writable.
       COMMON = {
         # sigprocmask/__sigaction dereference a pointer arg unless it is NULL, which
         # glibc guards with an explicit NULL check (and still reaches the call on the
         # NULL path): sigprocmask's +set+ and __sigaction's +act+ (both arg 1).
-        # __sigaction also writes back through +oldact+ (arg 2), so oldact must be
-        # NULL. +act+'s real requirement is just "NULL or readable"; x86 alone once
-        # over-constrained it to a libc global (+:global_var?+) and thereby hid valid
-        # gadgets -- a per-arch drift this shared table exists to prevent.
+        # __sigaction also writes back through +oldact+ (arg 2), so oldact must be NULL.
         'sigprocmask' => { 1 => :nullable_deref },
         '__sigaction' => { 1 => :nullable_deref, 2 => :zero? },
-        # __close takes no pointer argument (nothing to constrain). unsetenv reads
-        # its name (arg 0); requiring it be a libc global mirrors __sigaction's old
-        # over-strict :global_var? proxy and may deserve the same relaxation, but no
-        # current fixture reaches unsetenv near an exec to verify -- left as-is.
+        # __close takes no pointer argument (nothing to constrain). unsetenv reads its
+        # name (arg 0); +:global_var?+ may over-constrain it (readable would suffice),
+        # but no current fixture reaches unsetenv near an exec to verify -- left as-is.
         '__close' => {},
         'unsetenv' => { 0 => :global_var? },
         # setsigmask/setsigdefault copy *set into the attr unconditionally, so the

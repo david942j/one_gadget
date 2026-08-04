@@ -3,7 +3,6 @@
 require 'one_gadget/emulators/instruction'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/emulators/processor'
-require 'one_gadget/emulators/safe_calls'
 require 'one_gadget/error'
 
 module OneGadget
@@ -12,12 +11,6 @@ module OneGadget
     class X86 < Processor
       attr_reader :bp # @return [String] Stack base register.
       attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp.
-
-      # The x86 emulators accept exactly {SafeCalls::COMMON}; every libc call the
-      # emulator models is arch-independent, so there are no x86-only entries. The
-      # +merge+ hook stays available should a genuinely arch-specific one arise.
-      # See {Processor#dispatch_safe_call}.
-      SAFE_CALLS = SafeCalls::COMMON
 
       # Constructor for a x86 processor.
       def initialize(registers, sp, bp, pc)
@@ -300,7 +293,7 @@ module OneGadget
       def inst_call(addr)
         return reach_terminal_call(addr) if terminal_call?(addr)
 
-        dispatch_safe_call(addr, SAFE_CALLS)
+        dispatch_safe_call(addr)
       end
 
       # Record a "must be writable" constraint for a store's target address.

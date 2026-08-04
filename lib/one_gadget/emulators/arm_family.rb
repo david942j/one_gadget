@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'one_gadget/emulators/lambda'
-require 'one_gadget/emulators/safe_calls'
 
 module OneGadget
   module Emulators
@@ -83,10 +82,6 @@ module OneGadget
         bp ? { sp => 0, bp => 0 } : { sp => 0 }
       end
 
-      # The ARM emulators accept exactly {SafeCalls::COMMON} -- no arch-specific
-      # syscall wrappers beyond the shared set. See {Processor#dispatch_safe_call}.
-      SAFE_CALLS = SafeCalls::COMMON
-
       private
 
       # A +bl+/+blx+ call: record the terminal +exec*+ target, accept a known-safe
@@ -94,7 +89,7 @@ module OneGadget
       def inst_bl(addr)
         return reach_terminal_call(addr) if terminal_call?(addr)
 
-        dispatch_safe_call(addr, SAFE_CALLS)
+        dispatch_safe_call(addr)
       end
 
       # Track a store: write +values+ (one per word from +dst_l+) into the stack

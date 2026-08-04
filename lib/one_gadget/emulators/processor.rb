@@ -2,6 +2,7 @@
 
 require 'one_gadget/emulators/conditional'
 require 'one_gadget/emulators/lambda'
+require 'one_gadget/emulators/safe_calls'
 require 'one_gadget/error'
 
 module OneGadget
@@ -244,8 +245,8 @@ module OneGadget
       end
 
       # Accept a +call+ to a libc function the emulator treats as non-terminal
-      # (a syscall wrapper). +checker+ maps the function name to its per-argument
-      # requirements: an argument index paired with one of
+      # (a syscall wrapper). {SafeCalls::COMMON} maps each function name to its
+      # per-argument requirements: an argument index paired with one of
       # * +:zero?+ / +:global_var?+ - a precondition that must already hold, else
       #   the candidate is aborted (+:fail+).
       # * +:nullable_deref+ - the callee dereferences this argument *unless it is
@@ -267,11 +268,11 @@ module OneGadget
       # +<reg>+<imm>+ pointer may only become known-mapped once a later store marks
       # +<reg>+ writable.
       # @return [nil, :fail] +nil+ = call accepted, +:fail+ = abort the candidate.
-      def dispatch_safe_call(addr, checker)
-        func = checker.keys.find { |n| addr.include?(n) }
+      def dispatch_safe_call(addr)
+        func = SafeCalls::COMMON.keys.find { |n| addr.include?(n) }
         return :fail unless func
 
-        checker[func].each do |idx, req|
+        SafeCalls::COMMON[func].each do |idx, req|
           if req == :nullable_deref
             @deferred_reads << [argument(idx), :nullable]
           elsif req == :deref
