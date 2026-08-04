@@ -22,8 +22,11 @@ module OneGadget
     #   When +file+ is given, {OneGadget} will search gadgets according its
     #   build id first. +force_file = true+ to disable this feature.
     # @param [Integer] level
-    #   Output level.
-    #   If +level+ equals to zero, only gadgets with highest successful probability would be output.
+    #   Output level. Higher levels show more of the gadgets found.
+    #   +0+ (default) shows only the gadgets with the highest successful
+    #   probability; +1+ shows the full trimmed set; +2+ and above additionally
+    #   include gadgets a lower level drops as duplicate or harder-to-satisfy
+    #   (this emulates the file, bypassing the build-id database).
     # @return [Array<OneGadget::Gadget::Gadget>, Array<Integer>]
     #   The gadgets found.
     # @example
@@ -33,10 +36,16 @@ module OneGadget
       ret = if build_id
               OneGadget::Fetchers.from_build_id(build_id) || OneGadget::Logger.not_found(build_id)
             else
-              from_file(OneGadget::Helper.abspath(file), force: force_file)
+              # level >= RAW_LEVEL wants every gadget, but the build-id database
+              # only stores the trimmed set, so emulate the file instead of it.
+              force = force_file || level >= OneGadget::Fetchers::RAW_LEVEL
+              from_file(OneGadget::Helper.abspath(file), force:, level:)
             end
       ret = refine_gadgets(ret, level)
-      ret = ret.map(&:offset) unless details
+      # An offset can recur at level >= 2 (one entry point, several branch-reach
+      # constraint sets); the offset-only view lists it once. A no-op at lower
+      # levels, where offsets are already unique.
+      ret = ret.map(&:offset).uniq unless details
       ret
     rescue OneGadget::Error::Error => e
       OneGadget::Logger.error("#{e.class.name.split('::').last}: #{e.message}")
@@ -46,10 +55,10 @@ module OneGadget
     private
 
     # Try from build id first, then file
-    def from_file(path, force: false)
+    def from_file(path, force: false, level: 0)
       OneGadget::Helper.verify_elf_file!(path)
       gadgets = try_from_build(path) unless force
-      gadgets || OneGadget::Fetchers.from_file(path)
+      gadgets || OneGadget::Fetchers.from_file(path, level:)
     end
 
     def try_from_build(file)

@@ -11,6 +11,10 @@ require 'one_gadget/helper'
 module OneGadget
   # To find gadgets.
   module Fetchers
+    # At and above this level, keep every distinct gadget instead of trimming
+    # down to the easiest-to-reach set (see {ClassMethods#from_file}).
+    RAW_LEVEL = 2
+
     # Define class methods here.
     module ClassMethods
       # Fetch one-gadget offsets of this build id.
@@ -26,9 +30,14 @@ module OneGadget
 
       # Fetch one-gadget offsets from file.
       # @param [String] file The absolute path of libc file.
+      # @param [Integer] level
+      #   Output level. Below {RAW_LEVEL} the result is trimmed to the
+      #   easiest-to-reach gadgets ({#trim_gadgets}); at {RAW_LEVEL} and above
+      #   every distinct gadget is kept ({#all_gadgets}), including ones a lower
+      #   level drops as duplicate or harder-to-satisfy.
       # @return [Array<OneGadget::Gadget::Gadget>]
       #   Array of all found gadgets is returned.
-      def from_file(file)
+      def from_file(file, level: 0)
         arch = OneGadget::Helper.architecture(file)
         klass = {
           aarch64: OneGadget::Fetchers::AArch64,
@@ -38,10 +47,20 @@ module OneGadget
         }[arch]
         raise Error::UnsupportedArchitectureError, arch if klass.nil?
 
-        trim_gadgets(klass.new(file).find)
+        gadgets = klass.new(file).find
+        level >= RAW_LEVEL ? all_gadgets(gadgets) : trim_gadgets(gadgets)
       end
 
       private
+
+      # Keep every distinct gadget, dropping only exact +(offset, constraints)+
+      # repeats (the same suffix reached by more than one candidate path). Unlike
+      # {#trim_gadgets} this keeps duplicate-constraint and dominated gadgets, and
+      # lists an offset once per constraint set it can be reached under.
+      def all_gadgets(gadgets)
+        gadgets.uniq { |g| [g.offset, g.constraints] }
+               .sort_by { |g| [g.offset, g.constraints.size] }
+      end
 
       # Unique, remove gadgets with harder constraints.
       def trim_gadgets(gadgets)
