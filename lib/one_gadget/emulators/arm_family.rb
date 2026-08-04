@@ -76,29 +76,6 @@ module OneGadget
           v.is_a?(Integer) ? OneGadget::Helper.hex(v) : tok
         end
       end
-
-      # Libc-relative addresses are known-mapped too; they carry the +$base+ marker
-      # rather than a +pc+-relative one.
-      def mapped_pointer?(obj)
-        super || obj == libc_base.obj.to_s
-      end
-
-      # The libc load base as a symbolic +$base+ lambda.
-      def libc_base
-        @libc_base ||= OneGadget::Emulators::Lambda.new('$base')
-      end
-
-      # +$base+-relative addresses are treated as read-only; any other store
-      # target must be writable, so record it as a constraint.
-      def add_writable(lmda)
-        # XXX: a tighter check would consult the libc's writable LOAD segments.
-        return if lmda.obj == libc_base.obj
-        # The stack is invariantly writable, so a pure sp-relative target needs no
-        # constraint (cf. x86's needs_writable?, and the sp-skip in #track_write).
-        return if lmda.obj == sp
-
-        @constraints << [:writable, lmda]
-      end
     end
   end
 end
