@@ -375,10 +375,39 @@ module OneGadget
         !!stack && !stack.empty?
       end
 
-      # Whether an address expression names memory known to be mapped: a stack slot
-      # or a libc global. Architectures with an extra base marker override this.
+      # Whether an address expression names memory known to be mapped: a stack slot,
+      # the libc base, or a libc global.
       def mapped_pointer?(obj)
-        obj.include?(sp) || global_var?(obj)
+        obj.include?(sp) || obj == libc_base.obj.to_s || global_var?(obj)
+      end
+
+      # The libc load base as a symbolic +$base+ lambda. Only the arches that
+      # concretize libc-relative operands (amd64's +rip+, arm's +pc+) ever produce
+      # it; elsewhere it never matches a real operand, so it's harmless.
+      # @example
+      #   libc_base.to_s #=> '$base'
+      def libc_base
+        @libc_base ||= OneGadget::Emulators::Lambda.new('$base')
+      end
+
+      # Record a "must be writable" constraint for a store's target address.
+      # @param [OneGadget::Emulators::Lambda] lmda The destination address, zero-deref
+      #   (already +ref!+'d by the caller).
+      def add_writable(lmda)
+        @constraints << [:writable, lmda] if needs_writable?(lmda)
+      end
+
+      # Whether a store through +lmda+ imposes a "must be writable" constraint. It
+      # lands on writable-or-fixed memory for free when the target is the stack
+      # pointer (the stack is always writable), the program counter, or the libc
+      # base (a fixed libc-internal address); a frame pointer or attacker register
+      # still needs the constraint.
+      # @example (sp is +rsp+, pc is +rip+)
+      #   needs_writable?(arg_to_lambda('rax'))        #=> true   # an attacker register
+      #   needs_writable?(arg_to_lambda('[rsp+0x8]'))  #=> false  # the stack is writable
+      #   needs_writable?(arg_to_lambda('$base+0x10')) #=> false  # a fixed libc global
+      def needs_writable?(lmda)
+        ![sp, pc, libc_base.obj.to_s].include?(lmda.obj.to_s)
       end
 
       def register?(reg)

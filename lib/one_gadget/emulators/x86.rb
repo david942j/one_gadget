@@ -254,25 +254,6 @@ module OneGadget
         dispatch_safe_call(addr)
       end
 
-      # Record a "must be writable" constraint for a store's target address.
-      # @param [OneGadget::Emulators::Lambda] lmda The destination address,
-      #   zero-deref (already +ref!+'d by the caller).
-      def add_writable(lmda)
-        @constraints << [:writable, lmda] if needs_writable?(lmda)
-      end
-
-      # Whether a store through +lmda+ imposes a "must be writable" constraint. A
-      # store lands on writable memory for free when the target is the stack
-      # pointer (the stack is always writable) or a fixed libc-internal address;
-      # a frame pointer or attacker register still needs the constraint.
-      # @example (sp is +rsp+, pc is +rip+)
-      #   needs_writable?(arg_to_lambda('rax'))       #=> true   # an attacker register
-      #   needs_writable?(arg_to_lambda('[rsp+0x8]')) #=> false  # the stack is writable
-      #   needs_writable?(arg_to_lambda('rip'))       #=> false  # pc-relative libc address
-      def needs_writable?(lmda)
-        lmda.obj != pc && lmda.obj != sp
-      end
-
       def to_lambda(reg)
         return super unless reg =~ /^xmm\d+$/
 
