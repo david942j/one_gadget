@@ -21,6 +21,8 @@ module OneGadget
       attr_reader :sp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on sp.
       attr_reader :sp # @return [String] Stack pointer.
       attr_reader :pc # @return [String] Program counter.
+      attr_reader :bp # @return [String, nil] Frame pointer, or nil when this arch tracks none.
+      attr_reader :bp_based_stack # @return [Hash{Integer => Lambda}, nil] Stack content based on {#bp}, or nil.
 
       # Instantiate a {Processor} object.
       # @param [Array<String>] registers
@@ -34,12 +36,17 @@ module OneGadget
         @deferred_reads = [] # pointer args of safe calls, resolved once emulation ends
         @flags = nil     # last compare, for a following conditional branch
         @pending = nil   # a conditional branch awaiting one-line-ahead resolution
-        @sp_based_stack = Hash.new do |h, k|
-          h[k] = OneGadget::Emulators::Lambda.new(sp).tap do |lmda|
-            lmda.immi = k
-            lmda.deref!
-          end
-        end
+        @sp_based_stack = tracked_stack(sp)
+      end
+
+      # Enable frame-pointer stack tracking with +bp+ as the frame register, so a
+      # gadget staging data at +[bp+imm]+ (e.g. an argv array off the frame
+      # pointer) is recovered instead of collapsing to a bare +writable:+. A nil
+      # +bp+ leaves the arch +sp+-only. Call from the arch initializer after +super+.
+      # @return [void]
+      def setup_frame_pointer(bp)
+        @bp = bp
+        @bp_based_stack = tracked_stack(bp) unless bp.nil?
       end
 
       # Function names whose call ends a gadget: the real +exec*+ entry points.
@@ -189,14 +196,29 @@ module OneGadget
         end
       end
 
-      # Method need to be implemented in inheritors.
-      #
-      # @param [String | Lambda] obj
-      #  A lambda object or its string.
-      # @return [Hash{Integer => Lambda}, nil]
-      #  The corresponding stack that +obj+ used,
-      #  or nil if +obj+ doesn't use the stack.
-      def get_corresponding_stack(obj); raise NotImplementedError
+      # The stack that +obj+ addresses -- +sp+-based, {#bp}-based, or a per-register
+      # write history ({#reg_based_stack}) for any other register the candidate has
+      # written through.
+      # @param [String, Lambda] obj A lambda object or its string.
+      # @return [Hash{Integer => Lambda}, nil] The corresponding stack, or nil.
+      # @example
+      #   get_corresponding_stack('sp+0x10')  #=> sp_based_stack
+      #   get_corresponding_stack('x29+0x40') #=> bp_based_stack (when bp is x29)
+      #   get_corresponding_stack('x21')      #=> nil, or a write history if written through
+      def get_corresponding_stack(obj)
+        # A compound base (a nested Lambda, e.g. the address is itself "[reg]+imm" --
+        # one more indirection than a simple register+offset) isn't something any of
+        # sp/bp/reg_based_stack model correctly: their imm is always "an offset from a
+        # *named register*", not "an offset from a dereferenced value". Matching it via
+        # a substring check on its rendered form (e.g. "[rbp-0x78]" contains "rbp")
+        # would silently mistrack it as bp-relative.
+        return nil if obj.is_a?(OneGadget::Emulators::Lambda)
+
+        s = obj.to_s
+        return sp_based_stack if s.include?(sp)
+        return bp_based_stack if bp && s.include?(bp)
+
+        reg_based_stack(s)
       end
 
       # A per-register write history for a register that ISN'T the arch's
@@ -232,6 +254,17 @@ module OneGadget
       end
 
       private
+
+      # An always-on tracked stack keyed by offset: a Hash that lazily materialises
+      # +[reg+off]+ as a one-deref {Lambda}. Used for the +sp+- and {#bp}-based stacks.
+      def tracked_stack(reg)
+        Hash.new do |h, k|
+          h[k] = OneGadget::Emulators::Lambda.new(reg).tap do |lmda|
+            lmda.immi = k
+            lmda.deref!
+          end
+        end
+      end
 
       def check_register!(reg)
         raise Error::InstructionArgumentError, "#{reg.inspect} is not a valid register" unless register?(reg)
@@ -368,8 +401,9 @@ module OneGadget
         raise OneGadget::Error::UnsupportedInstructionArgumentError, "#{inst} #{args.join(', ')}"
       end
 
+      # Resolve +sp+- and (when tracked) {#bp}-relative operands to their offset.
       def eval_dict
-        { sp => 0 }
+        bp ? { sp => 0, bp => 0 } : { sp => 0 }
       end
 
       def size_t

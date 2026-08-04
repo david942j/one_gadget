@@ -10,9 +10,7 @@ require 'one_gadget/helper'
 module OneGadget
   module Emulators
     # Emulator of 32-bit ARM (both A32 and Thumb-2 encodings).
-    class Arm < Processor
-      include ArmFamily
-
+    class Arm < ArmFamily
       # Instantiate an {Arm} object.
       # @param [String, nil] file
       #   Path to the target libc. Used to read words from the literal pool when

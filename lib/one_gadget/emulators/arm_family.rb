@@ -1,15 +1,17 @@
 # frozen_string_literal: true
 
 require 'one_gadget/emulators/lambda'
+require 'one_gadget/emulators/processor'
 
 module OneGadget
   module Emulators
     # Behaviour shared by the two ARM-architecture emulators, {Arm} (AArch32) and
     # {AArch64}: the condition-code table plus the parts of the calling convention
-    # and memory model that are identical in 32- and 64-bit mode. Included into
-    # each; everything that genuinely differs (instruction set, register width,
-    # +pc+ handling) stays in the individual classes.
-    module ArmFamily
+    # and memory model that are identical in 32- and 64-bit mode. The common base
+    # each inherits (the ARM counterpart of {X86}); everything that genuinely
+    # differs (instruction set, register width, +pc+ handling) stays in the
+    # individual classes.
+    class ArmFamily < Processor
       # ARM condition-code suffix (the +<cc>+ in +b<cc>+ / +b.<cc>+) mapped to a
       # shared {Conditional::RELATION} predicate. Decodes the opaque mnemonics once:
       # +hs+/+cs+ and +lo+/+cc+ are aliases; +mi+/+pl+ (sign bit) act as signed
@@ -27,60 +29,6 @@ module OneGadget
       # whose result their flags reflect (see {Conditional::COMPARE_OPS}). x86 has
       # its own {X86::COMPARES}.
       COMPARES = { 'cmp' => :sub, 'cmn' => :add, 'tst' => :and }.freeze
-
-      # Frame-pointer register whose relative stores are tracked, or +nil+ when this
-      # arch tracks none. Enabled via {#setup_frame_pointer} (mirrors x86's +bp+).
-      attr_reader :bp
-
-      # @return [Hash{Integer => Lambda}, nil] Stack content based on {#bp}, or nil.
-      attr_reader :bp_based_stack
-
-      # Enable frame-pointer stack tracking with +bp+ as the frame register (so a
-      # gadget that stages data at +[bp+imm]+ -- e.g. an argv array off +x29+ -- is
-      # recovered instead of collapsing to a bare +writable:+). Nil disables it,
-      # leaving the arch +sp+-only. Call from the arch initializer after +super+.
-      def setup_frame_pointer(bp)
-        @bp = bp
-        return if bp.nil?
-
-        @bp_based_stack = Hash.new do |h, k|
-          h[k] = OneGadget::Emulators::Lambda.new(bp).tap do |lmda|
-            lmda.immi = k
-            lmda.deref!
-          end
-        end
-      end
-
-      # The stack that +obj+ addresses -- +sp+-based, {#bp}-based, or a
-      # per-register write history (see {Processor#reg_based_stack}) for any
-      # other register the candidate has written through.
-      # @param [String, Lambda] obj A lambda object or its string.
-      # @return [Hash{Integer => Lambda}, nil]
-      # @example
-      #   get_corresponding_stack('sp+0x10') #=> sp_based_stack
-      #   get_corresponding_stack('x29+0x40') #=> bp_based_stack (aarch64)
-      #   get_corresponding_stack('x21') #=> nil, or a write history if x21 was written through
-      def get_corresponding_stack(obj)
-        # A compound base (a nested Lambda, e.g. the address is itself "[reg]+imm"
-        # -- one more indirection than a simple register+offset) isn't something
-        # any of sp/bp/reg_based_stack model correctly: their imm is always "an
-        # offset from a *named register*", not "an offset from a dereferenced
-        # value". Matching it via a substring check on its rendered form (e.g.
-        # "[rbp-0x78]" contains "rbp") would silently mistrack it as bp-relative.
-        return nil if obj.is_a?(OneGadget::Emulators::Lambda)
-
-        s = obj.to_s
-        return sp_based_stack if s.include?(sp)
-        return bp_based_stack if bp && s.include?(bp)
-
-        reg_based_stack(s)
-      end
-
-      # Resolve +sp+- and (when tracked) {#bp}-relative operands to their offset;
-      # the base {Processor#eval_dict} covers only +sp+ (cf. x86).
-      def eval_dict
-        bp ? { sp => 0, bp => 0 } : { sp => 0 }
-      end
 
       private
 
