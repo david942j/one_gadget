@@ -32,6 +32,12 @@ module OneGadget
         # gadgets -- a per-arch drift this shared table exists to prevent.
         'sigprocmask' => { 1 => :nullable_deref },
         '__sigaction' => { 1 => :nullable_deref, 2 => :zero? },
+        # __close takes no pointer argument (nothing to constrain). unsetenv reads
+        # its name (arg 0); requiring it be a libc global mirrors __sigaction's old
+        # over-strict :global_var? proxy and may deserve the same relaxation, but no
+        # current fixture reaches unsetenv near an exec to verify -- left as-is.
+        '__close' => {},
+        'unsetenv' => { 0 => :global_var? },
         # setsigmask/setsigdefault copy *set into the attr unconditionally, so the
         # source (arg 1) must be readable and the attr they write (arg 0) writable.
         'posix_spawnattr_setsigmask' => { 0 => :writable, 1 => :deref },

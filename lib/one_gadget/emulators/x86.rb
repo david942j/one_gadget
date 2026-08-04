@@ -13,13 +13,11 @@ module OneGadget
       attr_reader :bp # @return [String] Stack base register.
       attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp.
 
-      # {SafeCalls::COMMON} plus x86-only entries: +__close+ and +unsetenv+ appear
-      # in x86 do_system paths (arm's don't call them). See
-      # {Processor#dispatch_safe_call}.
-      SAFE_CALLS = SafeCalls::COMMON.merge(
-        '__close' => {},
-        'unsetenv' => { 0 => :global_var? }
-      ).freeze
+      # The x86 emulators accept exactly {SafeCalls::COMMON}; every libc call the
+      # emulator models is arch-independent, so there are no x86-only entries. The
+      # +merge+ hook stays available should a genuinely arch-specific one arise.
+      # See {Processor#dispatch_safe_call}.
+      SAFE_CALLS = SafeCalls::COMMON
 
       # Constructor for a x86 processor.
       def initialize(registers, sp, bp, pc)
