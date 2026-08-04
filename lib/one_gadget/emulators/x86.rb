@@ -13,14 +13,12 @@ module OneGadget
       attr_reader :bp # @return [String] Stack base register.
       attr_reader :bp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on bp.
 
-      # {SafeCalls::COMMON} plus x86-only entries: +__close+/+unsetenv+ appear in
-      # x86 do_system paths (arm's don't call them), and +__sigaction+ requires its
-      # dereferenced +act+ (arg 1) be a libc global here rather than the plain
-      # nullable-deref arm uses. See {Processor#dispatch_safe_call}.
+      # {SafeCalls::COMMON} plus x86-only entries: +__close+ and +unsetenv+ appear
+      # in x86 do_system paths (arm's don't call them). See
+      # {Processor#dispatch_safe_call}.
       SAFE_CALLS = SafeCalls::COMMON.merge(
         '__close' => {},
-        'unsetenv' => { 0 => :global_var? },
-        '__sigaction' => { 1 => :global_var?, 2 => :zero? }
+        'unsetenv' => { 0 => :global_var? }
       ).freeze
 
       # Constructor for a x86 processor.

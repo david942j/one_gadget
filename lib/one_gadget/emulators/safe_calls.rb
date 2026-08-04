@@ -23,10 +23,15 @@ module OneGadget
       # @example +posix_spawnattr_setsigmask(attr, set)+ runs +attr->__ss = *set+
       #   so +set+ (arg 1) must be readable and +attr+ (arg 0) writable.
       COMMON = {
-        # sigprocmask dereferences its set argument unless it is NULL, which glibc
-        # guards with an explicit NULL check (and still reaches the call on the
-        # NULL path).
+        # sigprocmask/__sigaction dereference a pointer arg unless it is NULL, which
+        # glibc guards with an explicit NULL check (and still reaches the call on the
+        # NULL path): sigprocmask's +set+ and __sigaction's +act+ (both arg 1).
+        # __sigaction also writes back through +oldact+ (arg 2), so oldact must be
+        # NULL. +act+'s real requirement is just "NULL or readable"; x86 alone once
+        # over-constrained it to a libc global (+:global_var?+) and thereby hid valid
+        # gadgets -- a per-arch drift this shared table exists to prevent.
         'sigprocmask' => { 1 => :nullable_deref },
+        '__sigaction' => { 1 => :nullable_deref, 2 => :zero? },
         # setsigmask/setsigdefault copy *set into the attr unconditionally, so the
         # source (arg 1) must be readable and the attr they write (arg 0) writable.
         'posix_spawnattr_setsigmask' => { 0 => :writable, 1 => :deref },

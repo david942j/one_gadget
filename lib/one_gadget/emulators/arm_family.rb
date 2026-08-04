@@ -83,13 +83,9 @@ module OneGadget
         bp ? { sp => 0, bp => 0 } : { sp => 0 }
       end
 
-      # {SafeCalls::COMMON} plus one ARM-specific entry: +__sigaction+ dereferences
-      # its +act+ (arg 1) unless NULL (a nullable deref, unlike x86's global-var
-      # requirement) and must not write back through +oldact+ (arg 2 == NULL).
-      # See {Processor#dispatch_safe_call}.
-      SAFE_CALLS = SafeCalls::COMMON.merge(
-        '__sigaction' => { 1 => :nullable_deref, 2 => :zero? }
-      ).freeze
+      # The ARM emulators accept exactly {SafeCalls::COMMON} -- no arch-specific
+      # syscall wrappers beyond the shared set. See {Processor#dispatch_safe_call}.
+      SAFE_CALLS = SafeCalls::COMMON
 
       private
 
