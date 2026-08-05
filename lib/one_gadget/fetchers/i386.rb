@@ -35,9 +35,14 @@ module OneGadget
         res = super
         return if res.nil?
 
-        # unshift GOT constraint into cons
+        # The GOT base is a fixed, mapped libc address, surfaced as its own
+        # constraint; a writable:/readable: precondition rooted at it (a store or
+        # load through the GOT base) is therefore not an attacker precondition and
+        # is dropped. Unlike arm, i386 doesn't seed this register to +$base+ before
+        # emulating, so the emulator can't recognise it as mapped -- it is pruned
+        # here once +@base_reg+ is known.
         res[:constraints].unshift("#{@base_reg} is the GOT address of libc")
-        res[:constraints].delete_if { |c| c.start_with?("writable: #{@base_reg}") }
+        res[:constraints].reject! { |c| c.match?(/\A(?:writable|readable): \[*#{Regexp.escape(@base_reg)}\b/) }
         res
       end
 
