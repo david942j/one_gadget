@@ -103,6 +103,10 @@ module OneGadget
       # which glibc loads in the function prologue -- outside the candidate window.
       # Before emulating a candidate, detect that register and replay its
       # +ldr rX, [pc]; add rX, pc+ setup so it resolves to +$base + got+.
+      #
+      # Reading +cmds+ as evidence of which registers hold the GOT base is only
+      # sound because it is an executed window (see {Base#executed_window}): a line
+      # past the terminal call would describe a path this one never takes.
       def emulate(cmds)
         emu = emulator
         @got_base_regs = seed_got_registers(emu, cmds)
@@ -135,31 +139,8 @@ module OneGadget
       #   got_base_registers(['88ab2: ldr r2, [r1, r2]'])
       #   #=> ['r1']
       def got_base_registers(cmds)
-        executed(cmds).flat_map { |c| c.scan(/\[(r\d+|sl|fp|ip|lr),\s*(?:r\d+|sl|fp|ip|lr)\]/) }
-                      .flatten.uniq
-      end
-
-      # The part of a candidate that actually runs. Emulation stops at the terminal
-      # call, so whatever the window happens to include past it never executes and
-      # says nothing about how a register is used: seeding on such a line once made
-      # a loop counter look like the GOT base, turning a plain +r3 == 0x1+ at the
-      # window's entry into +$base+0xf4004 == 0x1+, a constraint nothing can meet.
-      def executed(cmds)
-        stop = cmds.index { |c| terminal_call_line?(c) }
-        stop ? cmds[..stop] : cmds
-      end
-
-      # Whether +cmd+ is the call that ends a gadget. Only a real +bl+/+blx+ counts:
-      # a conditional branch inside the same function carries a similar-looking
-      # target symbol but isn't a call.
-      # @example
-      #   terminal_call_line?('73f82: bl 73ba0 <execve@@GLIBC_2.4>')      #=> true
-      #   terminal_call_line?('73f56: beq.n 73f96 <execlp@@GLIBC_2.4+0x136>') #=> false
-      def terminal_call_line?(cmd)
-        return false unless cmd[/\A\s*[0-9a-f]+:\s*(\S+)/, 1]&.match?(/\A#{call_str}x?(?:\.[wn])?\z/)
-
-        name = cmd[/<([^@>]+)/, 1]
-        !name.nil? && OneGadget::Emulators::Processor::TERMINAL_CALL_RE.match?(name)
+        cmds.flat_map { |c| c.scan(/\[(r\d+|sl|fp|ip|lr),\s*(?:r\d+|sl|fp|ip|lr)\]/) }
+            .flatten.uniq
       end
 
       # Prime +emu+ with every GOT base register the candidate relies on, by
