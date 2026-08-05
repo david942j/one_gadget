@@ -213,8 +213,14 @@ module Aletheia
       op = safe_parse(m[1])
       return nil unless op&.reg && op.deref == 1
 
-      witness = relation_witness(m[2], Integer(m[3]))
-      witness && [op, witness & MASK64]
+      relop = m[2]
+      imm = Integer(m[3])
+      witness = relation_witness(relop, imm)
+      # "must be nonzero" admits any value, so record that a pointer will do:
+      # storing one keeps the location usable as a pointer by another constraint
+      # (+[$base+off] != 0+ alongside +[[$base+off]+0xe8] == 0+), which pinning
+      # the bare literal 1 would block.
+      witness && [op, witness & MASK64, relop == '!=' && imm.zero?]
     end
 
     # +<reg> is the GOT address of libc+: settable when we know the PLTGOT offset
@@ -275,7 +281,7 @@ module Aletheia
     # requires a settable register when X isn't the stack pointer.
     # @return [Float, nil]
     def deep_null_cost(op)
-      return nil unless stack_reg?(op.reg) || (op.reg && settable?(op.reg))
+      return nil unless stack_reg?(op.reg) || base_reg?(op) || (op.reg && settable?(op.reg))
 
       base = stack_reg?(op.reg) ? 0.15 : 0.25
       base + (0.05 * (op.deref - 2))
@@ -320,7 +326,7 @@ module Aletheia
         if (op = deref_zero(branch))
           deref_reads_zero?(plan, op)
         elsif (parsed = deref_relation(branch))
-          literal_satisfied?(plan, *parsed)
+          literal_satisfied?(plan, parsed[0], parsed[1], any_nonzero: parsed[2])
         elsif (pair = reg_relation(branch))
           reg_relation_satisfied?(plan, *pair)
         elsif (trio = reg_mem_relation(branch))
@@ -337,11 +343,16 @@ module Aletheia
 
     # Whether a memory-relation operand's tracked memory already holds +literal+
     # (see {#deref_relation}).
-    def literal_satisfied?(plan, op, literal)
-      return plan.base_mem[op.imm] == literal if base_reg?(op)
+    def literal_satisfied?(plan, op, literal, any_nonzero: false)
+      value = mem_value(plan, op)
+      return pointer_value?(value) || (value.is_a?(Integer) && !value.zero?) if any_nonzero
 
-      addr_off = mem_addr_off(plan, op)
-      addr_off && plan.mem[addr_off] == literal
+      value == literal
+    end
+
+    # A stored scratch pointer: a mapped, nonzero address the driver resolves.
+    def pointer_value?(value)
+      value.is_a?(Hash) && value.key?('scratch_off')
     end
 
     # Whether a +== NULL+ / +<= 0+ operand already reads zero under the current
@@ -351,6 +362,8 @@ module Aletheia
     # the same slot, instead of the two conflicting.
     def deref_reads_zero?(plan, op)
       return plan.regs[op.reg] == 0 if op.deref.zero? && op.reg
+      return mem_value(plan, op)&.zero? || false if op.deref >= 2
+      return false unless op.inner_imm.zero?
       return plan.base_mem[op.imm] == 0 if op.deref == 1 && base_reg?(op) # zeroed libc global
       return false unless op.deref == 1 && op.reg && scratch?(plan, op.reg)
 
@@ -408,7 +421,7 @@ module Aletheia
       when GOT                                     then apply_got(plan, disjunct)
       else
         if (op = deref_zero(disjunct)) then apply_deref_null(plan, op)
-        elsif (parsed = deref_relation(disjunct)) then apply_literal(plan, *parsed)
+        elsif (parsed = deref_relation(disjunct)) then apply_literal(plan, parsed[0], parsed[1], any_nonzero: parsed[2])
         elsif (pair = reg_relation(disjunct)) then apply_reg_relation(plan, *pair)
         elsif (trio = reg_mem_relation(disjunct)) then apply_reg_mem_relation(plan, *trio)
         else apply_relation(plan, disjunct)
@@ -421,7 +434,15 @@ module Aletheia
     # other constraint in this candidate already pinned) and writing +literal+
     # there. Unlike a zero target, there's no already-correct region to point
     # at, so this always needs a real write.
-    def apply_literal(plan, op, literal)
+    def apply_literal(plan, op, literal, any_nonzero: false)
+      # "Nonzero" is satisfied by a scratch pointer, which -- unlike a bare 1 --
+      # another constraint can still dereference (see {#deref_relation}).
+      literal = scratch_slot(plan, 0) if any_nonzero
+      if op.deref >= 2
+        target = deep_target_off(plan, op, allocate: true)
+        return target ? set_mem(plan, target, literal) : false
+      end
+      return false unless op.inner_imm.zero? # a displaced pointer value, not memory contents
       return set_base_mem(plan, op.imm, literal) if base_reg?(op)
 
       addr_off = mem_addr_off(plan, op)
@@ -457,6 +478,13 @@ module Aletheia
     #   slot, and that slot -> STRING_POOL
     # @example deref 3: X -> slot_1 -> STRING_POOL (two writes, one extra slot)
     def apply_deep_null(plan, op)
+      # A field read off a pointer ([[base+imm]+inner]): point that pointer at a
+      # fresh scratch area so the field lands in the zero fill.
+      unless op.inner_imm.zero?
+        target = deep_target_off(plan, op, allocate: true)
+        return target ? set_mem(plan, target, 0) : false
+      end
+
       addr_off =
         if stack_reg?(op.reg)
           SP_OFFSET + op.imm
@@ -663,8 +691,8 @@ module Aletheia
 
       a, b = [lhs, rhs].map { |s| safe_parse(s) }
       reg, mem = a&.deref&.zero? ? [a, b] : [b, a]
-      return nil unless reg&.deref&.zero? && reg.reg && reg.imm.zero? && settable?(reg.reg)
-      return nil unless mem&.deref == 1 && mem.reg
+      return nil unless reg&.deref&.zero? && reg.reg && settable?(reg.reg)
+      return nil unless (1..2).cover?(mem&.deref.to_i) && mem.reg
 
       [reg, op, mem]
     end
@@ -674,6 +702,11 @@ module Aletheia
     # global keeps whatever libc left there, so it counts as known only once the
     # plan has written it.
     def mem_value(plan, op)
+      if op.deref >= 2
+        target = deep_target_off(plan, op)
+        return target && (plan.mem[target] || (zeroed_scratch?(target) ? 0 : nil))
+      end
+      return nil unless op.inner_imm.zero? # a displaced pointer value, not memory contents
       return plan.base_mem[op.imm] if base_reg?(op)
 
       addr_off = mem_addr_off(plan, op)
@@ -682,13 +715,43 @@ module Aletheia
       plan.mem[addr_off] || (zeroed_scratch?(addr_off) ? 0 : nil)
     end
 
+    # The scratch offset of the level-1 slot +[reg+imm]+, allocating a scratch
+    # pointer for a settable base register when +allocate+ is set.
+    def level1_addr_off(plan, op, allocate: false)
+      off = mem_addr_off(plan, op)
+      return off if off
+      return nil unless allocate && op.reg && settable?(op.reg)
+
+      slot = scratch_slot(plan, op.imm)
+      set_reg(plan, xreg(op.reg), slot) ? slot['scratch_off'] + op.imm : nil
+    end
+
+    # The scratch offset a two-level operand +[[reg+imm]+inner]+ addresses: the
+    # pointer stored at +[reg+imm]+, displaced by +inner_imm+. With +allocate+,
+    # an unset pointer is made to reference a fresh scratch area, so the field it
+    # addresses lands in the zero fill.
+    def deep_target_off(plan, op, allocate: false)
+      via_base = base_reg?(op)
+      slot_off = via_base ? nil : level1_addr_off(plan, op, allocate:)
+      return nil unless via_base || slot_off
+
+      current = via_base ? plan.base_mem[op.imm] : plan.mem[slot_off]
+      return current['scratch_off'] + op.inner_imm if current.is_a?(Hash) && current.key?('scratch_off')
+      return nil unless allocate && current.nil?
+
+      target = scratch_slot(plan, 0)['scratch_off']
+      pointer = { 'scratch_off' => target }
+      stored = via_base ? set_base_mem(plan, op.imm, pointer) : set_mem(plan, slot_off, pointer)
+      stored ? target + op.inner_imm : nil
+    end
+
     # Whether the register and the memory value already meet +op+.
     def reg_mem_satisfied?(plan, reg, op, mem)
       current = plan.regs[xreg(reg.reg)]
       value = mem_value(plan, mem)
       return false if current.nil? || value.nil? || current.is_a?(Hash) || value.is_a?(Hash)
 
-      (current == value) == (op == '==')
+      (((current + reg.imm) & MASK64) == value) == (op == '==')
     end
 
     # Match the register and the memory it is compared against. Whichever side is
@@ -703,11 +766,14 @@ module Aletheia
       current = plan.regs[xreg(reg.reg)]
       return false if current.is_a?(Hash)
 
+      # The comparison is on `reg + imm`, so the register itself carries the
+      # displacement: it holds the matched value less `imm`.
       known = mem_value(plan, mem)
-      return set_reg(plan, xreg(reg.reg), counterpart(known, op)) if known && !known.is_a?(Hash)
+      return set_reg(plan, xreg(reg.reg), (counterpart(known, op) - reg.imm) & MASK64) if known && !known.is_a?(Hash)
 
       value = current || 0
-      set_reg(plan, xreg(reg.reg), value) && apply_literal(plan, mem, counterpart(value, op))
+      lhs = (value + reg.imm) & MASK64
+      set_reg(plan, xreg(reg.reg), value) && apply_literal(plan, mem, counterpart(lhs, op))
     end
 
     # Whether two plan values denote the same runtime value: two scratch pointers

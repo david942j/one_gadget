@@ -174,8 +174,9 @@ __attribute__((noreturn)) static void jump_inj(struct inj *g) {
 /* Apply the plan and jump. Plan grammar (one directive per line):
  *   default benign|poison|null   fill for registers the plan doesn't set
  *   reg <n> s|l|b <hex>          r<n> = scratch+hex (s) | literal (l) | base+hex (b)
- *   mem <hex-off> <hex-val>      *(scratch+off) = scratch+val (a scratch pointer,
- *                                for a chained dereference like [[sp]]==NULL)
+ *   mem <hex-off> s|l <hex>      *(scratch+off) = scratch+val (s) | literal (l)
+ *   bmem <hex-off> s|l <hex>     *(base+off) = scratch+val (s) | literal (l),
+ *                                for a constraint on a libc global
  *   sp <hex>                     sp = scratch + hex
  *   pc <hex>                     pc = base + hex
  *   thumb 1                      enter the gadget in Thumb state
@@ -204,10 +205,15 @@ static void self_inject(unsigned long base, unsigned char *scratch, const char *
                                  : kind == 'b' ? base + v
                                  : v);
             rset[n] = 1;
-        } else if (sscanf(line, "mem %lx %lx", &off, &v) == 2) {
+        } else if (sscanf(line, "mem %lx %c %lx", &off, &kind, &v) == 3) {
             /* A chained dereference (e.g. [[sp]]==NULL) needs a real pointer at
-             * scratch+off, not just the zero-fill a single dereference relies on. */
-            *(unsigned int *)(scratch + off) = (unsigned int)((unsigned long)scratch + v);
+             * scratch+off, not just the zero-fill a single dereference relies on;
+             * a value comparison instead needs the literal it is compared against. */
+            *(unsigned int *)(scratch + off) =
+                (unsigned int)(kind == 's' ? (unsigned long)scratch + v : v);
+        } else if (sscanf(line, "bmem %lx %c %lx", &off, &kind, &v) == 3) {
+            *(unsigned int *)(base + off) =
+                (unsigned int)(kind == 's' ? (unsigned long)scratch + v : v);
         } else if (sscanf(line, "sp %lx", &v) == 1) {
             sp = (unsigned int)((unsigned long)scratch + v);
         } else if (sscanf(line, "pc %lx", &v) == 1) {

@@ -110,8 +110,16 @@ RSpec.describe Aletheia::Satisfier do
   end
 
   it 'SKIPs (does not crash) on an unparseable operand' do
-    plan = satisfier.satisfy(gadget(['(s32)[[sp+0x30]+0x4] <= 0']))
+    # Deeper than the one modelled level of nesting (see Operand#inner_imm).
+    plan = satisfier.satisfy(gadget(['(s32)[[[sp+0x30]+0x4]+0x8] <= 0']))
     expect(plan.status).to eq('skip')
+  end
+
+  it 'points a pointer read from memory at scratch, for a field read off it' do
+    plan = satisfier.satisfy(gadget(['(s32)[[sp+0x30]+0x4] <= 0']))
+    expect(plan.status).to eq('ok')
+    # [sp+0x30] holds a scratch pointer, so the field at +0x4 reads the zero fill.
+    expect(plan.mem[Aletheia::Satisfier::SP_OFFSET + 0x30]).to have_key('scratch_off')
   end
 
   it 'defaults to benign fill, and to poison fill in strict mode' do

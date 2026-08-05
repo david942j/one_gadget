@@ -20,6 +20,13 @@ module Aletheia
       def sp = 'sp'
       def pc = 'pc'
 
+      # AAPCS role names objdump prints for the high general-purpose registers.
+      ALIASES = { 'sl' => 'r10', 'fp' => 'r11', 'ip' => 'r12' }.freeze
+
+      # Resolve a role name to the register it denotes, so a constraint written
+      # as +ip != 0x0+ is recognised as being about an assignable register.
+      def normalize_reg(reg) = ALIASES[reg] || reg
+
       def native_on?(host_machine) = %w[armv7l armv6l arm].include?(host_machine)
 
       # arm runs via stub self-injection rather than a gdbstub: qemu-arm's
@@ -33,8 +40,6 @@ module Aletheia
       def version_strict? = true
 
       def gdb_reg(name) = "$#{name}"
-
-      def normalize_reg(reg) = reg
 
       def stub_binary = 'park_stub_arm'
 
