@@ -234,23 +234,45 @@ module OneGadget
         operator, sign = rel
         operator = NEGATE[operator] unless taken
         cast = sign ? "(#{sign}#{self.class.bits})" : ''
-        __send__(COMPARE_OPS.fetch(op)[:render], cast, lhs, rhs, operator)
+        __send__(COMPARE_OPS.fetch(op)[:render], cast, lhs, rhs, operator, sign)
       end
 
       # Subtraction (+:sub+): a direct comparison of the two operands.
-      def render_sub(cast, lhs, rhs, op)
+      def render_sub(cast, lhs, rhs, op, _sign)
         rhs = ZERO if rhs == '0'
         "#{cast}#{lhs} #{op} #{rhs}"
       end
 
-      # Addition (+:add+): the flags reflect +lhs + rhs+, i.e. that sum compared against 0.
-      def render_add(cast, lhs, rhs, op)
-        "#{cast}(#{lhs} + #{rhs}) #{op} #{ZERO}"
+      # Addition (+:add+): the flags reflect +lhs + rhs+ compared against 0 -- but
+      # only for a signed or equality condition. An *unsigned* condition reads the
+      # carry out of the addition instead, which holds over a whole range of +lhs+,
+      # not just the one value making the sum zero: the carry is set exactly when
+      # +lhs + rhs+ wraps, i.e. when +lhs >= -rhs+. So the condition is +lhs+
+      # against +-rhs+, the form the subtractive compares already produce.
+      # @example glibc's "the syscall didn't return -errno" check, +cmn x0, 0x1000+
+      #   followed by a not-taken +b.hi+, is +(u64)x0 <= 0xfffffffffffff000+ --
+      #   satisfied by x0 == 0, which "(x0 + 0x1000) <= 0" would wrongly exclude.
+      def render_add(cast, lhs, rhs, op, sign)
+        return "#{cast}(#{lhs} + #{rhs}) #{op} #{ZERO}" unless sign == :u && negatable?(rhs)
+
+        "#{cast}#{lhs} #{op} #{OneGadget::Helper.hex((-Integer(rhs)) & mask)}"
       end
 
       # Bitwise AND (+:and+): a bitmask test; identical operands collapse to a plain zero test.
-      def render_and(_cast, lhs, rhs, op)
+      def render_and(_cast, lhs, rhs, op, _sign)
         lhs == rhs ? "#{lhs} #{op} #{ZERO}" : "(#{lhs} & #{rhs}) #{op} #{ZERO}"
+      end
+
+      # Whether +rhs+ can be moved to the other side of an unsigned add-compare.
+      # A zero addend never carries, so the condition doesn't reduce to a bound and
+      # the sum form is kept.
+      def negatable?(rhs)
+        OneGadget::Helper.integer?(rhs) && !Integer(rhs).zero?
+      end
+
+      # All-ones for this architecture's word size.
+      def mask
+        (1 << self.class.bits) - 1
       end
 
       # The address of an objdump line, used to tell whether the pending branch

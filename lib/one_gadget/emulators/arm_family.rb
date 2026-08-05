@@ -32,6 +32,36 @@ module OneGadget
 
       private
 
+      # A compare whose second operand may carry a shift modifier, e.g.
+      # +cmn x0, 0x1, lsl 12+ (the immediate is 0x1000, not 0x1). Fold a constant
+      # shift into the operand; abort on any modifier not modelled, since dropping
+      # it would silently understate the constraint.
+      # @return [Boolean] false aborts the candidate.
+      def handle_compare(op, cmd)
+        ops = operands(cmd)
+        return false if ops.size > 3
+
+        rhs = operand_str(ops[1])
+        if ops.size == 3
+          rhs = shifted_operand(rhs, ops[2])
+          return false if rhs.nil?
+        end
+        record_compare(op, operand_str(ops[0]), rhs)
+      end
+
+      # Apply a constant shift modifier to an already-rendered operand.
+      # @return [String, nil] nil when the shift isn't a constant amount applied to
+      #   a known integer, which the caller treats as unmodelled.
+      # @example
+      #   shifted_operand('0x1', 'lsl 12') #=> '0x1000'
+      def shifted_operand(rhs, modifier)
+        m = modifier.match(/\A(lsl|lsr|asr)\s+(\d+)\z/)
+        return nil unless m && OneGadget::Helper.integer?(rhs)
+
+        value = Integer(rhs)
+        OneGadget::Helper.hex(m[1] == 'lsl' ? value << Integer(m[2]) : value >> Integer(m[2]))
+      end
+
       # A +bl+/+blx+ call: record the terminal +exec*+ target, accept a known-safe
       # syscall wrapper, or +:fail+ to abort the candidate.
       def inst_bl(addr)
