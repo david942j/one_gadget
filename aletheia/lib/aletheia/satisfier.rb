@@ -185,6 +185,7 @@ module Aletheia
         elsif (parsed = deref_relation(disjunct)) then literal_cost(parsed[0])
         elsif reg_relation(disjunct) then 0.45 # pin both registers
         elsif reg_mem_relation(disjunct) then 0.5 # pin the register, store a matching value
+        elsif mem_mem_relation(disjunct) then 0.55 # match the value in memory on both sides
         else relational_cost(disjunct)
         end
       end
@@ -335,6 +336,8 @@ module Aletheia
           reg_relation_satisfied?(plan, *pair)
         elsif (trio = reg_mem_relation(branch))
           reg_mem_satisfied?(plan, *trio)
+        elsif (pair2 = mem_mem_relation(branch))
+          mem_mem_satisfied?(plan, *pair2)
         else
           reg, value = parse_relation(branch)
           current = reg && plan.regs[reg]
@@ -440,6 +443,7 @@ module Aletheia
         elsif (parsed = deref_relation(disjunct)) then apply_literal(plan, parsed[0], parsed[1], any_nonzero: parsed[2])
         elsif (pair = reg_relation(disjunct)) then apply_reg_relation(plan, *pair)
         elsif (trio = reg_mem_relation(disjunct)) then apply_reg_mem_relation(plan, *trio)
+        elsif (mm = mem_mem_relation(disjunct)) then apply_mem_mem_relation(plan, *mm)
         else apply_relation(plan, disjunct)
         end
       end
@@ -736,6 +740,42 @@ module Aletheia
       return nil unless (1..2).cover?(mem&.deref.to_i) && mem.reg
 
       [reg, op, mem]
+    end
+
+    # A comparison between two memory operands, e.g.
+    # +[sp+0x10] == [[$base+0x1c2438]+0x70]+: with neither side a register or a
+    # literal, the value has to be matched in memory on both sides.
+    # @return [(Aletheia::Operand, String, Aletheia::Operand), nil]
+    def mem_mem_relation(disjunct)
+      m = disjunct.match(/\A(?:\([su]\d+\))?(\S+) (==|!=) (?:\([su]\d+\))?(\S+)\z/) or return nil
+      lhs, op, rhs = m.captures
+      return nil if [lhs, rhs].any? { |s| s.match?(/\A#{IMM}\z/) }
+
+      a, b = [lhs, rhs].map { |s| safe_parse(s) }
+      return nil unless a&.reg && b&.reg && a.deref.positive? && b.deref.positive?
+
+      [a, op, b]
+    end
+
+    # Whether the two locations already read values meeting +op+.
+    def mem_mem_satisfied?(plan, lhs, op, rhs)
+      a = mem_value(plan, lhs)
+      b = mem_value(plan, rhs)
+      return false if a.nil? || b.nil?
+
+      values_equal?(a, b) == (op == '==')
+    end
+
+    # Store matching (or deliberately differing) values in the two locations.
+    # Whichever side already reads a known value drives the other, so a value an
+    # earlier constraint pinned is preserved rather than overwritten.
+    def apply_mem_mem_relation(plan, lhs, op, rhs)
+      a = mem_value(plan, lhs)
+      b = mem_value(plan, rhs)
+      return apply_literal(plan, rhs, counterpart(a, op)) if a.is_a?(Integer)
+      return apply_literal(plan, lhs, counterpart(b, op)) if b.is_a?(Integer)
+
+      apply_literal(plan, lhs, 0) && apply_literal(plan, rhs, op == '==' ? 0 : 1)
     end
 
     # The value tracked memory holds at run time, or +nil+ when unknown. An
