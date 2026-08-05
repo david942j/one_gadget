@@ -32,9 +32,22 @@ module OneGadget
         # source (arg 1) must be readable and the attr they write (arg 0) writable.
         'posix_spawnattr_setsigmask' => { 0 => :writable, 1 => :deref },
         'posix_spawnattr_setsigdefault' => { 0 => :writable, 1 => :deref },
-        # every other setup helper writes its attr / file-actions object (arg 0).
-        'posix_spawnattr_' => { 0 => :writable },
-        'posix_spawn_file_actions_' => { 0 => :writable }
+        # every other attr setup helper writes its attr object (arg 0).
+        'posix_spawnattr_' => { 0 => :writable }
+        # posix_spawn_file_actions_* helpers are deliberately absent, so a candidate
+        # that calls one is aborted (see {Processor#dispatch_safe_call}) rather than
+        # walked through. Accepting them would need a model out of reach today:
+        #   * the helper returns 0 only when its fd argument is a valid fd
+        #     (0 <= fd < INT_MAX), and the caller branches on that return -- a nonzero
+        #     result skips the following +posix_spawn+ -- so treating the call as
+        #     always succeeding emits a gadget whose reachability doesn't actually hold;
+        #   * appending the action grows +__actions+ via +realloc+, which can fail
+        #     (ENOMEM) or fault on a bogus object -- not guaranteeable from a symbolic
+        #     writable pointer;
+        #   * +posix_spawn_file_actions_t+ is a glibc-internal, version-dependent
+        #     layout, so modeling its fields soundly across libc versions is fragile;
+        #   * and a successful call injects a close/open/dup2 into the spawned child
+        #     whose harmlessness depends on the fd, which isn't expressible.
       }.freeze
     end
   end
