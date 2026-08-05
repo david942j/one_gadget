@@ -103,6 +103,10 @@ module OneGadget
       # which glibc loads in the function prologue -- outside the candidate window.
       # Before emulating a candidate, detect that register and replay its
       # +ldr rX, [pc]; add rX, pc+ setup so it resolves to +$base + got+.
+      #
+      # Reading +cmds+ as evidence of which registers hold the GOT base is only
+      # sound because it is an executed window (see {Base#executed_window}): a line
+      # past the terminal call would describe a path this one never takes.
       def emulate(cmds)
         emu = emulator
         @got_base_regs = seed_got_registers(emu, cmds)
