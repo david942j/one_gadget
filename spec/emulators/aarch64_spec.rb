@@ -36,6 +36,47 @@ describe OneGadget::Emulators::AArch64 do
       expect(branch_constraint('cmp x0, #0x400', 'b.lt', 0x2000, 0x1008)).to eq ['(s64)x0 >= 0x400'] # not taken
     end
 
+    # Feed a compare and a branch whose target is the following line, so it
+    # resolves as taken. Returns whether that resolving line was accepted --
+    # false once the accumulated conditions can no longer all hold.
+    # The resolving line must be an instruction this emulator models, else it
+    # would report false for that reason instead of the branch decision.
+    def taken_branch(addr, compare, branch)
+      @processor.process(format('%x: %s', addr, compare))
+      @processor.process(format('%x: %s %x <x>', addr + 4, branch, addr + 8))
+      @processor.process(format('%x: mov x9, x9', addr + 8))
+    end
+
+    it 'rejects a path whose branches cannot all hold' do
+      # Two branches on one compare, taken then not taken: the same test cannot
+      # give both answers, so the path can never execute.
+      expect(taken_branch(0x1000, 'cmp x2, #0x1', 'b.ne')).to be true # x2 != 0x1
+      @processor.process('2000: b.ne 3000 <x>')                       # same compare, not taken
+      expect(@processor.process('2004: mov x9, x9')).to be false      # so x2 == 0x1 too
+    end
+
+    it 'rejects two equalities that disagree' do
+      expect(taken_branch(0x1000, 'cmp x0, #0x1', 'b.eq')).to be true  # x0 == 0x1
+      expect(taken_branch(0x2000, 'cmp x0, #0x2', 'b.eq')).to be false # and x0 == 0x2
+    end
+
+    it 'rejects bounds that leave no value, and keeps ones that do' do
+      expect(taken_branch(0x1000, 'cmp x0, #0x10', 'b.cs')).to be true  # (u64)x0 >= 0x10
+      expect(taken_branch(0x2000, 'cmp x0, #0x20', 'b.ls')).to be true  # .. <= 0x20, still fine
+      expect(taken_branch(0x3000, 'cmp x0, #0x10', 'b.cc')).to be false # .. < 0x10, nothing left
+    end
+
+    it 'rejects an exclusive bound that meets its own limit' do
+      expect(taken_branch(0x1000, 'cmp x0, #0x20', 'b.hi')).to be true  # (u64)x0 > 0x20
+      expect(taken_branch(0x2000, 'cmp x0, #0x20', 'b.ls')).to be false # and (u64)x0 <= 0x20
+    end
+
+    it 'keeps a path whose comparisons are against something other than a number' do
+      # Nothing is known about how x1 and x2 relate, so neither branch is judged.
+      expect(taken_branch(0x1000, 'cmp x0, x1', 'b.eq')).to be true
+      expect(taken_branch(0x2000, 'cmp x0, x2', 'b.ne')).to be true
+    end
+
     it 'renders cmn as a bound, folding a shifted immediate' do
       # glibc's "the syscall didn't return -errno" check. An unsigned condition
       # after cmn reads the carry, so it bounds x0 rather than forcing x0+0x1000

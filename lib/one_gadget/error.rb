@@ -30,5 +30,10 @@ module OneGadget
     # Argument error of ruby methods.
     class ArgumentError < Error
     end
+
+    # Raises when the branches taken so far cannot all hold at once, i.e. the
+    # walked path can never execute.
+    class InfeasiblePathError < Error
+    end
   end
 end
