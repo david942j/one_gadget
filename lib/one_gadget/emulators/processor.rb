@@ -135,7 +135,9 @@ module OneGadget
       # dereference, see {#finalize_deferred_reads}). Both are keyed, offset-
       # normalised, and imply non-NULL identically; they differ only in how they
       # render (see {#render_constraint}). The remaining type, +:raw+, carries a
-      # ready-made constraint string that keys on itself.
+      # ready-made constraint string that keys on itself, and +:cmp+ a comparison
+      # recorded as its +[lhs, operator, rhs]+ parts (see {Conditional}), so it can
+      # be inspected rather than re-parsed from the rendered text.
       ADDRESS_TYPES = %i[writable readable].freeze
 
       # @return [Array<String>]
@@ -174,6 +176,7 @@ module OneGadget
         case type
         when :writable then "writable: #{obj}"
         when :readable then "readable: #{obj}"
+        when :cmp then obj.join(' ')
         else obj
         end
       end
@@ -192,7 +195,7 @@ module OneGadget
         return cons if nonzero_regs.empty?
 
         cons.reject do |type, obj|
-          type == :raw && (m = /\A(\S+) != 0x0\z/.match(obj)) && nonzero_regs.include?(m[1])
+          type == :cmp && obj[1] == '!=' && obj[2] == ZERO && nonzero_regs.include?(obj[0])
         end
       end
 

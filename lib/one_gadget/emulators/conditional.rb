@@ -158,7 +158,7 @@ module OneGadget
         op = @flags[:op]
         lhs = @flags[:lhs]
         rhs = @flags[:rhs]
-        @pending = { target:, render: ->(taken) { compare_constraint(op, lhs, rhs, rel, taken) } }
+        @pending = { target:, compare: ->(taken) { compare_triple(op, lhs, rhs, rel, taken) } }
         true
       end
 
@@ -176,7 +176,7 @@ module OneGadget
       def branch_on_zero(target, reg, negate:)
         hit = negate ? '!=' : '==' # taken (not negated) => reg == 0
         miss = negate ? '==' : '!='
-        @pending = { target:, render: ->(taken) { "#{reg} #{taken ? hit : miss} #{ZERO}" } }
+        @pending = { target:, compare: ->(taken) { [reg, taken ? hit : miss, ZERO] } }
         true
       end
 
@@ -193,7 +193,7 @@ module OneGadget
         mask = OneGadget::Helper.hex(1 << bit)
         hit = negate ? '!=' : '=='
         miss = negate ? '==' : '!='
-        @pending = { target:, render: ->(taken) { "(#{reg} & #{mask}) #{taken ? hit : miss} #{ZERO}" } }
+        @pending = { target:, compare: ->(taken) { ["(#{reg} & #{mask})", taken ? hit : miss, ZERO] } }
         true
       end
 
@@ -214,7 +214,7 @@ module OneGadget
         return if @pending.nil?
 
         taken = branch_addr(cmd) == @pending[:target]
-        @constraints << [:raw, @pending[:render].call(taken)]
+        @constraints << [:cmp, @pending[:compare].call(taken)]
         @pending = nil
       end
 
@@ -230,7 +230,7 @@ module OneGadget
       #   compare_constraint(:sub, 'x2', '0x1', ['!=', nil], false) #=> 'x2 == 0x1'
       # @example +jne+ (taken) after +test eax, eax+ -- an +:and+ compare
       #   compare_constraint(:and, 'eax', 'eax', ['!=', nil], true) #=> 'eax != 0'
-      def compare_constraint(op, lhs, rhs, rel, taken)
+      def compare_triple(op, lhs, rhs, rel, taken)
         operator, sign = rel
         operator = NEGATE[operator] unless taken
         cast = sign ? "(#{sign}#{self.class.bits})" : ''
@@ -240,7 +240,7 @@ module OneGadget
       # Subtraction (+:sub+): a direct comparison of the two operands.
       def render_sub(cast, lhs, rhs, op, _sign)
         rhs = ZERO if rhs == '0'
-        "#{cast}#{lhs} #{op} #{rhs}"
+        ["#{cast}#{lhs}", op, rhs]
       end
 
       # Addition (+:add+): the flags reflect +lhs + rhs+ compared against 0 -- but
@@ -253,14 +253,14 @@ module OneGadget
       #   followed by a not-taken +b.hi+, is +(u64)x0 <= 0xfffffffffffff000+ --
       #   satisfied by x0 == 0, which "(x0 + 0x1000) <= 0" would wrongly exclude.
       def render_add(cast, lhs, rhs, op, sign)
-        return "#{cast}(#{lhs} + #{rhs}) #{op} #{ZERO}" unless sign == :u && negatable?(rhs)
+        return ["#{cast}(#{lhs} + #{rhs})", op, ZERO] unless sign == :u && negatable?(rhs)
 
-        "#{cast}#{lhs} #{op} #{OneGadget::Helper.hex((-Integer(rhs)) & mask)}"
+        ["#{cast}#{lhs}", op, OneGadget::Helper.hex((-Integer(rhs)) & mask)]
       end
 
       # Bitwise AND (+:and+): a bitmask test; identical operands collapse to a plain zero test.
       def render_and(_cast, lhs, rhs, op, _sign)
-        lhs == rhs ? "#{lhs} #{op} #{ZERO}" : "(#{lhs} & #{rhs}) #{op} #{ZERO}"
+        [lhs == rhs ? lhs : "(#{lhs} & #{rhs})", op, ZERO]
       end
 
       # Whether +rhs+ can be moved to the other side of an unsigned add-compare.
