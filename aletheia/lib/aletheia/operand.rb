@@ -38,6 +38,9 @@ module Aletheia
         cast = m[2].to_i
         s = s[m[0].length..].strip
       end
+      # A parenthesised sum, e.g. the `(x0 + 0x1)` of `(u64)(x0 + 0x1) <= 0x0`:
+      # the parentheses only group, they don't dereference.
+      s = s[1..-2].strip while s.start_with?('(') && s.end_with?(')')
       deref = 0
       while s.start_with?('[') && s.end_with?(']')
         deref += 1

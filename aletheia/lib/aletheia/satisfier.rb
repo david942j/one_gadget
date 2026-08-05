@@ -442,7 +442,8 @@ module Aletheia
         target = deep_target_off(plan, op, allocate: true)
         return target ? set_mem(plan, target, literal) : false
       end
-      return false unless op.inner_imm.zero? # a displaced pointer value, not memory contents
+      # The displacement adds to the value read, so store the literal less it.
+      literal = (literal - op.inner_imm) & MASK64 if literal.is_a?(Integer)
       return set_base_mem(plan, op.imm, literal) if base_reg?(op)
 
       addr_off = mem_addr_off(plan, op)
@@ -572,6 +573,11 @@ module Aletheia
 
         op = safe_parse(e) or next
         next if op.deref.positive? || op.reg.nil? || stack_reg?(op.reg) || global?(op.reg)
+        # An element off the GOT base (i386 PIC) is a fixed libc address -- the
+        # real "sh"/"-c" string the gadget passes -- so it is already a valid
+        # element; re-pointing that register at scratch would only conflict with
+        # the GOT constraint that pinned it.
+        next if base_relative?(plan.regs[op.reg])
 
         # For `sh -c … <cmd>`, the first operand register after -c is the shell
         # command (`--`, a libc constant, just ends option parsing) -- point it at
@@ -619,11 +625,14 @@ module Aletheia
 
         return [xreg(reg), op == '==' ? 0 : mask] # (reg & mask)==0 -> 0; !=0 -> mask
       end
-      if (m = disjunct.match(/\A(?:\([su]\d+\))?(\w+) (==|!=|<=|>=|<|>) (#{IMM})\z/))
-        reg, op, imm = m[1], m[2], Integer(m[3])
-        return [nil, nil] unless settable?(reg)
-
-        return [xreg(reg), relation_witness(op, imm)]
+      if (m = disjunct.match(/\A(?:\([su]\d+\))?(.+?) (==|!=|<=|>=|<|>) (#{IMM})\z/))
+        # The left side may carry a displacement, e.g. `(x0 + 0x1) != 0x0`; the
+        # register then holds the witness less that displacement.
+        op = safe_parse(m[1])
+        if op&.deref&.zero? && op.reg && op.inner_imm.zero? && settable?(op.reg)
+          witness = relation_witness(m[2], Integer(m[3]))
+          return [xreg(op.reg), (witness - op.imm) & MASK64] if witness
+        end
       end
       [nil, nil]
     end
@@ -706,9 +715,17 @@ module Aletheia
         target = deep_target_off(plan, op)
         return target && (plan.mem[target] || (zeroed_scratch?(target) ? 0 : nil))
       end
-      return nil unless op.inner_imm.zero? # a displaced pointer value, not memory contents
-      return plan.base_mem[op.imm] if base_reg?(op)
+      raw = base_reg?(op) ? plan.base_mem[op.imm] : single_deref_value(plan, op)
+      # At one dereference the displacement adds to the value read (`[sp+0xc8]+0x1`),
+      # where at two it addresses the field (handled above).
+      return raw if op.inner_imm.zero? || !raw.is_a?(Integer)
 
+      (raw + op.inner_imm) & MASK64
+    end
+
+    # The value a single-dereference operand reads out of scratch, or +nil+ when
+    # its address isn't resolvable yet.
+    def single_deref_value(plan, op)
       addr_off = mem_addr_off(plan, op)
       return nil unless addr_off
 
