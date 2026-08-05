@@ -251,6 +251,7 @@ module Aletheia
     # @return [Float, nil]
     def writable_cost(op)
       return 0.05 if op.deref.zero? && op.reg && stack_reg?(op.reg) # already in scratch via sp
+      return 0.25 if op.deref == 1 && op.reg # store the pointer it must go through
 
       op.deref.zero? && op.reg ? 0.2 : nil
     end
@@ -311,7 +312,9 @@ module Aletheia
         compound_writable_satisfied?(plan, Regexp.last_match(1))
       when /\Awritable: (.+)\z/
         op = Operand_.parse(Regexp.last_match(1))
-        op.deref.zero? && op.reg && (stack_reg?(op.reg) || scratch?(plan, op.reg))
+        if op.deref == 1 && op.reg then pointer_resolved?(plan, op)
+        else op.deref.zero? && op.reg && (stack_reg?(op.reg) || scratch?(plan, op.reg))
+        end
       when /\Areadable: (.+)\z/
         (op = safe_parse(Regexp.last_match(1))) && pointer_resolved?(plan, op)
       when /is a valid (?:argv|envp)\z/
@@ -547,7 +550,16 @@ module Aletheia
       set_reg(plan, reg, { 'scratch_off' => STRING_POOL }) # a 16-aligned readable slot
     end
 
+    # +writable: [X]+ (a bare dereference, no trailing displacement -- the compound
+    # +writable: [X]+imm+ form is {WRITABLE_COMPOUND}) requires the pointer *stored*
+    # at X to reference writable memory, so point that slot at scratch, exactly as
+    # a pointer-form argv/envp constraint does.
     def apply_writable(plan, op)
+      if op.deref == 1 && op.reg
+        addr_off = level1_addr_off(plan, op, allocate: true) or return false
+
+        return set_mem(plan, addr_off, scratch_slot(plan, 0))
+      end
       return false unless op.deref.zero? && op.reg
       return true if stack_reg?(op.reg)
 
