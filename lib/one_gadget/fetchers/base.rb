@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'one_gadget/emulators/processor'
 require 'one_gadget/error'
 require 'one_gadget/fetchers/objdump'
 
@@ -68,7 +69,7 @@ module OneGadget
         candidates.each do |cand|
           lines = cand.lines
           (lines.size - 2).downto(0) do |i|
-            suffix = lines[i..]
+            suffix = executed_window(lines[i..])
             next if seen.key?(key = suffix.join)
 
             seen[key] = true
@@ -77,6 +78,31 @@ module OneGadget
           end
         end
         gadgets
+      end
+
+      # The part of +lines+ that runs: emulation ends at the terminal call, so
+      # anything past it never executes. A suffix reaches beyond one when the
+      # function holds several terminal calls and the candidate was walked back
+      # from a later one. Bounding it here lets everything downstream -- {#emulate}
+      # and its overrides, the dedup key above -- read a window as executed code.
+      # @param [Array<String>] lines A candidate suffix.
+      # @return [Array<String>]
+      def executed_window(lines)
+        stop = lines.index { |line| terminal_call_line?(line) }
+        stop ? lines[..stop] : lines
+      end
+
+      # Whether +line+ is the call that ends a gadget, by the same rule the emulator
+      # stops on ({OneGadget::Emulators::Processor#terminal_call?}). Not
+      # {#terminal_call_regexp}, which is looser so it can locate call sites: it
+      # also matches the +posix_spawn+ setup helpers, which emulation runs through.
+      # The mnemonic must be a call, so a branch whose target symbol merely looks
+      # similar (+<execlp@@GLIBC_2.4+0x136>+) doesn't end the window.
+      def terminal_call_line?(line)
+        return false unless line[/\A\s*[0-9a-f]+:\s*(\S+)/, 1]&.match?(/\A#{call_str}x?(?:\.[wn])?\z/)
+
+        name = line[/<([^@>]+)/, 1]
+        !name.nil? && OneGadget::Emulators::Processor::TERMINAL_CALL_RE.match?(name)
       end
 
       # Emulate a candidate suffix and turn it into a gadget, or +nil+ if it isn't one.
@@ -430,6 +456,12 @@ module OneGadget
       def call_str; raise NotImplementedError
       end
 
+      # Run a window through a fresh emulator, stopping at the first line it can't
+      # process (an unsupported instruction, or the terminal call that ends the
+      # gadget). +cmds+ is an executed window (see {#executed_window}): every line
+      # in it runs, so an override may read it as evidence of what the path does.
+      # @param [Array<String>] cmds
+      # @return [OneGadget::Emulators::Processor]
       def emulate(cmds)
         cmds.each_with_object(emulator) { |cmd, obj| break obj unless obj.process(cmd) }
       end
