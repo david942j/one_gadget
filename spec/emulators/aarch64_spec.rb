@@ -36,6 +36,25 @@ describe OneGadget::Emulators::AArch64 do
       expect(branch_constraint('cmp x0, #0x400', 'b.lt', 0x2000, 0x1008)).to eq ['(s64)x0 >= 0x400'] # not taken
     end
 
+    it 'renders cmn as a bound, folding a shifted immediate' do
+      # glibc's "the syscall didn't return -errno" check. An unsigned condition
+      # after cmn reads the carry, so it bounds x0 rather than forcing x0+0x1000
+      # to be zero -- x0 == 0 satisfies it. Same form amd64 emits for this check.
+      expect(branch_constraint('cmn x0, #0x1, lsl #12', 'b.hi', 0x2000, 0x1008))
+        .to eq ['(u64)x0 <= 0xfffffffffffff000'] # not taken
+      @processor = described_class.new
+      expect(branch_constraint('cmn x0, #0x1, lsl #12', 'b.hi', 0x2000, 0x2000))
+        .to eq ['(u64)x0 > 0xfffffffffffff000'] # taken
+      # An equality condition does read the sum, so it keeps the additive form.
+      @processor = described_class.new
+      expect(branch_constraint('cmn x0, #0x1', 'b.eq', 0x2000, 0x2000)).to eq ['(x0 + 0x1) == 0x0']
+    end
+
+    it 'aborts on a compare modifier it cannot model' do
+      # Silently dropping the modifier would understate the constraint.
+      expect(@processor.process('1000: cmn x0, x1, lsl x2')).to be false
+    end
+
     it 'renders cbz / cbnz' do
       expect(branch_constraint(nil, 'cbz x0,', 0x2000, 0x1008)).to eq ['x0 != 0x0'] # not taken
       @processor = described_class.new
