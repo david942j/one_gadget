@@ -214,8 +214,52 @@ module OneGadget
         return if @pending.nil?
 
         taken = branch_addr(cmd) == @pending[:target]
-        @constraints << [:cmp, @pending[:compare].call(taken)]
+        triple = @pending[:compare].call(taken)
         @pending = nil
+        @constraints << [:cmp, triple]
+        return if satisfiable?(comparisons_on(triple.first))
+
+        raise Error::InfeasiblePathError, "cannot hold together: #{triple.first}"
+      end
+
+      # Every comparison recorded so far on +expr+, the left side as rendered.
+      # Matching on that text is what makes this sound: the renderer substitutes
+      # each register's current value, so two constraints printing the same left
+      # side really are about the same tracked value (and a differing signedness
+      # cast is part of that text, keeping incomparable ones apart).
+      def comparisons_on(expr)
+        @constraints.filter_map { |type, obj| obj if type == :cmp && obj.first == expr }
+      end
+
+      # Whether some value satisfies every comparison in +triples+ at once, by
+      # intersecting the range each one allows. Comparisons against anything but
+      # an integer are ignored rather than guessed at, so an undecidable one never
+      # makes a path look impossible.
+      # @param [Array<(String, String, String)>] triples Comparisons on one expression.
+      # @return [Boolean]
+      # @example  x != 0x0  together with  x == 0x0  #=> false
+      def satisfiable?(triples)
+        low = nil
+        high = nil
+        excluded = []
+        triples.each do |_expr, op, rhs|
+          next unless OneGadget::Helper.integer?(rhs)
+
+          value = Integer(rhs)
+          case op
+          when '=='
+            low = [low, value].compact.max
+            high = [high, value].compact.min
+          when '!=' then excluded << value
+          when '<' then high = [high, value - 1].compact.min
+          when '<=' then high = [high, value].compact.min
+          when '>' then low = [low, value + 1].compact.max
+          when '>=' then low = [low, value].compact.max
+          end
+        end
+        return false if low && high && (low > high || (low == high && excluded.include?(low)))
+
+        true
       end
 
       private

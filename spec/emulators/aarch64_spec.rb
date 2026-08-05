@@ -36,6 +36,14 @@ describe OneGadget::Emulators::AArch64 do
       expect(branch_constraint('cmp x0, #0x400', 'b.lt', 0x2000, 0x1008)).to eq ['(s64)x0 >= 0x400'] # not taken
     end
 
+    it 'rejects a path whose branches cannot all hold' do
+      # Two branches on one compare, taken then not taken: the same test cannot
+      # give both answers, so the path can never execute.
+      expect(branch_constraint('cmp x2, #1', 'b.ne', 0x2000, 0x2000)).to eq ['x2 != 0x1']
+      @processor.process('2000: b.ne 3000 <x>')
+      expect(@processor.process('2004: nop')).to be false
+    end
+
     it 'renders cmn as a bound, folding a shifted immediate' do
       # glibc's "the syscall didn't return -errno" check. An unsigned condition
       # after cmn reads the carry, so it bounds x0 rather than forcing x0+0x1000
