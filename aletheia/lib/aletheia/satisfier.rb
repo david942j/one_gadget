@@ -183,6 +183,7 @@ module Aletheia
         if (op = deref_zero(disjunct)) then null_cost(op)
         elsif (parsed = deref_relation(disjunct)) then literal_cost(parsed[0])
         elsif reg_relation(disjunct) then 0.45 # pin both registers
+        elsif reg_mem_relation(disjunct) then 0.5 # pin the register, store a matching value
         else relational_cost(disjunct)
         end
       end
@@ -322,6 +323,8 @@ module Aletheia
           literal_satisfied?(plan, *parsed)
         elsif (pair = reg_relation(branch))
           reg_relation_satisfied?(plan, *pair)
+        elsif (trio = reg_mem_relation(branch))
+          reg_mem_satisfied?(plan, *trio)
         else
           reg, value = parse_relation(branch)
           current = reg && plan.regs[reg]
@@ -407,6 +410,7 @@ module Aletheia
         if (op = deref_zero(disjunct)) then apply_deref_null(plan, op)
         elsif (parsed = deref_relation(disjunct)) then apply_literal(plan, *parsed)
         elsif (pair = reg_relation(disjunct)) then apply_reg_relation(plan, *pair)
+        elsif (trio = reg_mem_relation(disjunct)) then apply_reg_mem_relation(plan, *trio)
         else apply_relation(plan, disjunct)
         end
       end
@@ -643,6 +647,67 @@ module Aletheia
       return 0 if val.is_a?(Hash) # a scratch pointer is a large nonzero address
 
       (val + 1) & MASK64
+    end
+
+    # A comparison between a register and a value read from memory, e.g.
+    # +x3 == [x1+0x8]+ or +r13d == [r14+0x70]+: neither {#parse_relation}
+    # (register against an immediate) nor {#deref_relation} (memory against an
+    # immediate) covers it, since neither side is a literal. Returns the register
+    # operand, the operator, and the memory operand, in whichever order they were
+    # written.
+    # @return [(Aletheia::Operand, String, Aletheia::Operand), nil]
+    def reg_mem_relation(disjunct)
+      m = disjunct.match(/\A(?:\([su]\d+\))?(\S+) (==|!=) (?:\([su]\d+\))?(\S+)\z/) or return nil
+      lhs, op, rhs = m.captures
+      return nil if [lhs, rhs].any? { |s| s.match?(/\A#{IMM}\z/) }
+
+      a, b = [lhs, rhs].map { |s| safe_parse(s) }
+      reg, mem = a&.deref&.zero? ? [a, b] : [b, a]
+      return nil unless reg&.deref&.zero? && reg.reg && reg.imm.zero? && settable?(reg.reg)
+      return nil unless mem&.deref == 1 && mem.reg
+
+      [reg, op, mem]
+    end
+
+    # The value tracked memory holds at run time, or +nil+ when unknown. An
+    # address inside our scratch reads zero unless the plan writes it; a libc
+    # global keeps whatever libc left there, so it counts as known only once the
+    # plan has written it.
+    def mem_value(plan, op)
+      return plan.base_mem[op.imm] if base_reg?(op)
+
+      addr_off = mem_addr_off(plan, op)
+      return nil unless addr_off
+
+      plan.mem[addr_off] || (zeroed_scratch?(addr_off) ? 0 : nil)
+    end
+
+    # Whether the register and the memory value already meet +op+.
+    def reg_mem_satisfied?(plan, reg, op, mem)
+      current = plan.regs[xreg(reg.reg)]
+      value = mem_value(plan, mem)
+      return false if current.nil? || value.nil? || current.is_a?(Hash) || value.is_a?(Hash)
+
+      (current == value) == (op == '==')
+    end
+
+    # Match the register and the memory it is compared against. Whichever side is
+    # already settled drives the other: when the memory's contents are known (a
+    # zero-filled scratch slot, or a value an earlier constraint stored) the
+    # register is pinned to match it, rather than overwriting memory that another
+    # constraint depends on -- e.g. +[$base+off] != 0+ pins the global first, and
+    # +x3 == [$base+off]+ must then take its value, not reset it. A register
+    # already pinned to a scratch pointer is left alone: its run-time address
+    # isn't known here, so no stored literal can be shown to equal it.
+    def apply_reg_mem_relation(plan, reg, op, mem)
+      current = plan.regs[xreg(reg.reg)]
+      return false if current.is_a?(Hash)
+
+      known = mem_value(plan, mem)
+      return set_reg(plan, xreg(reg.reg), counterpart(known, op)) if known && !known.is_a?(Hash)
+
+      value = current || 0
+      set_reg(plan, xreg(reg.reg), value) && apply_literal(plan, mem, counterpart(value, op))
     end
 
     # Whether two plan values denote the same runtime value: two scratch pointers
