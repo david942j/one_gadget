@@ -93,6 +93,7 @@ module Aletheia
       # unmapped-page write in reality, not a merely-untracked one.
       ordered = order_constraints(gadget.constraints)
       @null_unsafe_bases = ordered.grep(WRITABLE_COMPOUND) { Regexp.last_match(1) }
+      @nonzero_witnesses = []
       ordered.each_with_index do |constraint, i|
         chosen = satisfy_constraint(plan, constraint)
         return skip(plan, "unsupported-or-unsat: #{constraint}") unless chosen
@@ -355,6 +356,18 @@ module Aletheia
       value.is_a?(Hash) && value.key?('scratch_off')
     end
 
+    # Locations written only to satisfy a "must be nonzero" constraint, which a
+    # later constraint may promote to a scratch pointer (see {#apply_literal}).
+    def nonzero_witnesses
+      @nonzero_witnesses ||= []
+    end
+
+    # Identifies the memory a single-dereference operand names, across the two
+    # address spaces the plan writes: scratch and the libc globals.
+    def witness_key(op)
+      base_reg?(op) ? [:base, op.imm] : [:mem, op.reg, op.imm]
+    end
+
     # Whether a +== NULL+ / +<= 0+ operand already reads zero under the current
     # plan: a bare register pinned to 0, or a single deref off a scratch-pointing
     # register whose target lands in the zero-filled region. This lets one register
@@ -435,9 +448,16 @@ module Aletheia
     # there. Unlike a zero target, there's no already-correct region to point
     # at, so this always needs a real write.
     def apply_literal(plan, op, literal, any_nonzero: false)
-      # "Nonzero" is satisfied by a scratch pointer, which -- unlike a bare 1 --
-      # another constraint can still dereference (see {#deref_relation}).
-      literal = scratch_slot(plan, 0) if any_nonzero
+      # "Nonzero" is satisfied by the smallest value that works. A scratch pointer
+      # would also do and stays dereferenceable, but it writes a full word where
+      # the code may read a narrower field, clobbering the neighbouring one --
+      # observed turning working gadgets into faults. So store 1 and record the
+      # location, letting {#deep_target_off} promote it to a pointer only if some
+      # constraint actually dereferences it (a pointer is nonzero either way).
+      if any_nonzero
+        literal = 1
+        nonzero_witnesses << witness_key(op)
+      end
       if op.deref >= 2
         target = deep_target_off(plan, op, allocate: true)
         return target ? set_mem(plan, target, literal) : false
@@ -753,12 +773,15 @@ module Aletheia
       return nil unless via_base || slot_off
 
       current = via_base ? plan.base_mem[op.imm] : plan.mem[slot_off]
-      return current['scratch_off'] + op.inner_imm if current.is_a?(Hash) && current.key?('scratch_off')
-      return nil unless allocate && current.nil?
+      return current['scratch_off'] + op.inner_imm if pointer_value?(current)
+      # A location pinned only as "nonzero" may be promoted to a pointer, which is
+      # nonzero too, so the constraint that pinned it still holds.
+      return nil unless allocate && (current.nil? || nonzero_witnesses.include?(witness_key(op)))
 
       target = scratch_slot(plan, 0)['scratch_off']
       pointer = { 'scratch_off' => target }
-      stored = via_base ? set_base_mem(plan, op.imm, pointer) : set_mem(plan, slot_off, pointer)
+      if via_base then plan.base_mem[op.imm] = pointer else plan.mem[slot_off] = pointer end
+      stored = true
       stored ? target + op.inner_imm : nil
     end
 
