@@ -50,6 +50,18 @@ module OneGadget
       # a subtraction.
       COMPARES = { 'cmp' => :sub, 'test' => :and }.freeze
 
+      # A segment-prefixed operand reads thread-local storage, which isn't modelled
+      # (nor is its counterpart on the other arches -- aarch64's +mrs tpidr_el0+
+      # and arm's +mrc p15+ are unsupported instructions, so those paths already
+      # abort). Every gadget observed behind one tests +errno == ENOEXEC+ on
+      # glibc's +execvpe+ path -- a value the caller would have to have arranged
+      # beforehand, since the gadget is entered after the +execve+ that would set
+      # it -- so modelling this only produces gadgets that all but never apply.
+      # Worth revisiting if a libc is found reaching a terminal call under a
+      # condition that commonly holds, e.g. +errno != <some error>+.
+      # @example +cmp DWORD PTR fs:[r14], 0x8+ -- errno == ENOEXEC
+      SEGMENT_OPERAND = /\b(?:fs|gs|ds|es|ss|cs):/
+
       # Supported instruction set.
       # @return [Array<Instruction>] The supported instructions.
       def instructions
@@ -79,6 +91,8 @@ module OneGadget
       # Operands of +cmd+ (mnemonic dropped), size hints removed, each stripped of
       # a trailing +<symbol>+.
       def operands(cmd)
+        raise Error::UnsupportedInstructionArgumentError, cmd if SEGMENT_OPERAND.match?(cmd)
+
         cmd.sub(/\A[0-9a-f]+:\s*\S+\s*/, '').split(',').map do |o|
           o.gsub(/\b(XMMWORD|QWORD|DWORD|WORD|BYTE|PTR)\b/, '').strip.sub(/\s*<.*>\z/, '')
         end
