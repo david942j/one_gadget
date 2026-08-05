@@ -181,7 +181,7 @@ module Aletheia
       when GOT                                  then got_cost(disjunct)
       else
         if (op = deref_zero(disjunct)) then null_cost(op)
-        elsif (parsed = deref_literal(disjunct)) then literal_cost(parsed[0])
+        elsif (parsed = deref_relation(disjunct)) then literal_cost(parsed[0])
         else relational_cost(disjunct)
         end
       end
@@ -196,21 +196,23 @@ module Aletheia
       op if op&.reg && op.deref.positive?
     end
 
-    # A dereferenced value required to equal an arbitrary (possibly nonzero)
-    # literal, e.g. +[rbp-0x50] == 0x1+ -- a value read from tracked memory that a
-    # later comparison in the *same* candidate requires to hold a specific
-    # constant, not just "readable" or "zero" ({#deref_zero} handles the zero
-    # case first, so only a genuinely nonzero target reaches here). Only a single
-    # dereference is modeled -- a chained +[[X]] == <imm>+ would need the same
-    # deep-pointer machinery as {#apply_deep_null}, not yet needed by any known
-    # gadget.
+    # A dereferenced value compared against a literal, e.g. +[rbp-0x50] == 0x1+ or
+    # +[$base+0x1c2430] != 0x0+ -- a value read from tracked memory that a later
+    # comparison in the *same* candidate constrains. Returns the operand together
+    # with the value to store so the comparison holds (see {#relation_witness}),
+    # which the register-side relation machinery can't express: {#parse_relation}
+    # matches a bare register name, never a memory operand. The zero-equality case
+    # is claimed by {#deref_zero} first. Only a single dereference is modeled -- a
+    # chained +[[X]+imm]+ would need the same deep-pointer machinery as
+    # {#apply_deep_null}.
     # @return [(Aletheia::Operand, Integer), nil]
-    def deref_literal(disjunct)
-      m = disjunct.match(/\A(.+?) == (#{IMM})\z/) or return nil
+    def deref_relation(disjunct)
+      m = disjunct.match(/\A(?:\([su]\d+\))?(.+?) (==|!=|<=|>=|<|>) (#{IMM})\z/) or return nil
       op = safe_parse(m[1])
       return nil unless op&.reg && op.deref == 1
 
-      [op, Integer(m[2])]
+      witness = relation_witness(m[2], Integer(m[3]))
+      witness && [op, witness & MASK64]
     end
 
     # +<reg> is the GOT address of libc+: settable when we know the PLTGOT offset
@@ -283,6 +285,7 @@ module Aletheia
     # @return [Float, nil]
     def literal_cost(op)
       return 0.15 if stack_reg?(op.reg)
+      return 0.2 if base_reg?(op) # a libc global the driver writes directly
 
       op.reg && settable?(op.reg) ? 0.3 : nil
     end
@@ -314,7 +317,7 @@ module Aletheia
       else
         if (op = deref_zero(branch))
           deref_reads_zero?(plan, op)
-        elsif (parsed = deref_literal(branch))
+        elsif (parsed = deref_relation(branch))
           literal_satisfied?(plan, *parsed)
         else
           reg, value = parse_relation(branch)
@@ -326,8 +329,11 @@ module Aletheia
       end
     end
 
-    # Whether a +[X] == <imm>+ operand's tracked memory already reads +literal+.
+    # Whether a memory-relation operand's tracked memory already holds +literal+
+    # (see {#deref_relation}).
     def literal_satisfied?(plan, op, literal)
+      return plan.base_mem[op.imm] == literal if base_reg?(op)
+
       addr_off = mem_addr_off(plan, op)
       addr_off && plan.mem[addr_off] == literal
     end
@@ -384,7 +390,7 @@ module Aletheia
         op = safe_parse(Regexp.last_match(1))
         if op.nil? then false
         elsif op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
-        elsif op.deref == 1 && base_reg?(op) then (plan.base_mem[op.imm] = 0) && true # zero the libc global
+        elsif op.deref == 1 && base_reg?(op) then set_base_mem(plan, op.imm, 0) # zero the libc global
         elsif op.deref == 1 && stack_reg?(op.reg) then true # sp-relative slot is already zeroed scratch
         elsif op.deref == 1 && op.reg then set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm })
         elsif op.deref >= 2 then apply_deep_null(plan, op)
@@ -396,7 +402,7 @@ module Aletheia
       when GOT                                     then apply_got(plan, disjunct)
       else
         if (op = deref_zero(disjunct)) then apply_deref_null(plan, op)
-        elsif (parsed = deref_literal(disjunct)) then apply_literal(plan, *parsed)
+        elsif (parsed = deref_relation(disjunct)) then apply_literal(plan, *parsed)
         else apply_relation(plan, disjunct)
         end
       end
@@ -408,6 +414,8 @@ module Aletheia
     # there. Unlike a zero target, there's no already-correct region to point
     # at, so this always needs a real write.
     def apply_literal(plan, op, literal)
+      return set_base_mem(plan, op.imm, literal) if base_reg?(op)
+
       addr_off = mem_addr_off(plan, op)
       if addr_off.nil?
         return false unless op.reg && settable?(op.reg)
@@ -424,6 +432,7 @@ module Aletheia
     # (an sp-relative slot is already zero); cf. the +== NULL+ deref handling.
     def apply_deref_null(plan, op)
       return true if op.deref == 1 && stack_reg?(op.reg)
+      return set_base_mem(plan, op.imm, 0) if op.deref == 1 && base_reg?(op) # zero the libc global
       return apply_deep_null(plan, op) if op.deref >= 2
 
       op.reg ? set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm }) : false
@@ -656,6 +665,16 @@ module Aletheia
       return false if existing && existing != value
 
       plan.mem[off] = value
+      true
+    end
+
+    # As {#set_mem}, but for a libc global (+plan.base_mem+), which the driver
+    # writes at +base + off+ once the runtime load base is known.
+    def set_base_mem(plan, off, value)
+      existing = plan.base_mem[off]
+      return false if existing && existing != value
+
+      plan.base_mem[off] = value
       true
     end
 
