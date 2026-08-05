@@ -81,13 +81,10 @@ module OneGadget
       end
 
       # The part of +lines+ that runs: emulation ends at the terminal call, so
-      # anything past it belongs to some later path and never executes. A suffix
-      # can contain one when a function holds several terminal calls and the
-      # candidate was walked back from a later one.
-      #
-      # Bounding it here, rather than leaving each reader to notice, is what lets
-      # anything given a window -- {#emulate} and its overrides, the dedup key
-      # above -- treat every line in it as executed.
+      # anything past it never executes. A suffix reaches beyond one when the
+      # function holds several terminal calls and the candidate was walked back
+      # from a later one. Bounding it here lets everything downstream -- {#emulate}
+      # and its overrides, the dedup key above -- read a window as executed code.
       # @param [Array<String>] lines A candidate suffix.
       # @return [Array<String>]
       def executed_window(lines)
@@ -95,12 +92,12 @@ module OneGadget
         stop ? lines[..stop] : lines
       end
 
-      # Whether +line+ is the call that ends a gadget, matching where the emulator
-      # actually stops ({OneGadget::Emulators::Processor#terminal_call?}) rather
-      # than the looser scan {#terminal_call_regexp} uses to find call sites: that
-      # one also matches the +posix_spawn+ setup helpers, which emulation runs
-      # through. Requiring a real call keeps a branch whose target symbol merely
-      # looks similar (+<execlp@@GLIBC_2.4+0x136>+) from ending the window.
+      # Whether +line+ is the call that ends a gadget, by the same rule the emulator
+      # stops on ({OneGadget::Emulators::Processor#terminal_call?}). Not
+      # {#terminal_call_regexp}, which is looser so it can locate call sites: it
+      # also matches the +posix_spawn+ setup helpers, which emulation runs through.
+      # The mnemonic must be a call, so a branch whose target symbol merely looks
+      # similar (+<execlp@@GLIBC_2.4+0x136>+) doesn't end the window.
       def terminal_call_line?(line)
         return false unless line[/\A\s*[0-9a-f]+:\s*(\S+)/, 1]&.match?(/\A#{call_str}x?(?:\.[wn])?\z/)
 
