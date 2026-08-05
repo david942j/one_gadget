@@ -182,6 +182,7 @@ module Aletheia
       else
         if (op = deref_zero(disjunct)) then null_cost(op)
         elsif (parsed = deref_relation(disjunct)) then literal_cost(parsed[0])
+        elsif reg_relation(disjunct) then 0.45 # pin both registers
         else relational_cost(disjunct)
         end
       end
@@ -319,6 +320,8 @@ module Aletheia
           deref_reads_zero?(plan, op)
         elsif (parsed = deref_relation(branch))
           literal_satisfied?(plan, *parsed)
+        elsif (pair = reg_relation(branch))
+          reg_relation_satisfied?(plan, *pair)
         else
           reg, value = parse_relation(branch)
           current = reg && plan.regs[reg]
@@ -403,6 +406,7 @@ module Aletheia
       else
         if (op = deref_zero(disjunct)) then apply_deref_null(plan, op)
         elsif (parsed = deref_relation(disjunct)) then apply_literal(plan, *parsed)
+        elsif (pair = reg_relation(disjunct)) then apply_reg_relation(plan, *pair)
         else apply_relation(plan, disjunct)
         end
       end
@@ -592,12 +596,78 @@ module Aletheia
       [nil, nil]
     end
 
+    # A comparison between two registers, e.g. +x3 == x0+ or +r3 != r1+: neither
+    # side is a literal, so {#parse_relation} (a register against an immediate)
+    # can't express it. Only equality is modeled -- an ordering between two
+    # uncontrolled registers hasn't been needed, and picking witnesses for it
+    # would constrain both sides more than the branch actually requires.
+    # @return [(String, String, String), nil] normalised lhs, operator, rhs.
+    def reg_relation(disjunct)
+      m = disjunct.match(/\A(?:\([su]\d+\))?(\w+) (==|!=) (?:\([su]\d+\))?(\w+)\z/) or return nil
+      lhs, op, rhs = m.captures
+      # \w+ also matches a hex literal, which is {#parse_relation}'s business.
+      return nil if [lhs, rhs].any? { |r| r.match?(/\A#{IMM}\z/) }
+      return nil unless settable?(lhs) && settable?(rhs)
+
+      [xreg(lhs), op, xreg(rhs)]
+    end
+
+    # Whether both registers already hold values meeting +op+.
+    def reg_relation_satisfied?(plan, lhs, op, rhs)
+      return op == '==' if lhs == rhs # the same register, after normalisation
+
+      a, b = plan.regs.values_at(lhs, rhs)
+      return false if a.nil? || b.nil?
+
+      values_equal?(a, b) == (op == '==')
+    end
+
+    # Pin whichever side isn't pinned yet so +op+ holds. A register already set by
+    # an earlier constraint is never overwritten -- the other side is matched to
+    # it, and a genuine conflict falls through to {#set_reg}'s refusal.
+    def apply_reg_relation(plan, lhs, op, rhs)
+      return op == '==' if lhs == rhs
+
+      a, b = plan.regs.values_at(lhs, rhs)
+      return reg_relation_satisfied?(plan, lhs, op, rhs) unless a.nil? || b.nil?
+      return set_reg(plan, lhs, counterpart(b, op)) if a.nil? && !b.nil?
+      return set_reg(plan, rhs, counterpart(a, op)) if b.nil? && !a.nil?
+
+      set_reg(plan, lhs, 0) && set_reg(plan, rhs, op == '==' ? 0 : 1)
+    end
+
+    # A value for the unpinned side of a register equality, given the pinned
+    # side's value +val+ (an integer, or a scratch-pointer Hash).
+    def counterpart(val, op)
+      return val if op == '=='
+      return 0 if val.is_a?(Hash) # a scratch pointer is a large nonzero address
+
+      (val + 1) & MASK64
+    end
+
+    # Whether two plan values denote the same runtime value: two scratch pointers
+    # at the same offset, or two equal integers. A scratch pointer and an integer
+    # are never treated as equal -- the pointer's address isn't known until the
+    # driver resolves it.
+    def values_equal?(a, b)
+      return a['scratch_off'] == b['scratch_off'] if a.is_a?(Hash) && b.is_a?(Hash)
+      return false if a.is_a?(Hash) || b.is_a?(Hash)
+
+      a == b
+    end
+
+    # A value satisfying +<reg> op imm+. An upper bound admits a whole range, so
+    # pick the smallest benign member (zero) rather than the bound itself: a
+    # register pinned to the extreme needlessly conflicts with a co-occurring
+    # constraint on the same register, e.g. +(u64)rax <= 0xfffffffffffff000+
+    # alongside +eax == 0x0+, which zero satisfies at once.
     def relation_witness(op, imm)
       case op
-      when '==', '>=', '<=' then imm
+      when '==', '>=' then imm
       when '!=' then imm.zero? ? 1 : 0
       when '>'  then imm + 1
-      when '<'  then imm - 1
+      when '<=' then imm.negative? ? imm : 0
+      when '<'  then imm.positive? ? 0 : imm - 1
       end
     end
 
