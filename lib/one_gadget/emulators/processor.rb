@@ -145,6 +145,10 @@ module OneGadget
       # be inspected rather than re-parsed from the rendered text.
       ADDRESS_TYPES = %i[writable readable].freeze
 
+      # {SafeCalls} requirements naming a pointer the callee uses, as opposed to a
+      # precondition on the value itself (see {#record_pointer}).
+      POINTER_REQUIREMENTS = %i[writable deref nullable_deref].freeze
+
       # @return [Array<String>]
       #   Extra constraints found during execution.
       def constraints
@@ -313,21 +317,9 @@ module OneGadget
         func = SafeCalls::COMMON.keys.find { |n| addr.include?(n) }
         return :fail unless func
 
-        requirements = SafeCalls::COMMON[func]
-        requirements.each do |idx, req|
-          if req == :nullable_deref
-            @deferred_reads << [argument(idx), :nullable]
-          elsif req == :deref
-            @deferred_reads << [argument(idx), :readable]
-          elsif req == :writable
-            # A literal here is an address the callee would write through -- NULL
-            # after a preceding call, say. Not a precondition anyone can meet.
-            return :fail unless argument(idx).is_a?(OneGadget::Emulators::Lambda)
-
-            add_writable(argument(idx))
-          elsif !check_argument(idx, req)
-            return :fail
-          end
+        SafeCalls::COMMON[func].each do |idx, req|
+          ok = POINTER_REQUIREMENTS.include?(req) ? record_pointer(argument(idx), req) : check_argument(idx, req)
+          return :fail unless ok
         end
         clobber_caller_saved
         nil
@@ -387,6 +379,26 @@ module OneGadget
         return value.any? { |v| clobbered?(v) } if value.is_a?(Array)
 
         value.is_a?(OneGadget::Emulators::Lambda) && value.obj == CLOBBERED
+      end
+
+      # Record what the callee does through a pointer argument.
+      #
+      # Only a symbolic value carries a precondition the caller can arrange: an
+      # address that arrived as a literal is either one nobody can make readable
+      # or writable, or NULL. The exception is the argument a callee dereferences
+      # only when it isn't NULL -- passing NULL is exactly how that dereference is
+      # avoided, so it is accepted and needs nothing of the caller.
+      # @return [Boolean] false to abort the candidate.
+      def record_pointer(arg, req)
+        return req == :nullable_deref if arg.is_a?(Integer) && arg.zero?
+        return false unless arg.is_a?(OneGadget::Emulators::Lambda)
+
+        case req
+        when :writable then add_writable(arg)
+        when :deref then @deferred_reads << [arg, :readable]
+        when :nullable_deref then @deferred_reads << [arg, :nullable]
+        end
+        true
       end
 
       # Now that emulation is complete and the full writable set is known, record
