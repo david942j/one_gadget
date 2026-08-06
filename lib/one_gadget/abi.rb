@@ -23,8 +23,10 @@ module OneGadget
     # is visible through the other, which is what
     # {OneGadget::Emulators::RegisterFile} keeps them consistent about.
     # @example writing +edi+ is writing the low half of +rdi+
+    # @example writing +r8d+ is writing the low half of +r8+
     NARROW_VIEWS = {
-      amd64: %w[ax bx cx dx di si bp sp].to_h { |reg| ["e#{reg}", "r#{reg}"] },
+      amd64: (%w[ax bx cx dx di si bp sp].map { |reg| ["e#{reg}", "r#{reg}"] } +
+              8.upto(15).map { |i| ["r#{i}d", "r#{i}"] }).to_h,
       i386: {},
       aarch64: 0.upto(30).to_h { |i| ["w#{i}", "x#{i}"] }.merge('wzr' => 'xzr'),
       arm: {}

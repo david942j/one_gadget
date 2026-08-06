@@ -129,6 +129,29 @@ describe OneGadget::Emulators::Amd64 do
       expect(@processor.registers['rax'].to_s).to eq 'rsi'
     end
 
+    it 'accepts the d-name of an extended register as that register' do
+      @processor.process('1000: mov r8d,0x1')
+      # the call's fifth argument is that 1 -- an instruction naming r8d used to
+      # be rejected outright, and r8d read as a symbol of its own.
+      expect(@processor.argument(4)).to eq 1
+      @processor.process('1004: lea r13d,[rdx+0x2]')
+      expect(@processor.registers['r13'].to_s).to eq 'rdx+0x2'
+    end
+
+    it 'sign-extends a 32-bit value into the register movsxd widens it into' do
+      @processor.process('1000: lea r13d,[rdx+0x2]')
+      @processor.process('1004: movsxd r13,r13d')
+      # nothing names half of a symbolic value, so it widens whole.
+      expect(@processor.registers['r13'].to_s).to eq 'rdx+0x2'
+
+      other = described_class.new
+      other.process('1000: mov eax,0xffffffff')
+      other.process('1004: movsxd rax,eax')
+      expect(other.registers['rax']).to eq(-1)
+      # a destination that isn't a register is a store this doesn't model.
+      expect(other.process('1008: movsxd QWORD PTR [rsp],eax')).to be false
+    end
+
     it 'names the low half of an untouched register by its own name' do
       # rax is untouched, so its low half is still what "eax" names -- a narrower
       # requirement than one naming the whole register.
