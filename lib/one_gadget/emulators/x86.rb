@@ -240,7 +240,6 @@ module OneGadget
         # only supports dst == src
         raise Error::UnsupportedInstructionArgumentError, 'xor operator only supports dst = src' unless dst == src
 
-        dst[0] = 'r' if self.class.bits == 64 && dst.start_with?('e')
         registers[dst] = 0
       end
 
