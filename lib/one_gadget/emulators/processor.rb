@@ -372,9 +372,17 @@ module OneGadget
       end
 
       # Stands for a value left by a call: unknowable, and not the caller's to pick.
-      # Branches on it are refused rather than rendered (see {Conditional#record_compare}).
       def clobbered_value
         OneGadget::Emulators::Lambda.new(CLOBBERED)
+      end
+
+      # Whether +value+ is one a call left behind. Nothing can be said about it, so
+      # reading one as a constraint operand abandons the path (see
+      # {Conditional#operand_str}).
+      def clobbered?(value)
+        return value.any? { |v| clobbered?(v) } if value.is_a?(Array)
+
+        value.is_a?(OneGadget::Emulators::Lambda) && value.obj == CLOBBERED
       end
 
       # Now that emulation is complete and the full writable set is known, record

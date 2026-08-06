@@ -110,9 +110,17 @@ module OneGadget
 
       def handle_branch(mnem, cmd)
         return true if mnem == 'jmp' # unconditional: control handled by the stitched path
-        return branch_on_zero(jump_target(cmd), cx_reg(mnem), negate: false) if mnem.end_with?('cxz')
+        return zero_branch(cmd, cx_reg(mnem)) if mnem.end_with?('cxz')
 
         branch_on_compare(JCC[mnem], jump_target(cmd))
+      end
+
+      # +jcxz+ and friends test the counter register by name, so check its value
+      # here as {Conditional#operand_str} does for the operands it renders.
+      def zero_branch(cmd, reg)
+        return :fail if clobbered?(registers[reg])
+
+        branch_on_zero(jump_target(cmd), reg, negate: false)
       end
 
       def cx_reg(mnem)
