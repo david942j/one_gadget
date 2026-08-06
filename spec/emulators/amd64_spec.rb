@@ -98,6 +98,28 @@ describe OneGadget::Emulators::Amd64 do
     end
   end
 
+  describe 'reading back a slot the gadget wrote' do
+    it 'yields what was stored there, not the value the slot held on entry' do
+      @processor.process('1000: mov QWORD PTR [rsp+0x8],rdx')
+      @processor.process('1004: mov rax,QWORD PTR [rsp+0x8]')
+      expect(@processor.registers['rax'].to_s).to eq 'rdx'
+
+      # through a plain register too, not just the stack pointer
+      @processor.process('1008: mov QWORD PTR [rbx+0x8],rsi')
+      @processor.process('100c: mov rcx,QWORD PTR [rbx+0x8]')
+      expect(@processor.registers['rcx'].to_s).to eq 'rsi'
+    end
+
+    it 'still reads a slot the gadget never wrote as a dereference' do
+      @processor.process('1000: mov rax,QWORD PTR [rsp+0x8]')
+      expect(@processor.registers['rax'].to_s).to eq '[rsp+0x8]'
+      # a neighbouring slot is not the one that was written
+      @processor.process('1004: mov QWORD PTR [rsp+0x10],rdx')
+      @processor.process('1008: mov rcx,QWORD PTR [rsp+0x18]')
+      expect(@processor.registers['rcx'].to_s).to eq '[rsp+0x18]'
+    end
+  end
+
   describe 'sub-register views' do
     it 'lets a 32-bit write through to the register it names part of' do
       @processor.process('1000: mov edi,0x1')

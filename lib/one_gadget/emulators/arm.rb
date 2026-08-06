@@ -161,8 +161,7 @@ module OneGadget
         check_register!(dst)
         raise_unsupported('ldr', dst, src, index) unless OneGadget::Helper.integer?(index)
 
-        val = src.include?(pc) ? literal_value : arg_to_lambda(resolve_int_regs(src))
-        note_read(val)
+        val = src.include?(pc) ? literal_value : read_value(arg_to_lambda(resolve_int_regs(src)))
         registers[dst] = val
 
         index = Integer(index)

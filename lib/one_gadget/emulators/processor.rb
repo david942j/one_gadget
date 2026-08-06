@@ -518,6 +518,39 @@ module OneGadget
         @constraints << [:writable, lmda] if needs_writable?(lmda)
       end
 
+      # The value an instruction reads through +val+: what this candidate put at
+      # that address, when it is one the candidate has written, and the
+      # dereference itself otherwise (recording the read, see {#note_read}).
+      #
+      # A slot the gadget fills in reads back as what was put there, so a
+      # constraint on it names the value the caller has to arrange rather than
+      # whatever the slot held on entry -- which the gadget has already replaced.
+      # @param [Object] val The operand's value, as produced by {#arg_to_lambda}.
+      # @return [Object]
+      # @example (arm) +str r3, [sp, #4]+ then +ldr r0, [sp, #4]+ reads back r3
+      def read_value(val)
+        stored = stored_value(val)
+        return stored unless stored.nil?
+
+        note_read(val)
+        val
+      end
+
+      # What this candidate stored at the address +val+ dereferences, or +nil+ if
+      # it stored nothing there. Only a single dereference of a base this emulator
+      # tracks names a slot it can answer for (see {#get_corresponding_stack}).
+      # @param [Object] val
+      # @return [Object, nil]
+      def stored_value(val)
+        return nil unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count == 1
+
+        ptr = val.dup.ref!
+        return nil unless ptr.deref_count.zero?
+
+        stack = get_corresponding_stack(ptr.obj)
+        stack&.key?(ptr.immi) ? stack[ptr.immi] : nil
+      end
+
       # Require +val+'s pointer be readable when a load dereferences an
       # uncontrolled base -- one that doesn't root at mapped memory (see
       # {#mapped_pointer?}), since a value read from the stack or a libc global is
