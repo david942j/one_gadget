@@ -38,8 +38,15 @@ module OneGadget
       arm: %w[r0 r1 r2 r3 r12 lr]
     }.freeze
 
-    # Where each ABI leaves an integer return value.
-    RETURN_REGISTER = { amd64: 'rax', i386: 'eax', aarch64: 'x0', arm: 'r0' }.freeze
+    # The names under which each ABI's integer return value is visible: the
+    # register a call leaves it in, together with its narrower views, which name
+    # the same storage.
+    RETURN_REGISTERS = {
+      amd64: %w[rax eax],
+      i386: %w[eax],
+      aarch64: %w[x0 w0],
+      arm: %w[r0]
+    }.freeze
 
     module_function
 

@@ -343,6 +343,12 @@ module OneGadget
       # accepted on the basis that they succeed, and success is what they all
       # report that way, so a branch on the result resolves instead of ending the
       # path. A path that needs the failing side then contradicts itself and drops.
+      #
+      # TODO: success is assumed, not required. A path that keeps going after the
+      # call fails can reach a terminal call just as well, and is dropped here
+      # only because the return is pinned. Modelling the result per function --
+      # which values it can return, and what each one requires -- would let both
+      # sides be walked, at the cost of a constraint describing the failing one.
       # @return [void]
       def clobber_caller_saved
         caller_saved.each do |reg|
@@ -352,14 +358,12 @@ module OneGadget
           current = registers[reg]
           registers[reg] = current.is_a?(Array) ? Array.new(current.size) { clobbered_value } : clobbered_value
         end
-        %w[e r x w].each { |width| zero_return_register(width) }
+        return_registers.each { |reg| registers[reg] = 0 if registers.key?(reg) }
       end
 
-      # Zero the return register, in whichever width names it.
-      def zero_return_register(prefix)
-        reg = OneGadget::ABI::RETURN_REGISTER[arch_name] or return
-        name = "#{prefix}#{reg[1..]}"
-        registers[name] = 0 if registers.key?(name)
+      # Names this architecture's calling convention returns a value in.
+      def return_registers
+        @return_registers ||= OneGadget::ABI::RETURN_REGISTERS.fetch(arch_name, [])
       end
 
       # Registers this architecture's calling convention lets a call destroy.
