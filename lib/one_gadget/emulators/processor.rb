@@ -169,7 +169,7 @@ module OneGadget
         # offset (sort ascending, then uniq keeps that first).
         cons = @constraints.sort_by { |type, obj| address_deref0?(type, obj) ? obj.immi : 0 }
                            .uniq { |type, obj| constraint_key(type, obj) }
-        cons = drop_implied_nonzero(cons)
+        cons = drop_restated_null(drop_implied_nonzero(cons))
         cons.map { |type, obj| render_constraint(type, obj) }.sort
       end
 
@@ -213,6 +213,20 @@ module OneGadget
 
         cons.reject do |type, obj|
           type == :cmp && obj[1] == '!=' && obj[2] == ZERO && nonzero_regs.include?(obj[0])
+        end
+      end
+
+      # Drop a "<X> == 0x0" branch constraint that a NULL requirement on the same
+      # value already states (see {#require_null}). Both ask for the same zero, and
+      # the one naming it NULL is the one that says what the zero is for.
+      # @param [Array<[Symbol, Object]>] cons The de-duplicated constraint list.
+      # @return [Array<[Symbol, Object]>]
+      def drop_restated_null(cons)
+        nulls = cons.filter_map { |type, obj| obj[/\A(.+) == NULL\z/, 1] if type == :raw }
+        return cons if nulls.empty?
+
+        cons.reject do |type, obj|
+          type == :cmp && obj[1] == '==' && obj[2] == ZERO && nulls.include?(obj[0])
         end
       end
 

@@ -75,6 +75,18 @@ describe OneGadget::Emulators::Amd64 do
       end
     end
 
+    # A branch that already tested the pointer for zero asks for the same zero the
+    # NULL requirement does, so the pair collapses to the one that says what for.
+    it 'states once a zero that both a branch and a NULL requirement ask for' do
+      @processor.process('1000: test rdx,rdx')
+      @processor.process('1004: je 2000 <x>')
+      @processor.process('2000: nop') # taken -> rdx == 0
+      @processor.process('2004: call 3f110 <__sigaction@@GLIBC_2.2.5>')
+      cons = @processor.constraints
+      expect(cons).to include('rdx == NULL')
+      expect(cons).not_to include('rdx == 0x0')
+    end
+
     # The stack is always writable, so a pure stack-pointer store needs no
     # "writable" constraint; a store through any other register still does.
     it 'omits "writable" for a stack-pointer store but keeps it otherwise' do
