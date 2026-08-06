@@ -74,8 +74,17 @@ module OneGadget
       #   record_compare(:sub, '0x1', '0x1') #=> true
       #   # a following +b.ne+ not taken renders  0x1 == 0x1  (a stripped tautology)
       def record_compare(op, lhs, rhs)
-        @flags = { op:, lhs:, rhs: }
+        # A value a call left behind isn't the caller's to choose, so a branch on
+        # it states nothing about the gadget's preconditions. Record no flags: the
+        # branch that follows finds none and abandons the path.
+        @flags = clobbered_operand?(lhs, rhs) ? nil : { op:, lhs:, rhs: }
         true
+      end
+
+      # Whether any operand carries a value left by a call (see
+      # {Processor#clobber_caller_saved}).
+      def clobbered_operand?(*operands)
+        operands.any? { |o| o.to_s.include?(OneGadget::Emulators::Processor::CLOBBERED) }
       end
 
       # Model a compare line: record its two operands' current values under the
@@ -174,6 +183,8 @@ module OneGadget
       # @example x86 reuses it for +jrcxz+/+jecxz+/+jcxz+ (always branch-if-zero)
       #   branch_on_zero(0x4a200, 'rcx', negate: false)
       def branch_on_zero(target, reg, negate:)
+        return :fail if clobbered_operand?(reg)
+
         hit = negate ? '!=' : '==' # taken (not negated) => reg == 0
         miss = negate ? '==' : '!='
         @pending = { target:, compare: ->(taken) { [reg, taken ? hit : miss, ZERO] } }
@@ -190,6 +201,8 @@ module OneGadget
       #   branch_on_bit(0x4a200, 'w0', 4, negate: false) #=> true
       #   # taken path emits  (w0 & 0x10) == 0 ; fall-through emits  (w0 & 0x10) != 0
       def branch_on_bit(target, reg, bit, negate:)
+        return :fail if clobbered_operand?(reg)
+
         mask = OneGadget::Helper.hex(1 << bit)
         hit = negate ? '!=' : '=='
         miss = negate ? '==' : '!='

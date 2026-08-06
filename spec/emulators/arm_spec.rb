@@ -146,10 +146,15 @@ describe OneGadget::Emulators::Arm do
       expect(@processor.process('4: bl 24778 <sigprocmask@@GLIBC_2.4>')).to be true
       @processor.process('8: mov r2, #0')
       expect(@processor.process('c: bl 24754 <__sigaction@@GLIBC_2.4>')).to be true
-      @processor.process('10: mov r2, r0')
+      # r4 is callee-saved, so it still holds whatever the caller put there --
+      # unknown, and so not accepted as the required zero. (r0 would now be zero:
+      # that is the return the call is taken to have made.)
+      @processor.process('10: mov r2, r4')
       expect(@processor.process('14: bl 24754 <__sigaction@@GLIBC_2.4>')).to be false
-      # a posix_spawn setup helper is accepted (SAFE_CALLS prefix).
-      expect(@processor.process('18: bl 10c690 <posix_spawnattr_init@@GLIBC_2.4>')).to be true
+      # a posix_spawn setup helper is accepted (SAFE_CALLS prefix), given an attr
+      # it can write through -- r0 is zero here, being the previous call's return.
+      @processor.process('18: mov r0, r4')
+      expect(@processor.process('1c: bl 10c690 <posix_spawnattr_init@@GLIBC_2.4>')).to be true
       # an unhandled call aborts the candidate.
       expect(@processor.process('1c: bl 12345 <free@@GLIBC_2.4>')).to be false
     end

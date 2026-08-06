@@ -18,6 +18,29 @@ module OneGadget
     # +r13+/+r14+/+r15+ are always shown by objdump as +sp+/+lr+/+pc+.
     ARM = %w[sp lr pc] + 0.upto(12).map { |i| "r#{i}" }
 
+    # Registers a call may destroy, per each ABI's calling convention: the return
+    # register, the argument registers and the scratch ones. A callee is free to
+    # leave anything here in an arbitrary state, so what it holds afterwards is not
+    # something the caller of a gadget can choose. Listed per architecture with the
+    # narrower views of each register, which name the same storage.
+    CALLER_SAVED = {
+      # SysV amd64: return rax, arguments rdi/rsi/rdx/rcx/r8/r9, scratch r10/r11.
+      amd64: %w[rax rcx rdx rsi rdi r8 r9 r10 r11] +
+             %w[eax ecx edx esi edi] + 8.upto(11).map { |i| "r#{i}d" } +
+             0.upto(15).map { |i| "xmm#{i}" },
+      # cdecl i386: return eax, scratch ecx/edx; arguments go on the stack.
+      i386: %w[eax ecx edx] + 0.upto(7).map { |i| "xmm#{i}" },
+      # AAPCS64: x0-x7 arguments and return, x9-x15 temporaries, x16/x17 the
+      # intra-procedure-call scratch, x18 the platform register.
+      aarch64: (0.upto(7).to_a + 9.upto(18).to_a).flat_map { |i| ["x#{i}", "w#{i}"] },
+      # AAPCS: r0-r3 arguments and return, r12 (ip) the intra-procedure scratch,
+      # and lr, which the call itself overwrites with the return address.
+      arm: %w[r0 r1 r2 r3 r12 lr]
+    }.freeze
+
+    # Where each ABI leaves an integer return value.
+    RETURN_REGISTER = { amd64: 'rax', i386: 'eax', aarch64: 'x0', arm: 'r0' }.freeze
+
     module_function
 
     # Registers' name of amd64.
