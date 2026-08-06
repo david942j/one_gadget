@@ -149,6 +149,10 @@ describe OneGadget::Emulators::Arm do
       # r0 carries the result of the call above, taken to be zero, so it meets it too.
       @processor.process('10: mov r2, r0')
       expect(@processor.process('14: bl 24754 <__sigaction@@GLIBC_2.4>')).to be true
+      # a register the caller picks is accepted too, and says what to put there.
+      @processor.process('18: mov r2, r4')
+      expect(@processor.process('1c: bl 24754 <__sigaction@@GLIBC_2.4>')).to be true
+      expect(@processor.constraints).to include('r4 == NULL')
       # a posix_spawn setup helper is accepted (SAFE_CALLS prefix), given an attr
       # it can write through.
       @processor.process('18: mov r0, r4')
