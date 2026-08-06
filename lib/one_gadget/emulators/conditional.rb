@@ -126,7 +126,7 @@ module OneGadget
       #   operand_str('[sp+0x8]') #=> '[sp+0x8]'  # a memory operand -> unchanged
       def operand_str(operand)
         if register?(operand)
-          raise Error::UnsupportedInstructionArgumentError, operand if clobbered?(registers[operand])
+          raise Error::ClobberedRegisterError, operand if clobbered?(registers[operand])
 
           return registers[operand].to_s
         end

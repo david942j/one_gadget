@@ -118,7 +118,7 @@ module OneGadget
       # +jcxz+ and friends test the counter register by name, so check its value
       # here as {Conditional#operand_str} does for the operands it renders.
       def zero_branch(cmd, reg)
-        return :fail if clobbered?(registers[reg])
+        raise Error::ClobberedRegisterError, reg if clobbered?(registers[reg])
 
         branch_on_zero(jump_target(cmd), reg, negate: false)
       end
