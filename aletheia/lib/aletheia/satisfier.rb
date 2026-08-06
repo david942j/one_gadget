@@ -598,17 +598,25 @@ module Aletheia
 
     # +{e0, e1, ...}+ argv/envp contents: point every controllable register
     # element at a readable scratch string so the array is fully valid. Literals,
-    # NULL, libc globals and stack slots are handled by the code or zero-fill.
+    # libc globals and stack slots are handled by the code or zero-fill.
+    #
+    # A NULL element ends the array, so nothing past it is part of what the callee
+    # sees and nothing past it needs building.
     def apply_argv_list(plan, inner)
       elements = inner.split(',').map(&:strip).reject { |e| e == '...' }
       seen_c = false
       command_set = false
       elements.each do |e|
         seen_c ||= (e == '"-c"')
-        next if e.start_with?('"') || e == 'NULL'
+        next if e.start_with?('"')
+        break if e == 'NULL'
 
         op = safe_parse(e) or next
         next if op.deref.positive? || op.reg.nil? || stack_reg?(op.reg) || global?(op.reg)
+        # Another constraint requiring this element be NULL spells that same
+        # terminator as a register, so leave it there rather than fail trying to
+        # make it a string.
+        break if op.imm.zero? && plan.regs[op.reg] == 0
         # An element off the GOT base (i386 PIC) is a fixed libc address -- the
         # real "sh"/"-c" string the gadget passes -- so it is already a valid
         # element; re-pointing that register at scratch would only conflict with

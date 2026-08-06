@@ -86,6 +86,22 @@ RSpec.describe Aletheia::Satisfier do
     expect(plan.regs['x21']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
   end
 
+  it 'lets a register another constraint pins to NULL terminate the argv' do
+    # x3 is __sigaction's oldact -- it has to be NULL, and NULL is exactly what
+    # ends an argv, so the array is `sh -c <x6>` rather than unsatisfiable.
+    plan = satisfier.satisfy(gadget(['x3 == NULL', '{"sh", "-c", x6, x3, NULL} is a valid argv']))
+    expect(plan.status).to eq('ok')
+    expect(plan.regs['x3']).to eq(0)
+    expect(plan.regs['x6']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
+  end
+
+  it 'builds no element past the argv terminator' do
+    plan = satisfier.satisfy(gadget(['{"sh", "-c", x6, NULL, x21} is a valid argv']))
+    expect(plan.status).to eq('ok')
+    expect(plan.regs['x6']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
+    expect(plan.regs).not_to have_key('x21')
+  end
+
   it 'zeroes memory for a single-deref "[reg] == NULL" by pointing the register at scratch' do
     plan = satisfier.satisfy(gadget(['[x0] == NULL']))
     expect(plan.status).to eq('ok')
