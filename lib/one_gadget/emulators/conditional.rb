@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'one_gadget/error'
 require 'one_gadget/helper'
 
 module OneGadget
@@ -124,7 +125,11 @@ module OneGadget
       #   operand_str('16')       #=> '0x10'      # a decimal immediate -> hex
       #   operand_str('[sp+0x8]') #=> '[sp+0x8]'  # a memory operand -> unchanged
       def operand_str(operand)
-        return registers[operand].to_s if register?(operand)
+        if register?(operand)
+          raise Error::ClobberedRegisterError, operand if clobbered?(registers[operand])
+
+          return registers[operand].to_s
+        end
 
         OneGadget::Helper.hex(Integer(operand))
       rescue ArgumentError
@@ -166,14 +171,16 @@ module OneGadget
       # its own compare, so no preceding compare is needed. +negate:+ selects the sense:
       # +false+ branches when the register is zero, +true+ when it isn't.
       # @param [Integer] target Destination address of the branch.
-      # @param [String] reg The tested register, already rendered (as {#operand_str} returns).
-      # @param [Boolean] negate +false+ = branch when +reg+ is zero, +true+ = when it isn't.
+      # @param [String] operand The tested register, as the instruction writes it;
+      #   rendered here, so a value the caller cannot reason about stops the path.
+      # @param [Boolean] negate +false+ = branch when it is zero, +true+ = when it isn't.
       # @example aarch64 +cbz x0, 4a200+ - branch taken when +x0 == 0+
       #   branch_on_zero(0x4a200, 'x0', negate: false) #=> true
       #   # fall-through path emits  x0 != 0 ; taken path emits  x0 == 0
       # @example x86 reuses it for +jrcxz+/+jecxz+/+jcxz+ (always branch-if-zero)
       #   branch_on_zero(0x4a200, 'rcx', negate: false)
-      def branch_on_zero(target, reg, negate:)
+      def branch_on_zero(target, operand, negate:)
+        reg = operand_str(operand)
         hit = negate ? '!=' : '==' # taken (not negated) => reg == 0
         miss = negate ? '==' : '!='
         @pending = { target:, compare: ->(taken) { [reg, taken ? hit : miss, ZERO] } }
@@ -183,13 +190,14 @@ module OneGadget
       # Register a self-contained branch that tests a single bit of a register: also
       # carries its own test, so no preceding compare is needed. Renders a bitmask test.
       # @param [Integer] target Destination address of the branch.
-      # @param [String] reg The tested register, already rendered (as {#operand_str} returns).
+      # @param [String] operand The tested register, as the instruction writes it (see {#branch_on_zero}).
       # @param [Integer] bit The bit index being tested.
       # @param [Boolean] negate +false+ = branch when the bit is zero, +true+ = when it's set.
       # @example aarch64 +tbz w0, #4, 4a200+ - branch taken when bit 4 of +w0+ is 0
       #   branch_on_bit(0x4a200, 'w0', 4, negate: false) #=> true
       #   # taken path emits  (w0 & 0x10) == 0 ; fall-through emits  (w0 & 0x10) != 0
-      def branch_on_bit(target, reg, bit, negate:)
+      def branch_on_bit(target, operand, bit, negate:)
+        reg = operand_str(operand)
         mask = OneGadget::Helper.hex(1 << bit)
         hit = negate ? '!=' : '=='
         miss = negate ? '==' : '!='

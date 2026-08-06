@@ -70,8 +70,8 @@ module OneGadget
         when 'b', 'b.al' then true # unconditional: control handled by the stitched path
         when 'cbz' then handle_cbz(ops, negate: false)
         when 'cbnz' then handle_cbz(ops, negate: true)
-        when 'tbz' then branch_on_bit(ops[2].to_i(16), operand_str(ops[0]), Integer(ops[1]), negate: false)
-        when 'tbnz' then branch_on_bit(ops[2].to_i(16), operand_str(ops[0]), Integer(ops[1]), negate: true)
+        when 'tbz' then branch_on_bit(ops[2].to_i(16), ops[0], Integer(ops[1]), negate: false)
+        when 'tbnz' then branch_on_bit(ops[2].to_i(16), ops[0], Integer(ops[1]), negate: true)
         else branch_on_compare(COND[mnem[2..]], ops[0].to_i(16))
         end
       end

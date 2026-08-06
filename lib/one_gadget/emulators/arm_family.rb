@@ -90,7 +90,7 @@ module OneGadget
       # @param [Array<String>] ops The branch's operands.
       # @param [Boolean] negate +false+ for +cbz+, +true+ for +cbnz+.
       def handle_cbz(ops, negate:)
-        branch_on_zero(ops[1].to_i(16), operand_str(ops[0]), negate:)
+        branch_on_zero(ops[1].to_i(16), ops[0], negate:)
       end
 
       # Replace register tokens that currently hold a concrete integer with that

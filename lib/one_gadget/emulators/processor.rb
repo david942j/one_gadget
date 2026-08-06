@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'one_gadget/abi'
 require 'one_gadget/emulators/conditional'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/emulators/safe_calls'
@@ -130,6 +131,10 @@ module OneGadget
       def argument(_idx); raise NotImplementedError
       end
 
+      # Marks a register holding whatever a call returned or left behind; see
+      # {#clobber_caller_saved}.
+      CLOBBERED = '$clobbered'
+
       # Constraint types whose payload is an address {Lambda} asserting the target
       # is mapped -- +:writable+ (a store target) and +:readable+ (an unconditional
       # dereference, see {#finalize_deferred_reads}). Both are keyed, offset-
@@ -139,6 +144,10 @@ module OneGadget
       # recorded as its +[lhs, operator, rhs]+ parts (see {Conditional}), so it can
       # be inspected rather than re-parsed from the rendered text.
       ADDRESS_TYPES = %i[writable readable].freeze
+
+      # {SafeCalls} requirements naming a pointer the callee uses, as opposed to a
+      # precondition on the value itself (see {#record_pointer}).
+      POINTER_REQUIREMENTS = %i[writable deref nullable_deref].freeze
 
       # @return [Array<String>]
       #   Extra constraints found during execution.
@@ -309,17 +318,87 @@ module OneGadget
         return :fail unless func
 
         SafeCalls::COMMON[func].each do |idx, req|
-          if req == :nullable_deref
-            @deferred_reads << [argument(idx), :nullable]
-          elsif req == :deref
-            @deferred_reads << [argument(idx), :readable]
-          elsif req == :writable
-            add_writable(argument(idx))
-          elsif !check_argument(idx, req)
-            return :fail
-          end
+          ok = POINTER_REQUIREMENTS.include?(req) ? record_pointer(argument(idx), req) : check_argument(idx, req)
+          return :fail unless ok
         end
+        clobber_caller_saved
         nil
+      end
+
+      # Forget the caller-saved registers, which the call it just accepted is free
+      # to leave in any state (see {OneGadget::ABI::CALLER_SAVED}). Keeping their
+      # entry values would let a later branch on one -- +call __close+ then
+      # +test eax, eax+ -- read as a condition on a value the caller chooses, when
+      # it is really the callee's return.
+      #
+      # The return register is set to zero rather than forgotten: these calls are
+      # accepted on the basis that they succeed, and success is what they all
+      # report that way, so a branch on the result resolves instead of ending the
+      # path. A path that needs the failing side then contradicts itself and drops.
+      #
+      # TODO: success is assumed, not required. A path that keeps going after the
+      # call fails can reach a terminal call just as well, and is dropped here
+      # only because the return is pinned. Modelling the result per function --
+      # which values it can return, and what each one requires -- would let both
+      # sides be walked, at the cost of a constraint describing the failing one.
+      # @return [void]
+      def clobber_caller_saved
+        caller_saved.each do |reg|
+          next unless registers.key?(reg)
+
+          # A vector register holds one value per lane; keep that shape.
+          current = registers[reg]
+          registers[reg] = current.is_a?(Array) ? Array.new(current.size) { clobbered_value } : clobbered_value
+        end
+        return_registers.each { |reg| registers[reg] = 0 if registers.key?(reg) }
+      end
+
+      # Names this architecture's calling convention returns a value in.
+      def return_registers
+        @return_registers ||= OneGadget::ABI::RETURN_REGISTERS.fetch(arch_name, [])
+      end
+
+      # Registers this architecture's calling convention lets a call destroy.
+      def caller_saved
+        @caller_saved ||= OneGadget::ABI::CALLER_SAVED.fetch(arch_name, [])
+      end
+
+      def arch_name
+        self.class.name.split('::').last.downcase.to_sym
+      end
+
+      # Stands for a value left by a call: unknowable, and not the caller's to pick.
+      def clobbered_value
+        OneGadget::Emulators::Lambda.new(CLOBBERED)
+      end
+
+      # Whether +value+ is one a call left behind. Nothing can be said about it, so
+      # reading one as a constraint operand abandons the path (see
+      # {Conditional#operand_str}).
+      def clobbered?(value)
+        return value.any? { |v| clobbered?(v) } if value.is_a?(Array)
+
+        value.is_a?(OneGadget::Emulators::Lambda) && value.obj == CLOBBERED
+      end
+
+      # Record what the callee does through a pointer argument.
+      #
+      # Only a symbolic value carries a precondition the caller can arrange: an
+      # address that arrived as a literal is either one nobody can make readable
+      # or writable, or NULL. The exception is the argument a callee dereferences
+      # only when it isn't NULL -- passing NULL is exactly how that dereference is
+      # avoided, so it is accepted and needs nothing of the caller.
+      # @return [Boolean] false to abort the candidate.
+      def record_pointer(arg, req)
+        return req == :nullable_deref if arg.is_a?(Integer) && arg.zero?
+        return false unless arg.is_a?(OneGadget::Emulators::Lambda)
+
+        case req
+        when :writable then add_writable(arg)
+        when :deref then @deferred_reads << [arg, :readable]
+        when :nullable_deref then @deferred_reads << [arg, :nullable]
+        end
+        true
       end
 
       # Now that emulation is complete and the full writable set is known, record
