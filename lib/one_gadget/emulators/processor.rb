@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'one_gadget/abi'
 require 'one_gadget/emulators/conditional'
 require 'one_gadget/emulators/lambda'
 require 'one_gadget/emulators/safe_calls'
@@ -129,6 +130,10 @@ module OneGadget
       #   Return value can be a {Lambda} or an +Integer+.
       def argument(_idx); raise NotImplementedError
       end
+
+      # Marks a register holding whatever a call returned or left behind; see
+      # {#clobber_caller_saved}.
+      CLOBBERED = '$clobbered'
 
       # Constraint types whose payload is an address {Lambda} asserting the target
       # is mapped -- +:writable+ (a store target) and +:readable+ (an unconditional
@@ -308,18 +313,68 @@ module OneGadget
         func = SafeCalls::COMMON.keys.find { |n| addr.include?(n) }
         return :fail unless func
 
-        SafeCalls::COMMON[func].each do |idx, req|
+        requirements = SafeCalls::COMMON[func]
+        requirements.each do |idx, req|
           if req == :nullable_deref
             @deferred_reads << [argument(idx), :nullable]
           elsif req == :deref
             @deferred_reads << [argument(idx), :readable]
           elsif req == :writable
+            # A literal here is an address the callee would write through -- NULL
+            # after a preceding call, say. Not a precondition anyone can meet.
+            return :fail unless argument(idx).is_a?(OneGadget::Emulators::Lambda)
+
             add_writable(argument(idx))
           elsif !check_argument(idx, req)
             return :fail
           end
         end
+        clobber_caller_saved
         nil
+      end
+
+      # Forget the caller-saved registers, which the call it just accepted is free
+      # to leave in any state (see {OneGadget::ABI::CALLER_SAVED}). Keeping their
+      # entry values would let a later branch on one -- +call __close+ then
+      # +test eax, eax+ -- read as a condition on a value the caller chooses, when
+      # it is really the callee's return.
+      #
+      # The return register is set to zero rather than forgotten: these calls are
+      # accepted on the basis that they succeed, and success is what they all
+      # report that way, so a branch on the result resolves instead of ending the
+      # path. A path that needs the failing side then contradicts itself and drops.
+      # @return [void]
+      def clobber_caller_saved
+        caller_saved.each do |reg|
+          next unless registers.key?(reg)
+
+          # A vector register holds one value per lane; keep that shape.
+          current = registers[reg]
+          registers[reg] = current.is_a?(Array) ? Array.new(current.size) { clobbered_value } : clobbered_value
+        end
+        %w[e r x w].each { |width| zero_return_register(width) }
+      end
+
+      # Zero the return register, in whichever width names it.
+      def zero_return_register(prefix)
+        reg = OneGadget::ABI::RETURN_REGISTER[arch_name] or return
+        name = "#{prefix}#{reg[1..]}"
+        registers[name] = 0 if registers.key?(name)
+      end
+
+      # Registers this architecture's calling convention lets a call destroy.
+      def caller_saved
+        @caller_saved ||= OneGadget::ABI::CALLER_SAVED.fetch(arch_name, [])
+      end
+
+      def arch_name
+        self.class.name.split('::').last.downcase.to_sym
+      end
+
+      # Stands for a value left by a call: unknowable, and not the caller's to pick.
+      # Branches on it are refused rather than rendered (see {Conditional#record_compare}).
+      def clobbered_value
+        OneGadget::Emulators::Lambda.new(CLOBBERED)
       end
 
       # Now that emulation is complete and the full writable set is known, record
