@@ -353,12 +353,13 @@ module OneGadget
           current = registers[reg]
           registers[reg] = current.is_a?(Array) ? Array.new(current.size) { clobbered_value } : clobbered_value
         end
-        return_registers.each { |reg| registers[reg] = 0 if registers.key?(reg) }
+        reg = return_register
+        registers[reg] = 0 if reg && registers.key?(reg)
       end
 
-      # Names this architecture's calling convention returns a value in.
-      def return_registers
-        @return_registers ||= OneGadget::ABI::RETURN_REGISTERS.fetch(arch_name, [])
+      # The register this architecture's calling convention returns a value in.
+      def return_register
+        OneGadget::ABI::RETURN_REGISTER[arch_name]
       end
 
       # Registers this architecture's calling convention lets a call destroy.
