@@ -148,9 +148,14 @@ module OneGadget
       # be inspected rather than re-parsed from the rendered text.
       ADDRESS_TYPES = %i[writable readable].freeze
 
-      # {SafeCalls} requirements naming a pointer the callee uses, as opposed to a
-      # precondition on the value itself (see {#record_pointer}).
-      POINTER_REQUIREMENTS = %i[writable deref nullable_deref].freeze
+      # {SafeCalls} requirements naming what a callee does with a pointer argument,
+      # each recorded as something the caller must arrange (see {#record_pointer}),
+      # as opposed to a precondition read off the value as it stands.
+      POINTER_REQUIREMENTS = %i[writable deref nullable_deref null].freeze
+
+      # The {POINTER_REQUIREMENTS} a NULL argument already satisfies: both ask for
+      # a pointer the callee will leave alone, and NULL is how that is asked for.
+      NULLABLE_REQUIREMENTS = %i[nullable_deref null].freeze
 
       # @return [Array<String>]
       #   Extra constraints found during execution.
@@ -164,7 +169,7 @@ module OneGadget
         # offset (sort ascending, then uniq keeps that first).
         cons = @constraints.sort_by { |type, obj| address_deref0?(type, obj) ? obj.immi : 0 }
                            .uniq { |type, obj| constraint_key(type, obj) }
-        cons = drop_implied_nonzero(cons)
+        cons = drop_restated_null(drop_implied_nonzero(cons))
         cons.map { |type, obj| render_constraint(type, obj) }.sort
       end
 
@@ -208,6 +213,20 @@ module OneGadget
 
         cons.reject do |type, obj|
           type == :cmp && obj[1] == '!=' && obj[2] == ZERO && nonzero_regs.include?(obj[0])
+        end
+      end
+
+      # Drop a "<X> == 0x0" branch constraint that a NULL requirement on the same
+      # value already states (see {#require_null}). Both ask for the same zero, and
+      # the one naming it NULL is the one that says what the zero is for.
+      # @param [Array<[Symbol, Object]>] cons The de-duplicated constraint list.
+      # @return [Array<[Symbol, Object]>]
+      def drop_restated_null(cons)
+        nulls = cons.filter_map { |type, obj| obj[/\A(.+) == NULL\z/, 1] if type == :raw }
+        return cons if nulls.empty?
+
+        cons.reject do |type, obj|
+          type == :cmp && obj[1] == '==' && obj[2] == ZERO && nulls.include?(obj[0])
         end
       end
 
@@ -288,15 +307,19 @@ module OneGadget
       def check_argument(idx, expect)
         case expect
         when :global_var? then global_var?(argument(idx))
-        when :zero? then argument(idx).is_a?(Integer) && argument(idx).zero?
         end
       end
 
       # Accept a +call+ to a libc function the emulator treats as non-terminal
       # (a syscall wrapper). {SafeCalls::COMMON} maps each function name to its
       # per-argument requirements: an argument index paired with one of
-      # * +:zero?+ / +:global_var?+ - a precondition that must already hold, else
-      #   the candidate is aborted (+:fail+).
+      # * +:global_var?+ - a precondition that must already hold, else the
+      #   candidate is aborted (+:fail+).
+      # * +:null+ - the callee must be given NULL here, so +<arg> == NULL+ is
+      #   recorded for the caller to arrange. A value that can never be NULL --
+      #   a fixed address, or any other non-zero literal -- aborts the candidate.
+      #   @example +__sigaction(sig, act, oldact)+ writes the old action through
+      #     +oldact+ unless it is NULL
       # * +:nullable_deref+ - the callee dereferences this argument *unless it is
       #   NULL*, which glibc guards with an explicit NULL check. When the pointer
       #   isn't already known to be mapped, +<arg> == NULL+ is recorded so the
@@ -389,19 +412,31 @@ module OneGadget
       #
       # Only a symbolic value carries a precondition the caller can arrange: an
       # address that arrived as a literal is either one nobody can make readable
-      # or writable, or NULL. The exception is the argument a callee dereferences
-      # only when it isn't NULL -- passing NULL is exactly how that dereference is
-      # avoided, so it is accepted and needs nothing of the caller.
+      # or writable, or NULL. The exception is the argument a callee leaves alone
+      # when it is NULL -- passing NULL is exactly how that is asked for, so it is
+      # accepted and needs nothing of the caller.
       # @return [Boolean] false to abort the candidate.
       def record_pointer(arg, req)
-        return req == :nullable_deref if arg.is_a?(Integer) && arg.zero?
+        return NULLABLE_REQUIREMENTS.include?(req) if arg.is_a?(Integer) && arg.zero?
         return false unless arg.is_a?(OneGadget::Emulators::Lambda)
 
         case req
         when :writable then add_writable(arg)
         when :deref then @deferred_reads << [arg, :readable]
         when :nullable_deref then @deferred_reads << [arg, :nullable]
+        when :null then return require_null(arg)
         end
+        true
+      end
+
+      # Record that +arg+ has to be NULL. An address that is mapped by the time
+      # the gadget runs -- the stack, a libc global -- names real memory and so
+      # can't also be NULL, and no caller can arrange otherwise.
+      # @return [Boolean] false to abort the candidate.
+      def require_null(arg)
+        return false if mapped_nonnull_pointer?(arg)
+
+        @constraints << [:raw, "#{arg} == NULL"]
         true
       end
 
