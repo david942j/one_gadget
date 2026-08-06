@@ -18,6 +18,18 @@ module OneGadget
     # +r13+/+r14+/+r15+ are always shown by objdump as +sp+/+lr+/+pc+.
     ARM = %w[sp lr pc] + 0.upto(12).map { |i| "r#{i}" }
 
+    # Names that address part of a wider register rather than storage of their
+    # own, mapped to the register they name part of. A write through either name
+    # is visible through the other, which is what
+    # {OneGadget::Emulators::RegisterFile} keeps them consistent about.
+    # @example writing +edi+ is writing the low half of +rdi+
+    NARROW_VIEWS = {
+      amd64: %w[ax bx cx dx di si bp sp].to_h { |reg| ["e#{reg}", "r#{reg}"] },
+      i386: {},
+      aarch64: 0.upto(30).to_h { |i| ["w#{i}", "x#{i}"] }.merge('wzr' => 'xzr'),
+      arm: {}
+    }.freeze
+
     # Registers a call may destroy, per each ABI's calling convention: the return
     # register, the argument registers and the scratch ones. A callee is free to
     # leave anything here in an arbitrary state, so what it holds afterwards is not

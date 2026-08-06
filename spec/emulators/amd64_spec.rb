@@ -70,6 +70,26 @@ describe OneGadget::Emulators::Amd64 do
     end
   end
 
+  describe 'sub-register views' do
+    it 'lets a 32-bit write through to the register it names part of' do
+      @processor.process('1000: mov edi,0x1')
+      # the call's first argument is that 1, not the value rdi was entered with.
+      expect(@processor.argument(0)).to eq 1
+      @processor.process('1004: mov eax,rsi')
+      expect(@processor.registers['rax'].to_s).to eq 'rsi'
+    end
+
+    it 'names the low half of an untouched register by its own name' do
+      # rax is untouched, so its low half is still what "eax" names -- a narrower
+      # requirement than one naming the whole register.
+      expect(@processor.registers['eax'].to_s).to eq 'eax'
+      expect(@processor.registers['eax']).to be_equal(@processor.registers['eax'])
+      @processor.process('1000: mov rax,0x1')
+      # once the full register holds something, no expression names half of it.
+      expect(@processor.registers['eax']).to eq 1
+    end
+  end
+
   describe 'process' do
     it 'libc-2.24 gadget' do
       gadget = <<-EOS

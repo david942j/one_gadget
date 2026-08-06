@@ -3,6 +3,7 @@
 require 'one_gadget/abi'
 require 'one_gadget/emulators/conditional'
 require 'one_gadget/emulators/lambda'
+require 'one_gadget/emulators/register_file'
 require 'one_gadget/emulators/safe_calls'
 require 'one_gadget/error'
 
@@ -18,7 +19,7 @@ module OneGadget
     class Processor
       include Conditional
 
-      attr_reader :registers # @return [Hash{String => OneGadget::Emulators::Lambda}] The current registers' state.
+      attr_reader :registers # @return [RegisterFile] The current registers' state.
       attr_reader :sp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on sp.
       attr_reader :sp # @return [String] Stack pointer.
       attr_reader :pc # @return [String] Program counter.
@@ -31,7 +32,9 @@ module OneGadget
       # @param [String] sp
       #   The stack register.
       def initialize(registers, sp)
-        @registers = registers.to_h { |reg| [reg, to_lambda(reg)] }
+        @registers = RegisterFile.build(registers, OneGadget::ABI::NARROW_VIEWS.fetch(arch_name, {})) do |reg|
+          to_lambda(reg)
+        end
         @sp = sp
         @constraints = []
         @deferred_reads = [] # pointer args of safe calls, resolved once emulation ends
