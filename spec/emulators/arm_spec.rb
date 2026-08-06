@@ -146,15 +146,29 @@ describe OneGadget::Emulators::Arm do
       expect(@processor.process('4: bl 24778 <sigprocmask@@GLIBC_2.4>')).to be true
       @processor.process('8: mov r2, #0')
       expect(@processor.process('c: bl 24754 <__sigaction@@GLIBC_2.4>')).to be true
-      # an r2 of unknown value doesn't meet that.
-      @processor.process('10: mov r2, r4')
-      expect(@processor.process('14: bl 24754 <__sigaction@@GLIBC_2.4>')).to be false
+      # r0 carries the result of the call above, taken to be zero, so it meets it too.
+      @processor.process('10: mov r2, r0')
+      expect(@processor.process('14: bl 24754 <__sigaction@@GLIBC_2.4>')).to be true
+      # an r2 of unknown value does not.
+      @processor.process('18: mov r2, r4')
+      expect(@processor.process('1c: bl 24754 <__sigaction@@GLIBC_2.4>')).to be false
       # a posix_spawn setup helper is accepted (SAFE_CALLS prefix), given an attr
       # it can write through.
-      @processor.process('18: mov r0, r4')
-      expect(@processor.process('1c: bl 10c690 <posix_spawnattr_init@@GLIBC_2.4>')).to be true
+      @processor.process('20: mov r0, r4')
+      expect(@processor.process('24: bl 10c690 <posix_spawnattr_init@@GLIBC_2.4>')).to be true
       # an unhandled call aborts the candidate.
       expect(@processor.process('1c: bl 12345 <free@@GLIBC_2.4>')).to be false
+    end
+
+    it 'forgets what a call may have changed' do
+      expect(@processor.process('0: bl 24778 <sigprocmask@@GLIBC_2.4>')).to be true
+      # the result is taken to be zero, so it can be reasoned about
+      expect(@processor.registers['r0']).to be_zero
+      # r1 is caller-saved: the call may have left anything there, so reading it
+      # as a branch operand abandons the path
+      expect(@processor.process('4: cmp r1, #0')).to be false
+      # r4 is callee-saved and still carries what the caller put in it
+      expect(@processor.registers['r4'].to_s).to eq 'r4'
     end
 
     it 'constrains posix_spawn setup-call pointers (source readable, attr writable)' do
