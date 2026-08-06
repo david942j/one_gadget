@@ -71,6 +71,7 @@ module OneGadget
           Instruction.new('jmp', 1),
           Instruction.new('lea', 2),
           Instruction.new('mov', 2),
+          Instruction.new('movsxd', 2),
           Instruction.new('nop', -1),
           Instruction.new('push', 1),
           Instruction.new('sub', 2),
@@ -140,6 +141,29 @@ module OneGadget
         # eval_dict, and any other tracked register is offset-only the same
         # way -- see Processor#reg_based_stack), so the immediate IS the offset.
         stack[dst.immi] = src
+      end
+
+      # +movsxd dst, src+: +src+'s low 32 bits, sign-extended into the 64-bit +dst+.
+      # A destination that isn't a register would be a store the emulator doesn't
+      # model, so the candidate is abandoned rather than tracked wrongly.
+      def inst_movsxd(dst, src)
+        check_register!(dst)
+
+        registers[dst] = sign_extend32(read_value(arg_to_lambda(src)))
+      end
+
+      # What a 32-bit +val+ sign-extends to. Only a concrete value can be extended;
+      # a symbolic one is taken whole, since no expression names its low half --
+      # the same over-approximation a narrow register read makes (see
+      # {RegisterFile#narrowed}).
+      # @example
+      #   sign_extend32(0x1)        #=> 0x1
+      #   sign_extend32(0xffffffff) #=> -0x1
+      def sign_extend32(val)
+        return val unless val.is_a?(Integer)
+
+        low = val & 0xffffffff
+        low < 0x80000000 ? low : low - 0x100000000
       end
 
       # This instruction moves 128bits.
