@@ -59,6 +59,34 @@ describe OneGadget::Emulators::Amd64 do
       expect(cons).not_to include('r12 != 0x0')
     end
 
+    # __sigaction writes the old action through oldact (arg 2) unless it is NULL,
+    # so the gadget is usable exactly when the caller can make that argument NULL.
+    it 'asks for NULL where the caller can supply it, and refuses where nobody can' do
+      @processor.process('1000: mov rdx,r12')
+      expect(@processor.process('1004: call 3f110 <__sigaction@@GLIBC_2.2.5>')).to be true
+      expect(@processor.constraints).to include('r12 == NULL')
+
+      # a libc global and a stack slot both name memory that exists when the
+      # gadget runs, so neither can be the NULL the callee has to be given.
+      ['lea rdx,[rip+0x2dd750]        # 3c3e88 <sym>', 'lea rdx,[rsp+0x10]'].each do |setup|
+        other = described_class.new
+        other.process("1000: #{setup}")
+        expect(other.process('1004: call 3f110 <__sigaction@@GLIBC_2.2.5>')).to be false
+      end
+    end
+
+    # A branch that already tested the pointer for zero asks for the same zero the
+    # NULL requirement does, so the pair collapses to the one that says what for.
+    it 'states once a zero that both a branch and a NULL requirement ask for' do
+      @processor.process('1000: test rdx,rdx')
+      @processor.process('1004: je 2000 <x>')
+      @processor.process('2000: nop') # taken -> rdx == 0
+      @processor.process('2004: call 3f110 <__sigaction@@GLIBC_2.2.5>')
+      cons = @processor.constraints
+      expect(cons).to include('rdx == NULL')
+      expect(cons).not_to include('rdx == 0x0')
+    end
+
     # The stack is always writable, so a pure stack-pointer store needs no
     # "writable" constraint; a store through any other register still does.
     it 'omits "writable" for a stack-pointer store but keeps it otherwise' do

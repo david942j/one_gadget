@@ -22,7 +22,7 @@ module OneGadget
         # NULL path): sigprocmask's +set+ and __sigaction's +act+ (both arg 1).
         # __sigaction also writes back through +oldact+ (arg 2), so oldact must be NULL.
         'sigprocmask' => { 1 => :nullable_deref },
-        '__sigaction' => { 1 => :nullable_deref, 2 => :zero? },
+        '__sigaction' => { 1 => :nullable_deref, 2 => :null },
         # __close takes no pointer argument (nothing to constrain). unsetenv reads its
         # name (arg 0); +:global_var?+ may over-constrain it (readable would suffice),
         # but no current fixture reaches unsetenv near an exec to verify -- left as-is.
