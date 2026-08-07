@@ -124,6 +124,28 @@ describe OneGadget::Emulators::AArch64 do
     end
   end
 
+  describe 'sub-register views' do
+    it 'lets a w write through to the x register it names part of' do
+      @processor.process('0: mov w0, #0x1')
+      # the call's first argument is that 1, not the value x0 was entered with.
+      expect(@processor.argument(0)).to eq 1
+      @processor.process('4: mov w19, x22')
+      expect(@processor.registers['x19'].to_s).to eq 'x22'
+    end
+
+    it 'names the low half of an untouched register by its own name' do
+      expect(@processor.registers['w19'].to_s).to eq 'w19'
+      @processor.process('0: mov x19, x22')
+      # once the full register holds something, no expression names half of it.
+      expect(@processor.registers['w19'].to_s).to eq 'x22'
+    end
+
+    it 'reads the zero register under either name' do
+      expect(@processor.registers['wzr']).to be_zero
+      expect(@processor.registers['xzr']).to be_zero
+    end
+  end
+
   describe 'process' do
     it 'libc-2.23 gadget' do
       gadget = <<-EOS
