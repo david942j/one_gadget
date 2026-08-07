@@ -99,6 +99,15 @@ describe OneGadget::Emulators::Arm do
       expect(@processor.registers['r6'].to_s).to eq '[r7+0xd8]'
     end
 
+    it 'reads back a slot the gadget stored to' do
+      @processor.process('0: str r3, [sp, #4]')
+      @processor.process('4: ldr r0, [sp, #4]')
+      expect(@processor.registers['r0'].to_s).to eq 'r3'
+      # a slot it never wrote still reads as a dereference.
+      @processor.process('8: ldr r1, [sp, #8]')
+      expect(@processor.registers['r1'].to_s).to eq '[sp+0x8]'
+    end
+
     it 'str (stack, writable, $base is skipped)' do
       @processor.process('0: mov r1, sp')
       @processor.process('4: str r0, [r1], #-8')
