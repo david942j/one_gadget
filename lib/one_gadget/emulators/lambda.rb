@@ -14,6 +14,8 @@ module OneGadget
       attr_accessor :obj # @return [String, Lambda] The object currently related to.
       attr_accessor :immi # @return [Integer] The immidiate value currently added.
       attr_accessor :deref_count # @return [Integer] The times of dereference.
+      attr_accessor :op # @return [String, nil] The operator applied to {#obj}, for an operation (see {.operation}).
+      attr_accessor :rhs # @return [Integer, Lambda, String, nil] The operator's right operand.
 
       # Instantiate a {Lambda} object.
       # @param [Lambda, String] obj
@@ -34,6 +36,8 @@ module OneGadget
         else
           ret = Lambda.new(obj)
           ret.immi = immi
+          ret.op = op
+          ret.rhs = rhs
         end
         ret.immi += other
         ret
@@ -67,6 +71,8 @@ module OneGadget
       def deref
         ret = Lambda.new(obj)
         ret.immi = immi
+        ret.op = op
+        ret.rhs = rhs
         ret.deref_count = deref_count + 1
         ret
       end
@@ -76,10 +82,43 @@ module OneGadget
       def to_s
         str = ''
         str += '[' * deref_count
-        str += obj.to_s unless obj.nil?
+        str += base_str
         str += OneGadget::Helper.hex(immi, psign: true) unless immi.zero?
         str += ']' * deref_count
         str
+      end
+
+      # A value this emulator can name but not fold: an operation applied to
+      # +lhs+, whose result no plain base+offset expresses. Kept as the operation
+      # itself, so a constraint on it still says what the caller has to arrange.
+      # @param [Lambda, String] lhs The left operand.
+      # @param [String] op The operator, as it should render.
+      # @param [Integer, Lambda, String] rhs The right operand.
+      # @return [Lambda]
+      # @example (amd64) +and rax, 0xf+ leaves rax holding +(rax & 0xf)+
+      #   Lambda.operation(registers['rax'], '&', 0xf)
+      def self.operation(lhs, op, rhs)
+        Lambda.new(lhs).tap do |lmda|
+          lmda.op = op
+          lmda.rhs = rhs
+        end
+      end
+
+      # Whether this names an operation rather than a base+offset (see {.operation}).
+      # @return [Boolean]
+      def operation?
+        !op.nil?
+      end
+
+      # What {#to_s} renders before any offset: the operation this names, or the
+      # object it is based on.
+      # @return [String]
+      def base_str
+        return '' if obj.nil?
+        return obj.to_s unless operation?
+
+        rendered = rhs.is_a?(Integer) ? OneGadget::Helper.hex(rhs) : rhs.to_s
+        "(#{obj} #{op} #{rendered})"
       end
 
       # Evaluates the value of lambda.

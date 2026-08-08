@@ -98,6 +98,25 @@ describe OneGadget::Emulators::Amd64 do
     end
   end
 
+  describe 'and' do
+    it 'names a mask it cannot fold, and folds one it can' do
+      @processor.process('1000: and rax,0xf')
+      expect(@processor.registers['rax'].to_s).to eq '(rax & 0xf)'
+
+      other = described_class.new
+      other.process('1000: mov eax,0x30')
+      other.process('1004: and eax,0xf')
+      expect(other.registers['eax']).to eq 0
+    end
+
+    it 'sets the flags a following branch reads, as well as writing the register' do
+      @processor.process('1000: and rax,0xf')
+      @processor.process('1004: jne 2000 <x>')
+      @processor.process('2000: nop') # taken
+      expect(@processor.constraints).to eq ['(rax & 0xf) != 0x0']
+    end
+  end
+
   describe 'reading back a slot the gadget wrote' do
     it 'yields what was stored there, not the value the slot held on entry' do
       @processor.process('1000: mov QWORD PTR [rsp+0x8],rdx')
