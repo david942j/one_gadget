@@ -49,13 +49,19 @@ RSpec.describe Aletheia::Satisfier do
     expect(a).not_to eq(b)
   end
 
-  it 'builds a valid argv rather than taking the cheaper NULL branch' do
-    # Both are configurations an attacker could choose, but an empty argv proves
-    # only that execve happened -- the shell has no command and exits unseen. The
-    # verifier takes the one it can witness.
+  it 'prefers the cheap NULL branch over building a valid argv' do
     plan = satisfier.satisfy(gadget(['x4 == NULL || {x4, x3, x23, NULL} is a valid argv']))
-    expect(plan.branches['c0']).to eq('{x4, x3, x23, NULL} is a valid argv')
+    expect(plan.regs['x4']).to eq(0)
+    expect(plan.branches['c0']).to eq('x4 == NULL')
+  end
+
+  it 'fills an array the gadget supplies no strings for as sh -c <cmd>' do
+    # Every element is the attacker's, so there is nothing to preserve: pointing
+    # them all at an empty string would make the shell read argv[1] as a script
+    # name and exit before anything could be observed.
+    plan = satisfier.satisfy(gadget(['{x4, x3, x23, NULL} is a valid argv']))
     expect(plan.regs['x4']).to eq('scratch_off' => Aletheia::Satisfier::NAME_POOL)
+    expect(plan.regs['x3']).to eq('scratch_off' => Aletheia::Satisfier::OPTION_POOL)
     expect(plan.regs['x23']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
   end
 

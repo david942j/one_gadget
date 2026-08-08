@@ -187,13 +187,12 @@ module Aletheia
         return nil if @null_unsafe_bases&.include?(base)
 
         (op = address_operand(base)) && null_cost(op)
-      # Building the argv is PREFERRED over the NULL branch, cheaper here meaning
-      # preferred: an empty argv proves only that execve happened, while an array
-      # filled as `sh -c <cmd>` lets the shell actually be seen running it. Both
-      # are configurations an attacker could choose; a verifier should take the
-      # one it can witness. An empty envp is fine, so envp keeps its own cost.
-      when /\A\{.*\} is a valid argv\z/ then 0.04
-      when /\A\{.*\} is a valid envp\z/ then 0.5 # array literal: element builder
+      # Cost is unchanged by which array shape this is: whether a built argv or a
+      # short one produces the observable shell varies per gadget -- an empty argv
+      # leaves a drivable interactive shell for some and an immediate exit for
+      # others -- so preferring either loses gadgets the other would have caught.
+      # Picking the witnessable one belongs in a retry, not in a cost.
+      when /\A\{.*\} is a valid (?:argv|envp)\z/ then 0.5 # array literal: element builder
       when /is a valid (?:argv|envp)\z/         then 0.4 # pointer form: point it at scratch
       when ALIGN                                then alignment_cost(disjunct)
       when GOT                                  then got_cost(disjunct)
