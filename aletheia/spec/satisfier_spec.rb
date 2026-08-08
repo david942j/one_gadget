@@ -55,14 +55,24 @@ RSpec.describe Aletheia::Satisfier do
     expect(plan.branches['c0']).to eq('x4 == NULL')
   end
 
-  it 'fills an array the gadget supplies no strings for as sh -c <cmd>' do
-    # Every element is the attacker's, so there is nothing to preserve: pointing
-    # them all at an empty string would make the shell read argv[1] as a script
-    # name and exit before anything could be observed.
+  it 'ends the array after argv[0], the shape a shell can be driven from' do
+    # Giving x3 a string too would make the shell read it as a script name and
+    # exit; {<str>, NULL} leaves it reading stdin. Verified against a real
+    # /bin/sh -- see the shape table on #apply_argv_list.
     plan = satisfier.satisfy(gadget(['{x4, x3, x23, NULL} is a valid argv']))
-    expect(plan.regs['x4']).to eq('scratch_off' => Aletheia::Satisfier::NAME_POOL)
-    expect(plan.regs['x3']).to eq('scratch_off' => Aletheia::Satisfier::OPTION_POOL)
+    expect(plan.regs['x4']).to eq('scratch_off' => Aletheia::Satisfier::STRING_POOL)
+    expect(plan.regs['x3']).to eq(0)
+    expect(plan.regs).not_to have_key('x23')
+  end
+
+  it 'gives the command slot of a "-c" array the command, not a terminator' do
+    plan = satisfier.satisfy(gadget(['{"sh", "-c", x23, NULL} is a valid argv']))
     expect(plan.regs['x23']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
+  end
+
+  it 'terminates after a fixed argv[0] the gadget supplies' do
+    plan = satisfier.satisfy(gadget(['{"/bin/sh", x0, NULL} is a valid argv']))
+    expect(plan.regs['x0']).to eq(0)
   end
 
   it 'sets a register to the immediate for a "reg == imm" branch condition' do

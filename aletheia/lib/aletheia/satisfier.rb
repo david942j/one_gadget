@@ -37,8 +37,6 @@ module Aletheia
     SP_OFFSET       = 0x10000
     STRING_POOL     = 0x100    # readable+writable zeroed bytes: a valid "" / [NULL] array
     COMMAND_POOL    = 0x200    # the "ls /" L2 command the driver seeds here
-    NAME_POOL       = 0x240    # "sh", for an argv with no strings of its own
-    OPTION_POOL     = 0x260    # "-c", likewise
     COMMAND_RESERVED = 0x40    # generous window at COMMAND_POOL treated as non-zero
     WRITABLE_BASE   = 0x12000  # write-areas live above the stack region (sp is at SP_OFFSET)
     WRITABLE_STRIDE = 0x800
@@ -618,78 +616,80 @@ module Aletheia
       nil
     end
 
-    # +{e0, e1, ...}+ argv/envp contents: give every controllable element a
-    # readable scratch string so the array is fully valid. Literals and libc
-    # globals are the fixed strings the gadget supplies and need nothing.
+    # +{e0, e1, ...}+ argv/envp contents: fill the elements the gadget leaves to
+    # the caller, so the array is one the spawned shell can be driven from.
     #
-    # A NULL element ends the array, so nothing past it is part of what the callee
-    # sees and nothing past it needs building.
+    # Established by running +/bin/sh+ under a pty with each shape and driving
+    # +ls /+:
+    #
+    #   NULL, {NULL}, {<str>, NULL}              drivable -- the shell reads stdin
+    #   {"/bin/sh", "-c", <cmd>, NULL}           drivable -- the shell runs <cmd>
+    #   {"/bin/sh", "-", NULL}                   drivable -- "-" means read stdin
+    #   {<str>, "", NULL}, {"", "", "", NULL}    NOT: the element after argv[0] is
+    #                                            a script name the shell fails to
+    #                                            open, and it exits
+    #
+    # So argv[0]'s content doesn't matter, and everything hangs on what follows
+    # it: the command where the gadget supplies +"-c"+, and the terminator
+    # otherwise. A NULL element ends the array; nothing past it needs building.
     def apply_argv_list(plan, inner)
       elements = inner.split(',').map(&:strip).reject { |e| e == '...' }
-      # An array with no strings of its own is one the gadget reads entirely out
-      # of attacker memory, so fill it the way an exploit would -- `sh -c <cmd>`.
-      # Pointing every element at an empty string instead makes the shell treat
-      # the empty argv[1] as a script to run, and it exits without reading stdin.
-      return apply_own_argv(plan, elements) if elements.none? { |e| e.start_with?('"') }
-
       seen_c = false
       command_set = false
+      index = 0
       elements.each do |e|
         seen_c ||= (e == '"-c"')
-        next if e.start_with?('"')
-        break if e == 'NULL'
-
-        op = safe_parse(e) or next
-        placement = argv_placement(plan, op)
+        # A fixed string the gadget supplies needs nothing, but still occupies a
+        # position, as does an element this cannot place.
+        placement = e.start_with?('"') ? nil : argv_element_placement(plan, e)
         break if placement == :terminator
-        next if placement.nil?
+        if placement.nil?
+          index += 1
+          next
+        end
 
-        # For `sh -c … <cmd>`, the first element after -c is the shell command
-        # (`--`, a libc constant, just ends option parsing) -- point it at "ls /".
-        # Every other element gets an empty readable string.
-        pool = seen_c && !command_set ? COMMAND_POOL : STRING_POOL
+        op, target = placement
+        pool = argv_pool(index, seen_c, command_set)
         command_set ||= (pool == COMMAND_POOL)
-        kind, target = placement
-        ok = if kind == :mem
-               set_mem(plan, target, { 'scratch_off' => pool })
-             else
-               set_reg(plan, target, { 'scratch_off' => pool - op.imm })
-             end
-        return false unless ok
+        return false unless place_argv_element(plan, target, op, pool)
+        break if pool.nil? # the array ends here
+
+        index += 1
       end
       true
     end
 
-    # Fill an argv the gadget supplies no strings for: +{"sh", "-c", <cmd>}+, then
-    # NULL, which is what an exploit puts there and what lets the shell be seen
-    # running the command. Elements past the terminator need nothing.
-    # @param [Array<String>] elements The array's elements, in order.
-    def apply_own_argv(plan, elements)
-      pools = [NAME_POOL, OPTION_POOL, COMMAND_POOL]
-      elements.each do |e|
-        break if e == 'NULL'
+    # What an argv element at +index+ has to hold: the command where the gadget
+    # supplies +"-c"+ (a +--+ separator, or any other fixed string, just delays
+    # it), a readable string at argv[0], and otherwise NULL -- an element after
+    # argv[0] is a script name, and no string there leaves a drivable shell.
+    # @return [Integer, nil] a scratch offset, or nil for the terminator.
+    def argv_pool(index, seen_c, command_set)
+      return COMMAND_POOL if seen_c && !command_set
+      return STRING_POOL if index.zero?
 
-        op = safe_parse(e) or next
-        placement = argv_placement(plan, op)
-        break if placement == :terminator
-        next if placement.nil?
-
-        # Past the command, the array ends: write the NULL that ends it and stop.
-        pool = pools.shift
-        return false unless place_argv_element(plan, placement, op, pool || 0)
-        break if pool.nil?
-      end
-      true
+      nil
     end
 
-    # Put +pool+ (a scratch offset, or 0 for the array terminator) where an argv
+    # The parsed element and where its value has to go, +:terminator+ when the
+    # array already ends there, or nil when it is nothing this can place.
+    def argv_element_placement(plan, element)
+      return :terminator if element == 'NULL'
+
+      op = safe_parse(element) or return nil
+      placement = argv_placement(plan, op)
+      return placement if placement == :terminator || placement.nil?
+
+      [op, placement]
+    end
+
+    # Put +pool+ (a scratch offset, or nil for the array terminator) where an argv
     # element is read from.
     def place_argv_element(plan, placement, op, pool)
       kind, target = placement
-      value = pool.zero? ? 0 : { 'scratch_off' => pool }
-      return set_mem(plan, target, value) if kind == :mem
+      return set_mem(plan, target, pool.nil? ? 0 : { 'scratch_off' => pool }) if kind == :mem
 
-      set_reg(plan, target, pool.zero? ? 0 : { 'scratch_off' => pool - op.imm })
+      set_reg(plan, target, pool.nil? ? 0 : { 'scratch_off' => pool - op.imm })
     end
 
     # Where an argv element's string pointer has to go for the callee to find it:
