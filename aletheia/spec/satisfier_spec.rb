@@ -49,10 +49,14 @@ RSpec.describe Aletheia::Satisfier do
     expect(a).not_to eq(b)
   end
 
-  it 'prefers the cheap NULL branch over building a valid argv' do
+  it 'builds a valid argv rather than taking the cheaper NULL branch' do
+    # Both are configurations an attacker could choose, but an empty argv proves
+    # only that execve happened -- the shell has no command and exits unseen. The
+    # verifier takes the one it can witness.
     plan = satisfier.satisfy(gadget(['x4 == NULL || {x4, x3, x23, NULL} is a valid argv']))
-    expect(plan.regs['x4']).to eq(0)
-    expect(plan.branches['c0']).to eq('x4 == NULL')
+    expect(plan.branches['c0']).to eq('{x4, x3, x23, NULL} is a valid argv')
+    expect(plan.regs['x4']).to eq('scratch_off' => Aletheia::Satisfier::NAME_POOL)
+    expect(plan.regs['x23']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
   end
 
   it 'sets a register to the immediate for a "reg == imm" branch condition' do

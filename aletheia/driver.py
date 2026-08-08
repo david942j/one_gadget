@@ -53,6 +53,11 @@ gdb.write("ALETHEIA base=%#x gadget=%#x scratch=%#x\n" % (base, gadget, scratch)
 # Seed the L2 command; a `sh -c <cmd>` gadget points its command slot here so the
 # shell runs `ls /` itself. Keep in sync with the satisfier's COMMAND_POOL.
 gdb.selected_inferior().write_memory(scratch + 0x200, b"ls /\x00")
+# An argv the gadget reads entirely out of attacker memory has no strings of its
+# own, so seed the ones an exploit would put there: `sh -c <cmd>`. Keep the
+# offsets in sync with the satisfier NAME_POOL/OPTION_POOL.
+gdb.selected_inferior().write_memory(scratch + 0x240, b"sh\x00")
+gdb.selected_inferior().write_memory(scratch + 0x260, b"-c\x00")
 
 # Default fill for registers the plan doesn't set: benign (readable scratch),
 # poison (unmapped -> unlisted derefs fault), or null (0 -> argv terminates).
