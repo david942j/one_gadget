@@ -59,6 +59,9 @@ module Aletheia
     # address it is an alignment of +X+ (see {#alignment_mask?}); as a value it is
     # a requirement on +X+'s bits (see {#parse_relation}).
     MASKED = /\A\((.+) & (#{IMM})\)\z/
+    # The same, embedded rather than whole -- e.g. the +(rsi & ~0xf)+ inside
+    # +[(rsi & ~0xf)] == NULL+ (see {#unmask_address}).
+    MASKED_INNER = /\((\w+(?:[+-]#{IMM})?) & (#{IMM})\)/
 
     # +<reg> is the GOT address of libc+ (i386 PIC): the register must hold the
     # libc GOT base, i.e. +base + PLTGOT offset+.
@@ -176,12 +179,12 @@ module Aletheia
       when /\Awritable: (.+)\z/
         (op = writable_target(Regexp.last_match(1))) && writable_cost(op)
       when /\Areadable: (.+)\z/
-        (op = safe_parse(Regexp.last_match(1))) && op.reg && 0.4 # point it at scratch
+        (op = address_operand(Regexp.last_match(1))) && op.reg && 0.4 # point it at scratch
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
         base = Regexp.last_match(1)
         return nil if @null_unsafe_bases&.include?(base)
 
-        (op = safe_parse(base)) && null_cost(op)
+        (op = address_operand(base)) && null_cost(op)
       when /\A\{.*\} is a valid (?:argv|envp)\z/ then 0.5 # array literal: element builder
       when /is a valid (?:argv|envp)\z/         then 0.4 # pointer form: point it at scratch
       when ALIGN                                then alignment_cost(disjunct)
@@ -329,14 +332,14 @@ module Aletheia
         else op.deref.zero? && op.reg && (stack_reg?(op.reg) || scratch?(plan, op.reg))
         end
       when /\Areadable: (.+)\z/
-        (op = safe_parse(Regexp.last_match(1))) && pointer_resolved?(plan, op)
+        (op = address_operand(Regexp.last_match(1))) && pointer_resolved?(plan, op)
       when /is a valid (?:argv|envp)\z/
         (op = pointer_form(branch)) && pointer_resolved?(plan, op)
       when ALIGN
         reg, _mask, want = parse_alignment(branch)
         (stack_reg?(reg) && want.zero?) || (want.zero? && scratch?(plan, reg))
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
-        (op = safe_parse(Regexp.last_match(1))) && deref_reads_zero?(plan, op)
+        (op = address_operand(Regexp.last_match(1))) && deref_reads_zero?(plan, op)
       when GOT
         base_relative?(plan.regs[branch[GOT, 1]])
       else
@@ -435,9 +438,9 @@ module Aletheia
       when /\Awritable: (.+)\z/
         (op = writable_target(Regexp.last_match(1))) ? apply_writable(plan, op) : false
       when /\Areadable: (.+)\z/
-        (op = safe_parse(Regexp.last_match(1))) ? apply_pointer(plan, op) : false
+        (op = address_operand(Regexp.last_match(1))) ? apply_pointer(plan, op) : false
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
-        op = safe_parse(Regexp.last_match(1))
+        op = address_operand(Regexp.last_match(1))
         if op.nil? then false
         elsif op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
         elsif op.deref == 1 && base_reg?(op) then set_base_mem(plan, op.imm, 0) # zero the libc global
@@ -714,27 +717,40 @@ module Aletheia
       [m[1], Integer(m[2])]
     end
 
-    # The operand a +writable:+ constraint asks to be writable. An address kept as
-    # an alignment of a register -- +(rsi & 0xfffffffffffffff0)+, the gadget
-    # rounding a pointer down -- is that register, provided a scratch slot is
-    # already aligned enough to survive the rounding untouched.
-    # @return [Aletheia::Operand, nil] nil when this isn't an address we can place.
-    def writable_target(text)
-      inner, mask = unmask(text)
-      op = safe_parse(inner)
-      return op if mask.nil?
-      return nil unless op&.bare_reg? && alignment_mask?(mask) && slots_aligned_to?(mask)
-
-      op
+    # Rewrite a rounded-down address -- +(rsi & 0xfffffffffffffff0)+, a gadget
+    # aligning a pointer -- to the pointer itself, since every address this hands
+    # out is already aligned enough for the rounding to leave it untouched.
+    #
+    # Only for a context where the value IS an address. As a *value* a mask is a
+    # requirement on bits, which {#masked_witness} answers exactly; dropping it
+    # there would silently accept a target the mask cannot produce. A mask left in
+    # place fails to parse, and the gadget skips rather than being mis-planned.
+    # @example
+    #   unmask_address('[(rsi & 0xfffffffffffffff0)] == NULL') #=> '[rsi] == NULL'
+    #   unmask_address('(eax & 0xf000) == 0x2000')             #=> unchanged
+    def unmask_address(text)
+      text.gsub(MASKED_INNER) do
+        operand = Regexp.last_match(1)
+        mask = Integer(Regexp.last_match(2))
+        alignment_mask?(mask) && slots_aligned_to?(mask) ? operand : Regexp.last_match(0)
+      end
     end
 
-    # Whether every scratch slot address already satisfies +mask+, so pointing a
-    # register at one makes the rounded address the slot itself. Checked against
-    # the allocator rather than assumed: a coarser mask (page alignment, say)
-    # would not survive {WRITABLE_STRIDE}.
+    # Parse +text+ in a context where its value is an ADDRESS, so a rounding mask
+    # is an alignment rather than a requirement on bits (see {#unmask_address}).
+    # @return [Aletheia::Operand, nil] nil when this isn't an address we can place.
+    def address_operand(text)
+      safe_parse(unmask_address(text))
+    end
+    alias writable_target address_operand
+
+    # Whether every address this satisfier hands out already satisfies +mask+, so
+    # rounding one leaves it untouched. Checked against the actual offsets rather
+    # than assumed: a coarser mask (page alignment, say) would not survive
+    # {WRITABLE_STRIDE}.
     def slots_aligned_to?(mask)
       granularity = alignment_granularity(mask)
-      (WRITABLE_BASE % granularity).zero? && (WRITABLE_STRIDE % granularity).zero?
+      [WRITABLE_BASE, WRITABLE_STRIDE, STRING_POOL, COMMAND_POOL].all? { |off| (off % granularity).zero? }
     end
 
     # The alignment +mask+ rounds to: its lowest set bit, which is where the run

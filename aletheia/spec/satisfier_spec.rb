@@ -127,6 +127,17 @@ RSpec.describe Aletheia::Satisfier do
       expect(plan.regs['x3']['scratch_off'] % 0x10).to eq(0)
     end
 
+    it 'reads a rounded pointer inside a larger expression as that pointer' do
+      # the whole disjunction is about the address x3 rounds to, so every mention
+      # of it resolves to x3 -- and the scratch it is pointed at is zeroed, which
+      # already satisfies the cheapest branch.
+      plan = satisfier.satisfy(gadget(['writable: (x3 & 0xfffffffffffffff0)',
+                                       '[(x3 & 0xfffffffffffffff0)] == NULL || ' \
+                                       '(x3 & 0xfffffffffffffff0) is a valid argv']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['x3']).to be_a(Hash)
+    end
+
     it 'refuses an alignment coarser than a scratch slot guarantees' do
       # page alignment: WRITABLE_STRIDE is 0x800, so slots are not all 0x1000-aligned.
       plan = satisfier.satisfy(gadget(['writable: (x3 & 0xfffffffffffff000)']))
