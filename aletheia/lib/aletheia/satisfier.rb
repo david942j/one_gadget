@@ -54,6 +54,12 @@ module Aletheia
     # (see {#parse_relation}).
     ALIGN           = /\A(\w+) & (#{IMM}) == (#{IMM})\z/
 
+    # +(X & mask)+ -- an operation one_gadget kept as itself because no base+offset
+    # expresses its result. What the mask means depends on where it appears: as an
+    # address it is an alignment of +X+ (see {#alignment_mask?}); as a value it is
+    # a requirement on +X+'s bits (see {#parse_relation}).
+    MASKED = /\A\((.+) & (#{IMM})\)\z/
+
     # +<reg> is the GOT address of libc+ (i386 PIC): the register must hold the
     # libc GOT base, i.e. +base + PLTGOT offset+.
     GOT = /\A(\w+) is the GOT address of libc\z/
@@ -168,7 +174,7 @@ module Aletheia
       case disjunct
       when WRITABLE_COMPOUND then 0.9 # deferred; see #order_compound_writable_last
       when /\Awritable: (.+)\z/
-        (op = safe_parse(Regexp.last_match(1))) && writable_cost(op)
+        (op = writable_target(Regexp.last_match(1))) && writable_cost(op)
       when /\Areadable: (.+)\z/
         (op = safe_parse(Regexp.last_match(1))) && op.reg && 0.4 # point it at scratch
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
@@ -212,11 +218,17 @@ module Aletheia
     # @return [(Aletheia::Operand, Integer), nil]
     def deref_relation(disjunct)
       m = disjunct.match(/\A(?:\([su]\d+\))?(.+?) (==|!=|<=|>=|<|>) (#{IMM})\z/) or return nil
-      op = safe_parse(m[1])
+      lhs, mask = unmask(m[1])
+      op = safe_parse(lhs)
       return nil unless op&.reg && op.deref == 1
 
       relop = m[2]
       imm = Integer(m[3])
+      # A masked read wants a value whose masked bits meet the target; writing
+      # that value into the slot satisfies it, the mask having nothing to say
+      # about the bits it clears.
+      return masked_deref_relation(op, mask, relop, imm) if mask
+
       witness = relation_witness(relop, imm)
       # "must be nonzero" admits any value, so record that a pointer will do:
       # storing one keeps the location usable as a pointer by another constraint
@@ -312,7 +324,7 @@ module Aletheia
       when WRITABLE_COMPOUND
         compound_writable_satisfied?(plan, Regexp.last_match(1))
       when /\Awritable: (.+)\z/
-        op = Operand_.parse(Regexp.last_match(1))
+        op = writable_target(Regexp.last_match(1))
         if op.deref == 1 && op.reg then pointer_resolved?(plan, op)
         else op.deref.zero? && op.reg && (stack_reg?(op.reg) || scratch?(plan, op.reg))
         end
@@ -421,7 +433,7 @@ module Aletheia
       when WRITABLE_COMPOUND
         compound_writable_satisfied?(plan, Regexp.last_match(1))
       when /\Awritable: (.+)\z/
-        (op = safe_parse(Regexp.last_match(1))) ? apply_writable(plan, op) : false
+        (op = writable_target(Regexp.last_match(1))) ? apply_writable(plan, op) : false
       when /\Areadable: (.+)\z/
         (op = safe_parse(Regexp.last_match(1))) ? apply_pointer(plan, op) : false
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
@@ -665,9 +677,10 @@ module Aletheia
     def parse_relation(disjunct)
       if (m = disjunct.match(/\A\((\w+) & (#{IMM})\) (==|!=) (#{IMM})\z/))
         reg, mask, op, rhs = m[1], Integer(m[2]), m[3], Integer(m[4])
-        return [nil, nil] unless rhs.zero? && settable?(reg)
+        return [nil, nil] unless settable?(reg)
 
-        return [xreg(reg), op == '==' ? 0 : mask] # (reg & mask)==0 -> 0; !=0 -> mask
+        witness = masked_witness(mask, op, rhs)
+        return witness.nil? ? [nil, nil] : [xreg(reg), witness]
       end
       if (m = disjunct.match(/\A(?:\([su]\d+\))?(.+?) (==|!=|<=|>=|<|>) (#{IMM})\z/))
         # The left side may carry a displacement, e.g. `(x0 + 0x1) != 0x0`; the
@@ -679,6 +692,77 @@ module Aletheia
         end
       end
       [nil, nil]
+    end
+
+    # +([X] & mask) <op> want+: the value to write at +[X]+, in the shape
+    # {#deref_relation} returns. Only equality and inequality are modelled -- an
+    # ordering between a masked read and a literal hasn't been needed.
+    # @return [(Aletheia::Operand, Integer, Boolean), nil]
+    def masked_deref_relation(op, mask, relop, want)
+      return nil unless %w[== !=].include?(relop)
+
+      witness = masked_witness(mask, relop, want)
+      witness && [op, witness, false]
+    end
+
+    # Split +text+ into the operand a mask is applied to and that mask, or leave
+    # it alone when it carries none (see {MASKED}).
+    # @return [(String, Integer or nil)]
+    def unmask(text)
+      m = text.match(MASKED) or return [text, nil]
+
+      [m[1], Integer(m[2])]
+    end
+
+    # The operand a +writable:+ constraint asks to be writable. An address kept as
+    # an alignment of a register -- +(rsi & 0xfffffffffffffff0)+, the gadget
+    # rounding a pointer down -- is that register, provided a scratch slot is
+    # already aligned enough to survive the rounding untouched.
+    # @return [Aletheia::Operand, nil] nil when this isn't an address we can place.
+    def writable_target(text)
+      inner, mask = unmask(text)
+      op = safe_parse(inner)
+      return op if mask.nil?
+      return nil unless op&.bare_reg? && alignment_mask?(mask) && slots_aligned_to?(mask)
+
+      op
+    end
+
+    # Whether every scratch slot address already satisfies +mask+, so pointing a
+    # register at one makes the rounded address the slot itself. Checked against
+    # the allocator rather than assumed: a coarser mask (page alignment, say)
+    # would not survive {WRITABLE_STRIDE}.
+    def slots_aligned_to?(mask)
+      granularity = (~mask & MASK64) + 1
+      (WRITABLE_BASE % granularity).zero? && (WRITABLE_STRIDE % granularity).zero?
+    end
+
+    # A value whose masked bits meet +want+, for +(X & mask) <op> want+.
+    #
+    # +==+ needs +want+ to fit inside the mask, since bits the mask clears can
+    # never be part of the result; when it does, +want+ itself is the value.
+    # +!=+ needs any value differing from +want+ somewhere the mask keeps, and
+    # flipping every masked bit gives one for free.
+    # @return [Integer, nil] The value to give X, or nil when nothing can satisfy it.
+    # @example
+    #   masked_witness(0xf000, '==', 0x2000) #=> 0x2000
+    #   masked_witness(0xf000, '==', 0x1)    #=> nil   -- 0x1 is outside the mask
+    #   masked_witness(0x10, '!=', 0x0)      #=> 0x10
+    def masked_witness(mask, op, want)
+      return nil unless (want & ~mask & MASK64).zero?
+
+      op == '==' ? want : (want ^ mask) & MASK64
+    end
+
+    # Whether +mask+ only clears low bits, i.e. it aligns rather than selects.
+    # Such a mask on an address asks for an aligned one, which a scratch slot
+    # already is (see {#aligned_slot?}).
+    # @example
+    #   alignment_mask?(0xfffffffffffffff0) #=> true   -- clears the low 4 bits
+    #   alignment_mask?(0xf000)             #=> false  -- selects a field
+    def alignment_mask?(mask)
+      low = ~mask & MASK64
+      ((low + 1) & low).zero?
     end
 
     # A comparison between two registers, e.g. +x3 == x0+ or +r3 != r1+: neither

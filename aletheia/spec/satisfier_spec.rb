@@ -86,6 +86,46 @@ RSpec.describe Aletheia::Satisfier do
     expect(plan.regs['x21']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
   end
 
+  describe 'masks one_gadget could not fold' do
+    it 'gives a register a value whose masked bits meet the target' do
+      plan = satisfier.satisfy(gadget(['(x1 & 0xf000) == 0x2000']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['x1']).to eq(0x2000)
+    end
+
+    it 'refuses a target the mask can never produce' do
+      # 0x1 lies outside the mask, so no value of x1 makes the masked read 0x1.
+      plan = satisfier.satisfy(gadget(['(x1 & 0xf000) == 0x1']))
+      expect(plan.status).to eq('skip')
+    end
+
+    it 'flips the masked bits for an inequality' do
+      plan = satisfier.satisfy(gadget(['(x2 & 0x10) != 0x0']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['x2']).to eq(0x10)
+    end
+
+    it 'writes the value where the mask reads through a pointer' do
+      plan = satisfier.satisfy(gadget(['([sp+0x40] & 0x10) != 0x0']))
+      expect(plan.status).to eq('ok')
+      expect(plan.mem[Aletheia::Satisfier::SP_OFFSET + 0x40]).to eq(0x10)
+    end
+
+    it 'points a register rounded down for alignment at a scratch slot' do
+      # the gadget writes through (x3 & ~0xf); a scratch slot is 16-aligned, so
+      # the rounding leaves it untouched and the slot is the address written.
+      plan = satisfier.satisfy(gadget(['writable: (x3 & 0xfffffffffffffff0)']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['x3']['scratch_off'] % 0x10).to eq(0)
+    end
+
+    it 'refuses an alignment coarser than a scratch slot guarantees' do
+      # page alignment: WRITABLE_STRIDE is 0x800, so slots are not all 0x1000-aligned.
+      plan = satisfier.satisfy(gadget(['writable: (x3 & 0xfffffffffffff000)']))
+      expect(plan.status).to eq('skip')
+    end
+  end
+
   it 'lets a register another constraint pins to NULL terminate the argv' do
     # x3 is __sigaction's oldact -- it has to be NULL, and NULL is exactly what
     # ends an argv, so the array is `sh -c <x6>` rather than unsatisfiable.
