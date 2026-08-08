@@ -733,8 +733,14 @@ module Aletheia
     # the allocator rather than assumed: a coarser mask (page alignment, say)
     # would not survive {WRITABLE_STRIDE}.
     def slots_aligned_to?(mask)
-      granularity = (~mask & MASK64) + 1
+      granularity = alignment_granularity(mask)
       (WRITABLE_BASE % granularity).zero? && (WRITABLE_STRIDE % granularity).zero?
+    end
+
+    # The alignment +mask+ rounds to: its lowest set bit, which is where the run
+    # of cleared low bits ends.
+    def alignment_granularity(mask)
+      mask & -mask
     end
 
     # A value whose masked bits meet +want+, for +(X & mask) <op> want+.
@@ -756,13 +762,20 @@ module Aletheia
 
     # Whether +mask+ only clears low bits, i.e. it aligns rather than selects.
     # Such a mask on an address asks for an aligned one, which a scratch slot
-    # already is (see {#aligned_slot?}).
+    # already is (see {#slots_aligned_to?}).
+    #
+    # Every bit above the cleared run must be set, which is the same as the mask
+    # carrying to the top when its own granularity is added. Tested against both
+    # widths, so a 32-bit mask isn't mistaken for a field selector by complementing
+    # it over 64 bits.
     # @example
     #   alignment_mask?(0xfffffffffffffff0) #=> true   -- clears the low 4 bits
+    #   alignment_mask?(0xfffffff0)         #=> true   -- the same, 32-bit
     #   alignment_mask?(0xf000)             #=> false  -- selects a field
     def alignment_mask?(mask)
-      low = ~mask & MASK64
-      ((low + 1) & low).zero?
+      return false unless mask.positive?
+
+      [1 << 32, 1 << 64].include?(mask + alignment_granularity(mask))
     end
 
     # A comparison between two registers, e.g. +x3 == x0+ or +r3 != r1+: neither

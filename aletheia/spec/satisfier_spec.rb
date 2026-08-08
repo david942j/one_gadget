@@ -119,6 +119,14 @@ RSpec.describe Aletheia::Satisfier do
       expect(plan.regs['x3']['scratch_off'] % 0x10).to eq(0)
     end
 
+    it 'reads a 32-bit alignment mask as an alignment, not a field' do
+      # i386 renders the same rounding as 0xfffffff0; complementing that over 64
+      # bits would make it look like a field selector and skip the gadget.
+      plan = satisfier.satisfy(gadget(['writable: (x3 & 0xfffffff0)']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['x3']['scratch_off'] % 0x10).to eq(0)
+    end
+
     it 'refuses an alignment coarser than a scratch slot guarantees' do
       # page alignment: WRITABLE_STRIDE is 0x800, so slots are not all 0x1000-aligned.
       plan = satisfier.satisfy(gadget(['writable: (x3 & 0xfffffffffffff000)']))
