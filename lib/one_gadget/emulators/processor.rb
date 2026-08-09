@@ -38,6 +38,7 @@ module OneGadget
         @sp = sp
         @constraints = []
         @deferred_reads = [] # pointer args of safe calls, resolved once emulation ends
+        @closed_fds = []     # where each descriptor closed before the terminal call comes from
         @flags = nil     # last compare, for a following conditional branch
         @pending = nil   # a conditional branch awaiting one-line-ahead resolution
         @sp_based_stack = tracked_stack(sp)
@@ -156,6 +157,12 @@ module OneGadget
       # The {POINTER_REQUIREMENTS} a NULL argument already satisfies: both ask for
       # a pointer the callee will leave alone, and NULL is how that is asked for.
       NULLABLE_REQUIREMENTS = %i[nullable_deref null].freeze
+
+      # @return [Array<String>] Where each descriptor this candidate closes is read
+      #   from, in the order they are closed, without repeats.
+      def closed_fds
+        @closed_fds.uniq
+      end
 
       # @return [Array<String>]
       #   Extra constraints found during execution.
@@ -315,6 +322,9 @@ module OneGadget
       # per-argument requirements: an argument index paired with one of
       # * +:global_var?+ - a precondition that must already hold, else the
       #   candidate is aborted (+:fail+).
+      # * +:closed_fd+ - the descriptor the callee closes. Nothing is required of
+      #   it; it is recorded, because closing a standard descriptor changes what
+      #   the spawned shell can still do (see {#note_closed_fd}).
       # * +:null+ - the callee must be given NULL here, so +<arg> == NULL+ is
       #   recorded for the caller to arrange. A value that can never be NULL --
       #   a fixed address, or any other non-zero literal -- aborts the candidate.
@@ -344,6 +354,8 @@ module OneGadget
         return :fail unless func
 
         SafeCalls::COMMON[func].each do |idx, req|
+          next note_closed_fd(argument(idx)) if req == :closed_fd
+
           ok = POINTER_REQUIREMENTS.include?(req) ? record_pointer(argument(idx), req) : check_argument(idx, req)
           return :fail unless ok
         end
@@ -406,6 +418,19 @@ module OneGadget
         return value.any? { |v| clobbered?(v) } if value.is_a?(Array)
 
         value.is_a?(OneGadget::Emulators::Lambda) && value.obj == CLOBBERED
+      end
+
+      # Record a descriptor the gadget closes on its way to the terminal call, by
+      # where it is read from.
+      #
+      # Only one the caller chooses is worth recording, since which descriptor
+      # lands there decides whether the spawned shell keeps its I/O. One fixed in
+      # the code is nobody's to change, and no path that reaches a terminal call
+      # closes one, so it isn't modelled.
+      # @param [Object] fd The descriptor argument, as {#argument} returns it.
+      # @return [void]
+      def note_closed_fd(fd)
+        @closed_fds << fd.to_s unless fd.is_a?(Integer)
       end
 
       # Record what the callee does through a pointer argument.

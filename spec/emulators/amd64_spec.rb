@@ -117,6 +117,21 @@ describe OneGadget::Emulators::Amd64 do
     end
   end
 
+  describe 'descriptors a gadget closes' do
+    it 'records where a closed descriptor is read from' do
+      @processor.process('1000: mov edi,DWORD PTR [rsp+0x44]')
+      @processor.process('1004: call ebe00 <__close@@GLIBC_2.2.5>')
+      expect(@processor.closed_fds).to eq ['[rsp+0x44]']
+    end
+
+    it 'says nothing about a descriptor fixed in the code' do
+      # nobody can change it, and no path reaching a terminal call closes one.
+      @processor.process('1000: mov edi,0x2')
+      @processor.process('1004: call ebe00 <__close@@GLIBC_2.2.5>')
+      expect(@processor.closed_fds).to be_empty
+    end
+  end
+
   describe 'reading back a slot the gadget wrote' do
     it 'yields what was stored there, not the value the slot held on entry' do
       @processor.process('1000: mov QWORD PTR [rsp+0x8],rdx')
