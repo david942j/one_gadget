@@ -37,6 +37,11 @@ module Aletheia
     SP_OFFSET       = 0x10000
     STRING_POOL     = 0x100    # readable+writable zeroed bytes: a valid "" / [NULL] array
     COMMAND_POOL    = 0x200    # the "ls /" L2 command the driver seeds here
+    # A descriptor for a gadget to close harmlessly: high enough to be unused, so
+    # closing it costs the spawned shell nothing (see #spare_the_shells_fds).
+    # Written as a 4-byte field, since two descriptors sit 4 bytes apart and a
+    # word-sized write of one would zero the other.
+    SPARE_FD        = 42
     COMMAND_RESERVED = 0x40    # generous window at COMMAND_POOL treated as non-zero
     WRITABLE_BASE   = 0x12000  # write-areas live above the stack region (sp is at SP_OFFSET)
     WRITABLE_STRIDE = 0x800
@@ -109,10 +114,39 @@ module Aletheia
 
         plan.branches["c#{i}"] = chosen
       end
+      spare_the_shells_fds(plan, gadget)
       plan
     end
 
     private
+
+    # A descriptor the gadget closes but does not constrain is the caller's to
+    # choose (one_gadget reports it as a +close(...)+ caveat). Left alone it reads
+    # as 0 out of the zero-filled scratch, so the gadget closes the shell's stdin
+    # and nothing can be driven through it -- an accident of this harness, not a
+    # property of the gadget. Put a spare descriptor there, which is what an
+    # exploit would do.
+    #
+    # A descriptor any constraint mentions is left alone: that constraint decides
+    # its value, and where it decides on 0 or 1 the gadget really does cost the
+    # shell that channel, which the verdict should show. Emptiness of the plan is
+    # not enough to go on -- a stack slot required NULL is satisfied by the zero
+    # fill without writing anything.
+    def spare_the_shells_fds(plan, gadget)
+      return unless gadget.respond_to?(:closed_fds)
+
+      gadget.closed_fds.each do |slot|
+        next if gadget.constraints.any? { |c| c.include?(slot) }
+
+        op = safe_parse(slot) or next
+        if op.deref == 1
+          off = mem_addr_off(plan, op)
+          set_mem(plan, off, { 'int32' => SPARE_FD }) if off && plan.mem[off].nil?
+        elsif op.deref.zero? && op.reg && plan.regs[xreg(op.reg)].nil?
+          set_reg(plan, xreg(op.reg), SPARE_FD)
+        end
+      end
+    end
 
     # Try each disjunct of +constraint+ cheapest-first; accept the first that is
     # already satisfied by the current plan or that applies without conflict. The

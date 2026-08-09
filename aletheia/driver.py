@@ -97,9 +97,15 @@ word_fmt = {4: "<I", 8: "<Q"}[word_size]
 word_mask = (1 << (word_size * 8)) - 1
 for off, val in plan.get("mem", {}).items():
     off = int(off)
+    fmt, mask = word_fmt, word_mask
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
-    gdb.selected_inferior().write_memory(scratch + off, struct.pack(word_fmt, int(val) & word_mask))
+    elif isinstance(val, dict) and "int32" in val:
+        # A 4-byte field, e.g. a file descriptor. Writing a full word here would
+        # run over the neighbouring field -- two adjacent descriptors are 4 bytes
+        # apart, and a word-sized write of one zeroes the other.
+        val, fmt, mask = val["int32"], "<i", 0xffffffff
+    gdb.selected_inferior().write_memory(scratch + off, struct.pack(fmt, int(val) & mask))
 
 # Libc-global writes (keyed by base-relative offset): a constraint on a $base+off
 # memory value, e.g. `(s64)[$base+off] <= 0`, satisfied by writing that global.
