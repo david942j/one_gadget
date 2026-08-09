@@ -41,6 +41,20 @@ describe 'one_gadget_i386' do
 
     # 0xed234's own first instruction (mov [ebp-0x30], ecx) writes ecx into the
     # exact stack slot the envp check later requires to be NULL, so ecx itself is
+    # A fixed libc string is reached through the GOT register on i386 PIC, so it
+    # reads as `esi-0x59734` where every other arch resolves it to `$base+<off>`
+    # and prints its content. The register's value is known -- it is the PLTGOT,
+    # which the gadget's own "is the GOT address of libc" constraint states -- so
+    # the string can be shown, and the `-c` this passes the shell is no longer
+    # indistinguishable from an argv element the caller supplies.
+    it 'shows the content of a string reached through the GOT register' do
+      path = data_path('libc-2.27-63b3d43ad45e1b0f601848c65b067f9e9b40528b.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, details: true, level: 2)
+                        .find { |g| g.offset == 0x3c98c }
+      expect(gadget.constraints).to include('esi is the GOT address of libc')
+      expect(gadget.constraints).to include('{"sh", "-c", [esp+0xc], NULL} is a valid argv')
+    end
+
     # the real precondition -- not the opaque "[[ebp-0x30]] == NULL" form its
     # sibling 0xed300 (whose window starts after that write) still gets.
     it 'resolves envp through a tracked stack slot to the register that fills it' do
