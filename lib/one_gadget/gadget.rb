@@ -19,6 +19,9 @@ module OneGadget
       attr_reader :constraints
       # @return [String] The final result of this gadget.
       attr_reader :effect
+      # @return [Array<String>] Where each descriptor this gadget closes before the
+      #   exec is read from, in the order it closes them (see {#caveats}).
+      attr_reader :closed_fds
 
       # Initialize method of {Gadget} instance.
       # @param [Integer] offset The relative address offset of this gadget.
@@ -31,6 +34,21 @@ module OneGadget
         @offset = offset
         @constraints = options[:constraints] || []
         @effect = options[:effect] || ''
+        @closed_fds = options[:closed_fds] || []
+      end
+
+      # What the gadget costs the caller beyond its constraints: a descriptor it
+      # closes on the way to the exec. Each line names the close itself, so it
+      # reads as the code does and can be matched exactly, and says what the value
+      # must avoid for the spawned shell to keep its I/O.
+      # @return [Array<String>]
+      # @example
+      #   ['close([rsp+0x44]): prevent it from being 0 (stdin) or 1 (stdout) ...']
+      def caveats
+        closed_fds.map do |fd|
+          "close(#{fd}): prevent it from being 0 (stdin) or 1 (stdout) to sound " \
+            'an interactive shell.'
+        end
       end
 
       # Returns a human-readable, colorized representation of this gadget,
@@ -42,6 +60,11 @@ module OneGadget
           str += "#{OneGadget::Helper.colorize('constraints')}:\n  "
           str += merge_constraints.join("\n  ")
         end
+        unless caveats.empty?
+          str += "\n" unless constraints.empty?
+          str += "#{OneGadget::Helper.colorize('caveats')}:\n  "
+          str += caveats.map { |c| wrap_caveat(c) }.join("\n  ")
+        end
         str.gsub!(/0x[\da-f]+/) { |s| OneGadget::Helper.colorize(s, sev: :integer) }
         OneGadget::ABI.all.each do |reg|
           str.gsub!(/([^\w])(#{reg})([^\w])/, "\\1#{OneGadget::Helper.colorize('\2', sev: :reg)}\\3")
@@ -50,15 +73,16 @@ module OneGadget
       end
 
       # Converts this gadget into a plain hash, suitable for serialization.
-      # @return [Hash{Symbol => Integer, String, Array<String>}]
+      # @return [Hash{Symbol => Integer, String, Array<String>, Array<Integer>}]
       #   A hash with keys +:value+ (the absolute address), +:effect+ (the
-      #   resulting function call) and +:constraints+ (the required constraints).
+      #   resulting function call), +:constraints+ (the required constraints) and,
+      #   when the gadget closes a descriptor, +:closed_fds+ with the {#caveats}
+      #   they carry.
       def to_obj
-        {
-          value:,
-          effect:,
-          constraints:
-        }
+        obj = { value:, effect:, constraints: }
+        return obj if caveats.empty?
+
+        obj.merge(closed_fds:, caveats:)
       end
 
       # Serializes this gadget into a JSON string.
@@ -80,6 +104,14 @@ module OneGadget
       end
 
       private
+
+      # Fold a caveat to the terminal width, indenting the continuation past the
+      # key so the key stays the only thing at the start of a line.
+      # @param [String] caveat
+      # @return [String]
+      def wrap_caveat(caveat)
+        caveat.scan(/\S.{0,68}(?=\s|\z)/).join("\n    ")
+      end
 
       # REG: OneGadget::ABI.all
       # IMM: [+-]0x[\da-f]+
