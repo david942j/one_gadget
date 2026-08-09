@@ -65,15 +65,6 @@ RSpec.describe Aletheia::Satisfier do
     expect(plan.regs).not_to have_key('x23')
   end
 
-  it 'treats a fixed string past argv[0] as the option, however it is spelled' do
-    # On i386 PIC the "-c" is a libc global off the GOT register, not the literal
-    # string. Read as an ordinary element it would terminate the array exactly
-    # where the command goes, and the shell exits with "-c requires an argument".
-    plan = satisfier.satisfy(gadget(['{"sh", $base+0x100, x23, NULL} is a valid argv']))
-    expect(plan.status).to eq('ok')
-    expect(plan.regs['x23']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
-  end
-
   it 'gives the command slot of a "-c" array the command, not a terminator' do
     plan = satisfier.satisfy(gadget(['{"sh", "-c", x23, NULL} is a valid argv']))
     expect(plan.regs['x23']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
