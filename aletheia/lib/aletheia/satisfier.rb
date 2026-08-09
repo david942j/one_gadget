@@ -672,10 +672,10 @@ module Aletheia
       command_set = false
       index = 0
       elements.each do |e|
-        seen_c ||= (e == '"-c"')
         # A fixed string the gadget supplies needs nothing, but still occupies a
         # position, as does an element this cannot place.
         placement = e.start_with?('"') ? nil : argv_element_placement(plan, e)
+        seen_c ||= option_element?(e, placement, index)
         break if placement == :terminator
         if placement.nil?
           index += 1
@@ -691,6 +691,23 @@ module Aletheia
         index += 1
       end
       true
+    end
+
+    # Whether an element is the option the gadget passes the shell -- the +"-c"+
+    # that makes the next element a command to run.
+    #
+    # It is not always spelled +"-c"+: on i386 PIC the same string is a libc global
+    # reached off the GOT register (+esi-0x59734+), which is why this asks whether
+    # the gadget supplies a FIXED string past argv[0] rather than matching the text.
+    # Reading it as an ordinary element instead terminates the array right where
+    # the command belongs, and the shell exits with "-c requires an argument".
+    # @param [String] element
+    # @param [Object] placement What {#argv_element_placement} made of it.
+    # @param [Integer] index Its position in the array.
+    def option_element?(element, placement, index)
+      return false if index.zero? # argv[0] is the shell's own name
+
+      element == '"-c"' || (placement.nil? && element != 'NULL')
     end
 
     # What an argv element at +index+ has to hold: the command where the gadget
