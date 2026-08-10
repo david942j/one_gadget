@@ -66,14 +66,13 @@ constraints:
                                     '(stdout) to sound an interactive shell.']
     end
 
-    it 'prints them in their own section, wrapped so the close starts each line' do
+    it 'prints them in their own section, one line each' do
       gadget = OneGadget::Gadget::Gadget.new(0x1234, effect: 'execve("/bin/sh", rsp+0x30, environ)',
                                                      constraints: ['rax == NULL'],
                                                      closed_fds: ['[rsp+0x44]', 'r12'])
       lines = gadget.inspect.gsub(/\e\[[0-9;]*m/, '').lines.map(&:chomp)
       expect(lines).to include 'caveats:'
       expect(lines.grep(/\A  close\(/).size).to eq 2
-      expect(lines.select { |l| l.start_with?('    ') }).not_to be_empty # continuation indented
     end
 
     it 'carries them into the serialized form, and omits the keys when there are none' do

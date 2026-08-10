@@ -63,7 +63,7 @@ module OneGadget
         unless caveats.empty?
           str += "\n" unless constraints.empty?
           str += "#{OneGadget::Helper.colorize('caveats')}:\n  "
-          str += caveats.map { |c| wrap_caveat(c) }.join("\n  ")
+          str += caveats.join("\n  ")
         end
         str.gsub!(/0x[\da-f]+/) { |s| OneGadget::Helper.colorize(s, sev: :integer) }
         OneGadget::ABI.all.each do |reg|
@@ -104,14 +104,6 @@ module OneGadget
       end
 
       private
-
-      # Fold a caveat to the terminal width, indenting the continuation past the
-      # key so the key stays the only thing at the start of a line.
-      # @param [String] caveat
-      # @return [String]
-      def wrap_caveat(caveat)
-        caveat.scan(/\S.{0,68}(?=\s|\z)/).join("\n    ")
-      end
 
       # REG: OneGadget::ABI.all
       # IMM: [+-]0x[\da-f]+
