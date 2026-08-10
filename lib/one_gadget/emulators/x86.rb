@@ -67,6 +67,7 @@ module OneGadget
       def instructions
         [
           Instruction.new('add', 2),
+          Instruction.new('and', 2),
           Instruction.new('call', 1),
           Instruction.new('jmp', 1),
           Instruction.new('lea', 2),
@@ -270,6 +271,36 @@ module OneGadget
         check_register!(dst)
 
         registers[dst] += read_value(arg_to_lambda(src))
+      end
+
+      # +and dst, src+ both writes +dst+ and sets the flags a following branch
+      # reads, so it does both: model the result, then record the compare the
+      # +test+ of the same operands would have (see {Conditional::COMPARE_OPS}).
+      # Modelling only the flags would leave +dst+ holding a value the gadget has
+      # already replaced.
+      def inst_and(dst, src)
+        check_register!(dst)
+
+        src = read_value(arg_to_lambda(src))
+        result = mask_result(registers[dst], src)
+        record_compare(:and, value_str(registers[dst]), value_str(src))
+        registers[dst] = result
+      end
+
+      # A value as a constraint reads it: an immediate in hex, anything else as
+      # it renders itself.
+      def value_str(val)
+        val.is_a?(Integer) ? OneGadget::Helper.hex(val) : val.to_s
+      end
+
+      # +lhs & rhs+: folded when both are concrete, and otherwise named as the
+      # operation itself, since no base+offset expresses it (see {Lambda.operation}).
+      def mask_result(lhs, rhs)
+        return lhs & rhs if lhs.is_a?(Integer) && rhs.is_a?(Integer)
+
+        raise_unsupported('and', lhs, rhs) unless lhs.is_a?(OneGadget::Emulators::Lambda)
+
+        OneGadget::Emulators::Lambda.operation(lhs, '&', rhs)
       end
 
       def inst_sub(dst, src)
