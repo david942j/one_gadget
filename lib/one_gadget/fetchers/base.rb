@@ -497,13 +497,26 @@ module OneGadget
       # @param [String] element
       # @return [String, nil]
       def global_str_content(element)
-        m = /\A\$base\+(0x[0-9a-f]+)\z/.match(element) or return nil
+        off = string_file_offset(element) or return nil
 
         bytes = File.binread(file)
-        off = m[1].to_i(16)
+        return nil unless off.between?(0, bytes.size - 1)
+
         stop = bytes.index("\x00", off) or return nil
         str = bytes[off...stop]
         str if str.length.between?(1, 16) && str.each_byte.all? { |c| c.between?(0x20, 0x7e) }
+      end
+
+      # The file offset a fixed address names, or +nil+ when +element+ isn't one.
+      # Here that is the resolved-offset form an arch produces once it concretizes
+      # a pc-relative operand; an arch that reaches its globals through a register
+      # instead overrides this (see +I386#string_file_offset+).
+      # @param [String] element
+      # @return [Integer, nil]
+      def string_file_offset(element)
+        m = /\A\$base\+(0x[0-9a-f]+)\z/.match(element) or return nil
+
+        m[1].to_i(16)
       end
 
       def offset_of(assembly)
