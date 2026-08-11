@@ -10,6 +10,9 @@ SimpleCov.start do
                                                      ])
   skip '/spec/'
   skip '/lib/one_gadget/builds/'
+  # The suite covers every line, so anything less is a real gap rather than a
+  # number to interpret -- and a new line arrives covered or the build says so.
+  minimum_coverage line: 100
 end
 
 # These requirements must be put after SimpleCov.start,

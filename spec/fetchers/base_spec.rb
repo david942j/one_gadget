@@ -19,7 +19,7 @@ describe OneGadget::Fetchers::Base do
       [0, 8, 16, 24].each { |off| stack[off] = OneGadget::Emulators::Lambda.new('rbp') }
       lmda = OneGadget::Emulators::Lambda.parse('rsp')
 
-      result = fetcher.send(:check_stack_argv, processor, 'rsp', lmda, true)
+      result = fetcher.send(:check_stack_argv, processor, lmda, true)
       expect(result).to eq('rsp == NULL || rbp == NULL || {rbp, rbp, rbp, rbp, ...} is a valid argv')
     end
   end
@@ -43,7 +43,8 @@ describe OneGadget::Fetchers::Base do
     # branch that reads the envp array off the stack.
     it 'yields a valid-envp constraint when envp is a stack register' do
       yielded = nil
-      ret = fetcher.send(:check_envp, processor, 'rsp') { |cons| yielded = cons }
+      envp_ptr = OneGadget::Emulators::Lambda.new('rsp')
+      ret = fetcher.send(:check_envp, processor, envp_ptr) { |cons| yielded = cons }
 
       expect(ret).to be_truthy
       expect(yielded).to match(/\Arsp == NULL \|\| \{.*\} is a valid envp\z/)

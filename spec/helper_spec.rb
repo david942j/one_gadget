@@ -21,6 +21,11 @@ describe OneGadget::Helper do
     expect(described_class.build_id_of(@libcpath)).to eq '60131540dadc6796cab33388349e6e4e68692053'
   end
 
+  it 'which' do
+    expect(described_class.which('ruby')).to be_a(String)
+    expect(described_class.which('one-gadget-no-such-executable')).to be_nil
+  end
+
   it 'colorize' do
     allow(described_class).to receive(:color_enabled?).and_return(true)
     expect(described_class.colorize('123', sev: :integer)).to eq "\e[38;5;189m123\e[0m"

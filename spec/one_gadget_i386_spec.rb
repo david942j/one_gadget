@@ -39,8 +39,6 @@ describe 'one_gadget_i386' do
       expect(OneGadget.gadgets(file: path)).to eq [0xed300, 0x18a495, 0x18a496]
     end
 
-    # 0xed234's own first instruction (mov [ebp-0x30], ecx) writes ecx into the
-    # exact stack slot the envp check later requires to be NULL, so ecx itself is
     # A fixed libc string is reached through the GOT register on i386 PIC, so it
     # reads as `esi-0x59734` where every other arch resolves it to `$base+<off>`
     # and prints its content. The register's value is known -- it is the PLTGOT,
@@ -55,6 +53,8 @@ describe 'one_gadget_i386' do
       expect(gadget.constraints).to include('{"sh", "-c", [esp+0xc], NULL} is a valid argv')
     end
 
+    # 0xed234's own first instruction (mov [ebp-0x30], ecx) writes ecx into the
+    # exact stack slot the envp check later requires to be NULL, so ecx itself is
     # the real precondition -- not the opaque "[[ebp-0x30]] == NULL" form its
     # sibling 0xed300 (whose window starts after that write) still gets.
     it 'resolves envp through a tracked stack slot to the register that fills it' do

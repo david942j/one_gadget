@@ -157,9 +157,7 @@ module OneGadget
       end
 
       def resolve_execve(processor)
-        arg0 = processor.argument(0).to_s
-        arg1 = processor.argument(1).to_s
-        arg2 = processor.argument(2).to_s
+        arg0, arg1, arg2 = (0..2).map { |i| processor.argument(i) }
         res = resolve_execve_args(processor, arg0, arg1, arg2)
         return nil if res.nil?
 
@@ -167,7 +165,7 @@ module OneGadget
       end
 
       def resolve_execve_args(processor, arg0, arg1, arg2, allow_null_argv: true)
-        return unless str_bin_sh?(arg0)
+        return unless str_bin_sh?(arg0.to_s)
 
         # arg1 == NULL || [arg1] == NULL
         # arg2 == NULL || [arg2] == NULL || arg[2] == envp
@@ -189,13 +187,13 @@ module OneGadget
       #
       # Terminology shared by all the +argv+ helpers below:
       # * +argv_ptr+ - the *pointer to* the argv array, i.e. the emulated content of the register passed
-      #   as +argv+ (the string form of +processor.argument(n)+). Examples: +"rsi"+, +"rsp+0x10"+,
-      #   +"[rbp-0x8]"+, or a global-variable reference.
+      #   as +argv+ ({OneGadget::Emulators::Processor#argument}), kept as the emulator produced it.
+      #   Examples: +rsi+, +rsp+0x10+, +[rbp-0x8]+, a global-variable reference, or a bare integer.
       # * +argv+ - the array *pointed to* by +argv_ptr+: its dereferenced entries
       #   +[argv[0], argv[1], argv[2], argv[3]]+, each already converted to a string.
       #
       # @param [OneGadget::Emulators::Processor] processor The processor state at the call site.
-      # @param [String] argv_ptr The pointer to the argv array. See above.
+      # @param [OneGadget::Emulators::Lambda, Integer] argv_ptr The pointer to the argv array. See above.
       # @param [Boolean] allow_null
       #   Whether +argv_ptr+ itself may be +NULL+ (true for +execve+, false for +posix_spawn+).
       # @return [String, nil, false] How {#resolve_execve_args} should treat this argv:
@@ -205,10 +203,9 @@ module OneGadget
       #   unsatisfiable constraint and drops the gadget.
       def check_argv(processor, argv_ptr, allow_null)
         argv_ptr = resolve_stack_deref(processor, argv_ptr)
-        lmda = OneGadget::Emulators::Lambda.parse(argv_ptr)
-
-        if lmda.deref_count.zero? && resolvable_stack(processor, lmda)
-          return check_stack_argv(processor, argv_ptr, lmda, allow_null)
+        if argv_ptr.is_a?(OneGadget::Emulators::Lambda) && argv_ptr.deref_count.zero? &&
+           resolvable_stack(processor, argv_ptr)
+          return check_stack_argv(processor, argv_ptr, allow_null)
         end
 
         check_nonstack_argv(argv_ptr, allow_null)
@@ -237,18 +234,18 @@ module OneGadget
       end
 
       # Handle the case where +argv_ptr+ points into the stack, so the +argv+ entries can be read off it.
-      # @param [String] argv_ptr The pointer to the argv array. See {#check_argv}.
-      # @param [OneGadget::Emulators::Lambda] lmda The parsed +argv_ptr+ (a stack register, zero dereference).
+      # @param [OneGadget::Emulators::Lambda] argv_ptr The pointer to the argv array
+      #   (a stack register, zero dereference). See {#check_argv}.
       # @return [String, nil, false] The same three-way contract as {#check_argv},
       #   which returns this value unchanged: a constraint, +nil+ (already valid),
       #   or +false+ (drop the gadget).
-      def check_stack_argv(processor, argv_ptr, lmda, allow_null)
-        stack = processor.get_corresponding_stack(lmda.obj)
+      def check_stack_argv(processor, argv_ptr, allow_null)
+        stack = processor.get_corresponding_stack(argv_ptr.obj)
         # A stack register we don't track a stack for (the frame pointer):
         # fall back to treating it as an opaque pointer.
-        return check_nonstack_argv(lmda.to_s, allow_null) if stack.nil?
+        return check_nonstack_argv(argv_ptr, allow_null) if stack.nil?
 
-        argv = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
+        argv = (0..3).map { |i| stack[argv_ptr.immi + processor.class.bits / 8 * i].to_s }
 
         # A shell spawned with a fixed "noexec" option never runs a command, so
         # drop the gadget (see this method's @return for the +false+ contract).
@@ -342,50 +339,49 @@ module OneGadget
       # that slot's own tracked value so the rest of argv/envp resolution can
       # treat it like a bare register instead of an opaque pointer.
       # @param [OneGadget::Emulators::Processor] processor
-      # @param [String] ptr An argv_ptr/envp_ptr expression.
-      # @return [String] +ptr+, or the resolved expression when it simplifies.
+      # @param [OneGadget::Emulators::Lambda, Integer] ptr An argv_ptr/envp_ptr.
+      # @return [OneGadget::Emulators::Lambda, Integer] +ptr+, or the value it
+      #   resolves to when it simplifies.
       # @example a tracked slot resolves to its source register
       #   # mov [ebp-0x30], ecx   (earlier in the same candidate)
-      #   resolve_stack_deref(processor, '[ebp-0x30]') #=> 'ecx'
+      #   resolve_stack_deref(processor, Lambda.parse('[ebp-0x30]')) #=> the ecx lambda
       # @example an untracked slot is a no-op
-      #   resolve_stack_deref(processor, '[ebp-0x40]') #=> '[ebp-0x40]'
+      #   resolve_stack_deref(processor, Lambda.parse('[ebp-0x40]')) #=> that same lambda
       def resolve_stack_deref(processor, ptr)
-        lmda = OneGadget::Emulators::Lambda.parse(ptr)
-        return ptr unless lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.deref_count == 1 &&
-                          OneGadget::ABI.stack_register?(lmda.obj)
+        return ptr unless ptr.is_a?(OneGadget::Emulators::Lambda) && ptr.deref_count == 1 &&
+                          OneGadget::ABI.stack_register?(ptr.obj)
 
-        stack = processor.get_corresponding_stack(lmda.obj)
-        tracked = stack && stack[lmda.immi]
+        stack = processor.get_corresponding_stack(ptr.obj)
+        tracked = stack && stack[ptr.immi]
         return ptr unless tracked.is_a?(OneGadget::Emulators::Lambda) && tracked.deref_count.zero?
 
-        tracked.to_s
+        tracked
       end
 
       # Generate the +envp+-related constraint for an +exec*+ call.
       #
       # Mirrors the +argv+ terminology from {#check_argv}: +envp_ptr+ is the *pointer to* the envp array
-      # (the string form of +processor.argument(n)+), while +envp+ is the array of dereferenced entries
+      # ({OneGadget::Emulators::Processor#argument}), while +envp+ is the array of dereferenced entries
       # it points to.
       #
       # @param [OneGadget::Emulators::Processor] processor The processor state at the call site.
-      # @param [String] envp_ptr The pointer to the envp array.
+      # @param [OneGadget::Emulators::Lambda, Integer] envp_ptr The pointer to the envp array.
       # @yieldparam [String] cons The +envp+ constraint, yielded only when one is required.
       # @return [Object, nil] Truthy when +envp+ is acceptable, +nil+ to reject the gadget.
       def check_envp(processor, envp_ptr)
-        # If str starts with [[ and is a global variable,
-        # believe it is environ.
-        # If it starts with [[ but not a global var, drop it.
-        return global_var?(envp_ptr) if envp_ptr.start_with?('[[')
+        # A doubly-dereferenced pointer that names a global variable is believed to
+        # be environ; one that doesn't drops the gadget.
+        return global_var?(envp_ptr.to_s) if envp_ptr.is_a?(OneGadget::Emulators::Lambda) &&
+                                             envp_ptr.deref_count >= 2
 
         envp_ptr = resolve_stack_deref(processor, envp_ptr)
-        lmda = OneGadget::Emulators::Lambda.parse(envp_ptr)
         # A concrete integer, or a register with nothing useful tracked for it,
         # falls through to the opaque-pointer case (see {#resolvable_stack}).
-        stack = lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.deref_count.zero? &&
-                resolvable_stack(processor, lmda)
+        stack = envp_ptr.is_a?(OneGadget::Emulators::Lambda) && envp_ptr.deref_count.zero? &&
+                resolvable_stack(processor, envp_ptr)
         if stack
           # I haven't see this case after some tests, but just in case :)
-          envp = (0..3).map { |i| stack[lmda.immi + processor.class.bits / 8 * i].to_s }
+          envp = (0..3).map { |i| stack[envp_ptr.immi + processor.class.bits / 8 * i].to_s }
           # TODO: Handle the case when libc will write something into envp
           cons = global_var?(envp[0]) ? nil : "#{envp_ptr} == NULL || {#{envp.join(', ')}, ...} is a valid envp"
         else
@@ -425,7 +421,7 @@ module OneGadget
         # concrete non-zero integer there is a fixed address we can't constrain.
         return nil if [args[0], args[2], args[3]].any? { |a| a.is_a?(Integer) && !a.zero? }
 
-        res = resolve_execve_args(processor, args[1].to_s, args[4].to_s, args[5].to_s, allow_null_argv: false)
+        res = resolve_execve_args(processor, args[1], args[4], args[5], allow_null_argv: false)
         return nil if res.nil?
 
         cons = res[:constraints]
