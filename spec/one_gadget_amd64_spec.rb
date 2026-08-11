@@ -40,6 +40,25 @@ describe 'one_gadget_amd64' do
       expect(gadget.constraints).to include('writable: (rsp+0xf & 0xfffffffffffffff0)')
     end
 
+    # Both of these build argv in place through a pointer no register names --
+    # 0xc18cd rounds one down (`and rsi, ~0xf`), 0xc1b3d loads one from the frame
+    # -- and then write [ptr] = "sh", [ptr+8] = r15. Tracking those writes is what
+    # replaces the opaque "[ptr] == NULL" disjunct, which the gadget's own store
+    # to argv[0] can never leave true, with the r15 requirement that really is
+    # the caller's to meet.
+    it 'names the argv a gadget builds through a pointer no register names' do
+      path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
+      by_offset = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+                           .to_h { |g| [g.offset, g] }
+      expect(by_offset[0xc18cd].constraints).to include(
+        'r15 == NULL || {"sh", r15, [(rsi & 0xfffffffffffffff0)+0x10], ' \
+        '[(rsi & 0xfffffffffffffff0)+0x18], ...} is a valid argv'
+      )
+      expect(by_offset[0xc1b3d].constraints).to include(
+        'r15 == NULL || {"sh", r15, [[rbp-0x48]+0x10], [[rbp-0x48]+0x18], ...} is a valid argv'
+      )
+    end
+
     # Regression: a candidate that ran past its terminal execve into the stack-guard
     # epilogue used to yield spurious gadgets whose fs:/[rax-8] constraints crashed
     # score computation at the default level. Halting at the terminal call drops them.

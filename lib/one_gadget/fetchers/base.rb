@@ -203,10 +203,7 @@ module OneGadget
       #   unsatisfiable constraint and drops the gadget.
       def check_argv(processor, argv_ptr, allow_null)
         argv_ptr = resolve_stack_deref(processor, argv_ptr)
-        if argv_ptr.is_a?(OneGadget::Emulators::Lambda) && argv_ptr.deref_count.zero? &&
-           resolvable_stack(processor, argv_ptr)
-          return check_stack_argv(processor, argv_ptr, allow_null)
-        end
+        return check_stack_argv(processor, argv_ptr, allow_null) if resolvable_stack(processor, argv_ptr)
 
         check_nonstack_argv(argv_ptr, allow_null)
       end
@@ -214,7 +211,7 @@ module OneGadget
       # Whether resolving +lmda+'s target via tracked memory is worth attempting,
       # as opposed to the plain opaque "==NULL || is a valid .." form
       # ({#check_nonstack_argv}/the envp equivalent). Always true for the arch's
-      # dedicated stack/frame pointer. For any other register, only when element
+      # dedicated stack/frame pointer. For anything else, only when element
       # 0 -- what {#argv_already_valid?}/{#generate_argv_with_sh} branch on --
       # was actually written within this candidate.
       # @example element 0 tracked -- resolvable
@@ -223,29 +220,32 @@ module OneGadget
       #   reg+0x10 (element 2) tracked, reg/reg+0x8 (elements 0/1) untracked
       #   => not resolvable; falls back to the opaque form instead of a garbled array
       # @param [OneGadget::Emulators::Processor] processor
-      # @param [OneGadget::Emulators::Lambda] lmda A zero-deref pointer operand.
+      # @param [OneGadget::Emulators::Lambda, Integer] lmda A pointer operand. A
+      #   concrete address is never resolvable: nothing was tracked against it.
       # @return [Hash{Integer => OneGadget::Emulators::Lambda}, nil]
       def resolvable_stack(processor, lmda)
-        stack = processor.get_corresponding_stack(lmda.obj)
-        return nil unless stack
-        return stack if OneGadget::ABI.stack_register?(lmda.obj)
+        return nil unless lmda.is_a?(OneGadget::Emulators::Lambda)
 
-        stack if stack.key?(lmda.immi)
+        stack, offset = processor.resolve_address(lmda)
+        return nil unless stack
+        return stack if lmda.deref_count.zero? && OneGadget::ABI.stack_register?(lmda.obj)
+
+        stack if stack.key?(offset)
       end
 
-      # Handle the case where +argv_ptr+ points into the stack, so the +argv+ entries can be read off it.
-      # @param [OneGadget::Emulators::Lambda] argv_ptr The pointer to the argv array
-      #   (a stack register, zero dereference). See {#check_argv}.
+      # Handle the case where +argv_ptr+ points into memory this candidate wrote,
+      # so the +argv+ entries can be read off it.
+      # @param [OneGadget::Emulators::Lambda] argv_ptr The pointer to the argv array. See {#check_argv}.
       # @return [String, nil, false] The same three-way contract as {#check_argv},
       #   which returns this value unchanged: a constraint, +nil+ (already valid),
       #   or +false+ (drop the gadget).
       def check_stack_argv(processor, argv_ptr, allow_null)
-        stack = processor.get_corresponding_stack(argv_ptr.obj)
+        stack, offset = processor.resolve_address(argv_ptr)
         # A stack register we don't track a stack for (the frame pointer):
         # fall back to treating it as an opaque pointer.
         return check_nonstack_argv(argv_ptr, allow_null) if stack.nil?
 
-        argv = (0..3).map { |i| stack[argv_ptr.immi + processor.class.bits / 8 * i].to_s }
+        argv = (0..3).map { |i| stack[offset + processor.class.bits / 8 * i].to_s }
 
         # A shell spawned with a fixed "noexec" option never runs a command, so
         # drop the gadget (see this method's @return for the +false+ contract).
@@ -351,8 +351,8 @@ module OneGadget
         return ptr unless ptr.is_a?(OneGadget::Emulators::Lambda) && ptr.deref_count == 1 &&
                           OneGadget::ABI.stack_register?(ptr.obj)
 
-        stack = processor.get_corresponding_stack(ptr.obj)
-        tracked = stack && stack[ptr.immi]
+        stack, offset = processor.resolve_address(ptr.dup.ref!)
+        tracked = stack && stack[offset]
         return ptr unless tracked.is_a?(OneGadget::Emulators::Lambda) && tracked.deref_count.zero?
 
         tracked
