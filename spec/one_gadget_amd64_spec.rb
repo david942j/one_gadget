@@ -13,7 +13,7 @@ describe 'one_gadget_amd64' do
       path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
         .to eq [0x46421, 0x46428, 0x4643b, 0x46444, 0x46449, 0x46450, 0x4647c,
-                0xc18cd, 0xc18d1, 0xc18d8, 0xc1b3d, 0xc1ba3, 0xc1bf2, 0xc1ca7,
+                0xc18c8, 0xc18cd, 0xc18d1, 0xc18d8, 0xc1b3d, 0xc1ba3, 0xc1bf2, 0xc1ca7,
                 0xe4968, 0xe5765, 0xe5771,
                 0xe6527, 0xe652e, 0xe6532, 0xe653e, 0xe6543, 0xe654a,
                 0xe654d, 0xe6552, 0xe6557, 0xe669e, 0xe66bd]
@@ -27,6 +27,17 @@ describe 'one_gadget_amd64' do
                         .find { |g| g.offset == 0xc1ca7 }
       expect(gadget.constraints).to include('writable: rax')
       expect(gadget.constraints).not_to include('rax != 0x0')
+    end
+
+    # 0xc18c8's argv pointer renders as "(rsp+0xf & 0xfffffffffffffff0)". While the
+    # fetcher round-tripped that pointer through its own rendering, reading it back
+    # raised -- three tokens where a base+offset has two -- and the candidate was
+    # discarded as "not a gadget". Passing the value instead of its text keeps it.
+    it 'keeps a gadget whose argv pointer renders as an operation' do
+      path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+                        .find { |g| g.offset == 0xc18c8 }
+      expect(gadget.constraints).to include('writable: (rsp+0xf & 0xfffffffffffffff0)')
     end
 
     # Regression: a candidate that ran past its terminal execve into the stack-guard
