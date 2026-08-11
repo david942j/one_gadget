@@ -71,7 +71,7 @@ module OneGadget
       end
 
       # Track a store: write +values+ (one per word from +dst_l+) into the stack
-      # {#get_corresponding_stack} resolves +dst_l+ to, and require +dst_l+
+      # {#resolve_address} resolves +dst_l+ to, and require +dst_l+
       # writable -- unless it is a pure +sp+ store. +sp+ is invariantly the
       # writable stack; the frame pointer only conventionally is, so a store
       # through it stays a real precondition (like amd64's +writable: rbp+imm+).
@@ -80,8 +80,8 @@ module OneGadget
       # @param [Array<OneGadget::Emulators::Lambda, Integer>] values One per word.
       # @return [void]
       def track_write(dst_l, *values)
-        stack = dst_l.deref_count.zero? ? get_corresponding_stack(dst_l.obj) : nil
-        values.each_with_index { |v, i| stack[dst_l.immi + size_t * i] = v } if stack
+        stack, offset = resolve_address(dst_l)
+        values.each_with_index { |v, i| stack[offset + size_t * i] = v } if stack
         add_writable(dst_l) unless stack.equal?(sp_based_stack)
       end
 

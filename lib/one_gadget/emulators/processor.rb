@@ -237,9 +237,25 @@ module OneGadget
         end
       end
 
-      # The stack that +obj+ addresses -- +sp+-based, {#bp}-based, or a per-register
+      # Where +address+ lands in the memory this emulator tracks: the stack it
+      # falls in and its offset within it. A load or store passes the address it
+      # dereferences, i.e. its operand with that dereference peeled off.
+      # @param [Lambda, String] address An address.
+      # @return [(Hash{Integer => Lambda}?, Integer)] The stack, +nil+ if none
+      #   tracks this address, and the offset to index it at.
+      # @example an offset from a register
+      #   resolve_address(Lambda.parse('rsp+0x10')) #=> [sp_based_stack, 0x10]
+      # @example an offset from a pointer no register names
+      #   resolve_address(Lambda.parse('[rbp-0x48]+0x8')) #=> [the "[rbp-0x48]" stack, 0x8]
+      def resolve_address(address)
+        base, offset = address_base(address)
+        [get_corresponding_stack(base), offset]
+      end
+
+      # The stack that +obj+ addresses -- +sp+-based, {#bp}-based, a per-register
       # write history ({#reg_based_stack}) for any other register the candidate has
-      # written through.
+      # written through, or a per-value one ({#value_based_stack}) when no register
+      # names the base at all.
       # @param [String, Lambda] obj A lambda object or its string.
       # @return [Hash{Integer => Lambda}, nil] The corresponding stack, or nil.
       # @example
@@ -247,19 +263,40 @@ module OneGadget
       #   get_corresponding_stack('x29+0x40') #=> bp_based_stack (when bp is x29)
       #   get_corresponding_stack('x21')      #=> nil, or a write history if written through
       def get_corresponding_stack(obj)
-        # A compound base (a nested Lambda, e.g. the address is itself "[reg]+imm" --
-        # one more indirection than a simple register+offset) isn't something any of
-        # sp/bp/reg_based_stack model correctly: their imm is always "an offset from a
-        # *named register*", not "an offset from a dereferenced value". Matching it via
-        # a substring check on its rendered form (e.g. "[rbp-0x78]" contains "rbp")
-        # would silently mistrack it as bp-relative.
-        return nil if obj.is_a?(OneGadget::Emulators::Lambda)
+        # Matched before the register names below: such a base's imm is an offset
+        # from the value it names, not from any register, so a substring check on
+        # its rendered form ("[rbp-0x78]" contains "rbp") would mistrack it as
+        # bp-relative.
+        return value_based_stack(obj) if obj.is_a?(OneGadget::Emulators::Lambda)
 
         s = obj.to_s
         return sp_based_stack if s.include?(sp)
         return bp_based_stack if bp && s.include?(bp)
 
         reg_based_stack(s)
+      end
+
+      # A write history for a base that is a value rather than a register -- a
+      # pointer the candidate derived and then built an array through, which no
+      # register names. It addresses one place for as long as it names the same
+      # value, so its writes are tracked like a register's, keyed by how it
+      # renders. Only a store that overwrites what the base itself reads from
+      # would invalidate that, which a candidate short enough to be a gadget
+      # doesn't do.
+      #
+      # Without this the stores such a candidate makes are invisible, and the
+      # argv it builds in place reads as an opaque "is a valid argv" whose NULL
+      # alternatives the candidate itself overwrites.
+      # @example a pointer rounded down before use
+      #   (rsi & 0xfffffffffffffff0)
+      # @example a pointer loaded from the frame
+      #   [rbp-0x48]
+      # @param [OneGadget::Emulators::Lambda] lmda A value used as a base.
+      # @return [Hash{Integer => Lambda}]
+      def value_based_stack(lmda)
+        key = lmda.to_s
+        @value_stacks ||= {}
+        @value_stacks[key] ||= tracked_stack(key)
       end
 
       # A per-register write history for a register that ISN'T the arch's
@@ -295,6 +332,23 @@ module OneGadget
       end
 
       private
+
+      # Split +address+ into the base it is offset from and that offset, in the
+      # forms {#get_corresponding_stack} and a tracked stack expect.
+      # @param [Lambda, String] address See {#resolve_address}.
+      # @return [(String, Lambda), Integer]
+      def address_base(address)
+        return [address, 0] unless address.is_a?(OneGadget::Emulators::Lambda)
+        # Still a dereference deep, so the whole thing names one value rather than
+        # an offset from anything: its own immediate is part of that name.
+        return [address, 0] if address.deref_count.positive?
+        # An operation's +obj+ is only the value it operates on, which addresses
+        # somewhere else entirely -- a candidate building an array through
+        # +(rsi & ~0xf)+ is not writing through +rsi+.
+        return [address.dup.tap { |base| base.immi = 0 }, address.immi] if address.operation?
+
+        [address.obj, address.immi]
+      end
 
       # An always-on tracked stack keyed by offset: a Hash that lazily materialises
       # +[reg+off]+ as a one-deref {Lambda}. Used for the +sp+- and {#bp}-based stacks.
@@ -562,18 +616,15 @@ module OneGadget
       end
 
       # What this candidate stored at the address +val+ dereferences, or +nil+ if
-      # it stored nothing there. Only a single dereference of a base this emulator
-      # tracks names a slot it can answer for (see {#get_corresponding_stack}).
+      # it stored nothing there. Only a single dereference of an address this
+      # emulator tracks names a slot it can answer for (see {#resolve_address}).
       # @param [Object] val
       # @return [Object, nil]
       def stored_value(val)
-        return nil unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count == 1
+        return nil unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count.positive?
 
-        ptr = val.dup.ref!
-        return nil unless ptr.deref_count.zero?
-
-        stack = get_corresponding_stack(ptr.obj)
-        stack&.key?(ptr.immi) ? stack[ptr.immi] : nil
+        stack, offset = resolve_address(val.dup.ref!)
+        stack&.key?(offset) ? stack[offset] : nil
       end
 
       # Require +val+'s pointer be readable when a load dereferences an
