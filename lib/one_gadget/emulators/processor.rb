@@ -639,6 +639,28 @@ module OneGadget
         OneGadget::Emulators::Lambda.parse(arg, predefined: registers)
       end
 
+      # The value +op+ produces from +lhs+ and +rhs+: folded when both are
+      # concrete, and otherwise named as the operation itself, since no
+      # base+offset expresses it (see {Lambda.operation}). +nil+ when it is
+      # neither -- an operation on something this emulator cannot name, which the
+      # caller reports against its own mnemonic.
+      # @param [Symbol] op A Ruby operator that doubles as how the operation renders.
+      # @param [Lambda, Integer] lhs
+      # @param [Lambda, Integer] rhs
+      # @return [Lambda, Integer, nil]
+      # @example (amd64) +and rax, 0xf+ with rax unknown leaves +(rax & 0xf)+
+      #   operation_result(:&, registers['rax'], 0xf)
+      def operation_result(op, lhs, rhs)
+        return lhs.send(op, rhs) if lhs.is_a?(Integer) && rhs.is_a?(Integer)
+        return nil unless lhs.is_a?(OneGadget::Emulators::Lambda)
+
+        # Exclusive-or of a value with itself is zero whether or not the value is
+        # known -- how every arch spells "zero this register".
+        return 0 if op == :^ && lhs.to_s == rhs.to_s
+
+        OneGadget::Emulators::Lambda.operation(lhs, op.to_s, rhs)
+      end
+
       def raise_unsupported(inst, *args)
         raise OneGadget::Error::UnsupportedInstructionArgumentError, "#{inst} #{args.join(', ')}"
       end

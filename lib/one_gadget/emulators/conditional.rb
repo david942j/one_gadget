@@ -128,12 +128,19 @@ module OneGadget
         if register?(operand)
           raise Error::ClobberedRegisterError, operand if clobbered?(registers[operand])
 
-          return registers[operand].to_s
+          return value_str(registers[operand])
         end
 
         OneGadget::Helper.hex(Integer(operand))
       rescue ArgumentError
         operand
+      end
+
+      # A value as a constraint reads it: a concrete one in hex, whichever side of
+      # a compare it came from, and anything else as it renders itself.
+      # @example value_str(1) #=> '0x1', so a folded register reads like an immediate
+      def value_str(val)
+        val.is_a?(Integer) ? OneGadget::Helper.hex(val) : val.to_s
       end
 
       # Register a branch on the last recorded compare's flags, resolved on the next
