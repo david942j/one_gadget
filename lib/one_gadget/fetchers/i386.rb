@@ -59,6 +59,21 @@ module OneGadget
         str.include?(@base_reg)
       end
 
+      # i386 PIC reaches a libc global through the GOT register, so a fixed string
+      # reads as +<got reg>-<off>+ rather than the resolved +$base+<off>+ every
+      # other arch produces. What that register holds is known -- it is the PLTGOT,
+      # which is why the gadget carries a "+<reg>+ is the GOT address of libc"
+      # constraint -- so the file offset follows from it.
+      # @example +esi-0x59734+ with PLTGOT +0x1d5000+ is +0x17b8cc+, the +"-c"+ glibc
+      #   passes the shell
+      def string_file_offset(element)
+        return super if @base_reg.nil?
+
+        m = /\A#{Regexp.escape(@base_reg)}([+-]0x[0-9a-f]+)\z/.match(element) or return super
+
+        got_offset + Integer(m[1], 16)
+      end
+
       def got_offset
         File.open(file) do |f|
           elf = ELFTools::ELFFile.new(f)
