@@ -30,6 +30,13 @@ module OneGadget
       # its own {X86::COMPARES}.
       COMPARES = { 'cmp' => :sub, 'cmn' => :add, 'tst' => :and }.freeze
 
+      # The data-processing instructions both ARM families spell the same way,
+      # mapped to the Ruby operator that folds them and renders them alike.
+      # +bic+ and +mvn+ are absent: they complement their operand first, which
+      # {#complement} turns back into one of these (see {#inst_bic}).
+      DATA_OPS = { 'and' => :&, 'orr' => :|, 'eor' => :^, 'lsl' => :<<, 'lsr' => :>> }.freeze
+      private_constant :DATA_OPS
+
       private
 
       # A compare whose second operand may carry a shift modifier, e.g.
@@ -61,6 +68,74 @@ module OneGadget
         value = Integer(rhs)
         OneGadget::Helper.hex(m[1] == 'lsl' ? value << Integer(m[2]) : value >> Integer(m[2]))
       end
+
+      # Apply a data-processing instruction and store its result. Both families
+      # allow the 2-operand shorthand, so +src+ may be the only operand given.
+      # @param [String] name The mnemonic, for the abort a value we cannot name raises.
+      # @return [void]
+      def data_op(name, dst, src, op2)
+        check_register!(dst)
+        src, op2 = shorthand(dst, src, op2)
+        result = operation_result(DATA_OPS.fetch(name), value_of(src), value_of(op2))
+        raise_unsupported(name, dst, src, op2) if result.nil?
+
+        # A shift can push bits past the register width, which the arbitrary-
+        # precision fold above would otherwise keep.
+        registers[dst] = result.is_a?(Integer) ? result & width_mask : result
+      end
+
+      %w[and orr eor lsl lsr].each do |name|
+        define_method(:"inst_#{name}") { |dst, src, op2 = nil| data_op(name, dst, src, op2) }
+      end
+
+      # +bic dst, src, op2+ clears the bits +op2+ sets, which is +and+ against its
+      # complement -- the form a constraint should read as, since that complement
+      # is the mask the caller has to arrange.
+      def inst_bic(dst, src, op2 = nil)
+        src, op2 = shorthand(dst, src, op2)
+        data_op('and', dst, src, OneGadget::Helper.hex(complement('bic', op2, dst, src, op2)))
+      end
+
+      # +mvn dst, op2+ is that complement on its own.
+      def inst_mvn(dst, op2)
+        check_register!(dst)
+
+        registers[dst] = complement('mvn', op2, dst, op2)
+      end
+
+      # +op2+ with every bit flipped. Only a concrete value has a complement this
+      # emulator can name; a symbolic one aborts rather than being recorded as a
+      # mask it isn't.
+      # @param [String] name The mnemonic to report an abort against.
+      # @return [Integer]
+      def complement(name, op2, *reported)
+        value = value_of(op2)
+        raise_unsupported(name, *reported) unless value.is_a?(Integer)
+
+        ~value & width_mask
+      end
+
+      # Every bit of a register, for masking a result back to its width.
+      def width_mask = (1 << self.class.bits) - 1
+
+      # The value of an operand. {Arm} overrides it for +pc+, whose value depends
+      # on the address of the instruction reading it.
+      def value_of(arg) = arg_to_lambda(arg)
+
+      # Expand a 2-operand data-processing form into its (src, op2) operands:
+      # +add dst, op2+ is shorthand for +add dst, dst, op2+, while an explicit
+      # 3-operand form is passed through unchanged.
+      # @example
+      #   shorthand('r0', 'r4', nil) # 2-operand: add r0, r4
+      #   #=> ['r0', 'r4']
+      #   shorthand('r0', 'r4', '8') # 3-operand: add r0, r4, 8
+      #   #=> ['r4', '8']
+      def shorthand(dst, src, op2)
+        op2.nil? ? [dst, src] : [src, op2]
+      end
+
+      # An instruction with no effect this emulator models anything of.
+      def inst_nop(*); end
 
       # A +bl+/+blx+ call: record the terminal +exec*+ target, accept a known-safe
       # syscall wrapper, or +:fail+ to abort the candidate.

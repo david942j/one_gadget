@@ -49,6 +49,13 @@ module OneGadget
         __send__(:"inst_#{inst.inst}", *args) != :fail
       end
 
+      # The flag-setting spelling of an instruction we model, which differs from
+      # the base mnemonic only by a trailing +s+ (+movs+, +ands+, ...). The flags
+      # it sets are not modelled, so a branch reading them aborts the path anyway;
+      # what matters here is the value it also writes. Conditional variants
+      # (+moveq+, +addne+, ...) are deliberately absent and stay unsupported.
+      FLAG_SETTING = /\A(mov|add|sub|and|orr|eor|bic|mvn|lsl|lsr)s\z/
+
       # Supported instruction set. Any instruction not listed here aborts the
       # current gadget candidate (mirrors the conservative aarch64 emulator).
       # @return [Array<Instruction>] The supported instructions.
@@ -64,6 +71,13 @@ module OneGadget
           Instruction.new('bl', 1),
           Instruction.new('blx', 1),
           Instruction.new('nop', 0..1),
+          Instruction.new('and', 2..3),
+          Instruction.new('orr', 2..3),
+          Instruction.new('eor', 2..3),
+          Instruction.new('bic', 2..3),
+          Instruction.new('mvn', 2),
+          Instruction.new('lsl', 2..3),
+          Instruction.new('lsr', 2..3),
           Instruction.new('cmp', 2..3),
           Instruction.new('cmn', 2..3),
           Instruction.new('tst', 2..3),
@@ -123,7 +137,7 @@ module OneGadget
       def normalize(body)
         mnem, rest = body.split(/\s+/, 2)
         mnem = mnem.sub(/\.(w|n)\z/, '')
-        mnem = { 'movs' => 'mov', 'adds' => 'add', 'subs' => 'sub' }.fetch(mnem, mnem)
+        mnem = mnem.sub(FLAG_SETTING, '\\1')
         [mnem, rest].compact.join(' ').gsub(/#(-?(?:0x)?[0-9a-f]+)/i, '\1')
       end
 
@@ -212,7 +226,8 @@ module OneGadget
       alias inst_blx inst_bl
 
       # Flag-only / no-effect instructions: keep emulating without changing state.
-      def inst_nop(*); end
+      # A raw syscall: not modelled, but it does not touch anything the emulator
+      # tracks either, so the candidate continues (see {ArmFamily#inst_nop}).
       alias inst_svc inst_nop
 
       def branch_mnem?(mnem)
@@ -244,27 +259,17 @@ module OneGadget
       end
 
       # Resolve an operand to its current value, modelling +pc+ symbolically.
+      # +pc+ reads as its own address plus the pipeline bias; everything else is
+      # an ordinary operand (see {ArmFamily#value_of}).
       def value_of(arg)
         return pc_value if arg == pc
 
-        arg_to_lambda(arg)
+        super
       end
 
       # Add two operand values, keeping any {Lambda} on the left of the sum.
       def combine(a, b)
         a.is_a?(Integer) ? b + a : a + b
-      end
-
-      # Expand a 2-operand data-processing form into its (src, op2) operands:
-      # +add dst, op2+ is shorthand for +add dst, dst, op2+, while an explicit
-      # 3-operand form is passed through unchanged.
-      # @example
-      #   shorthand('r0', 'r4', nil) # 2-operand: add r0, r4
-      #   #=> ['r0', 'r4']
-      #   shorthand('r0', 'r4', '8') # 3-operand: add r0, r4, 8
-      #   #=> ['r4', '8']
-      def shorthand(dst, src, op2)
-        op2.nil? ? [dst, src] : [src, op2]
       end
 
       # Parse an ARM register-list operand (as written by +push+/+pop+/+ldm+/+stm+)

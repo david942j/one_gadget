@@ -66,5 +66,20 @@ describe OneGadget::Fetchers::Base do
       expect(fetcher.send(:contradiction?, 'x2 == 0x1')).to be false
       expect(fetcher.send(:trivial_relation, '[rax] == NULL || rax == rax')).to be_nil
     end
+
+    # Two sides that differ textually can still be settled: concrete values
+    # compare directly, and one base against itself plus an offset never matches.
+    it 'settles a relation whose sides are comparable without the caller' do
+      expect(fetcher.send(:tautology?, '0x1 == 0x1')).to be true
+      expect(fetcher.send(:contradiction?, '0x1 != 0x1')).to be true
+      expect(fetcher.send(:contradiction?, 'r1 == r1+0x4')).to be true
+      expect(fetcher.send(:tautology?, 'r1 != r1+0x4')).to be true
+    end
+
+    # Offsets from one base are comparable as addresses, but the values *at*
+    # those addresses are not -- nothing says two stack slots differ.
+    it 'leaves a comparison of two dereferenced slots alone' do
+      expect(fetcher.send(:trivial_relation, '[r1] == [r1+0x4]')).to be_nil
+    end
   end
 end

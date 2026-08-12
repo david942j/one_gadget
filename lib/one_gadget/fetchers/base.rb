@@ -525,9 +525,37 @@ module OneGadget
         return nil if con.include?(' || ')
 
         m = con.match(/\A(?:\([su]\d+\))?(.+?) (==|!=|<=|>=|<|>) (.+)\z/)
-        return nil unless m && m[1] == m[3]
+        return nil unless m
 
-        %w[== >= <=].include?(m[2])
+        lhs, rhs = comparable_values(m[1], m[3])
+        return nil if lhs.nil?
+
+        lhs.public_send(m[2] == '!=' ? :!= : m[2].to_sym, rhs)
+      end
+
+      # The two sides of a relation as plain numbers, when they can be compared
+      # without the caller arranging anything: the same expression twice, two
+      # concrete values, or two offsets from one base (+r1+ against +r1+0x4+ can
+      # never be equal). +nil+ leaves the relation a real constraint.
+      #
+      # Offsets are only comparable undereferenced. +[r1]+ and +[r1+0x4]+ address
+      # different slots, but the values in them are unrelated -- nothing says they
+      # differ.
+      # @return [(Numeric, Numeric), nil]
+      def comparable_values(lhs, rhs)
+        return [0, 0] if lhs == rhs
+
+        left = OneGadget::Emulators::Lambda.parse(lhs)
+        right = OneGadget::Emulators::Lambda.parse(rhs)
+        return [left, right] if left.is_a?(Integer) && right.is_a?(Integer)
+        return nil unless [left, right].all? do |l|
+          l.is_a?(OneGadget::Emulators::Lambda) && l.deref_count.zero? && !l.operation?
+        end
+        return nil unless left.obj.to_s == right.obj.to_s
+
+        [left.immi, right.immi]
+      rescue OneGadget::Error::Error
+        nil
       end
 
       def tautology?(con)

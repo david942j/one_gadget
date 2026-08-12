@@ -279,20 +279,9 @@ module OneGadget
         registers[dst] = result
       end
 
-      # A value as a constraint reads it: an immediate in hex, anything else as
-      # it renders itself.
-      def value_str(val)
-        val.is_a?(Integer) ? OneGadget::Helper.hex(val) : val.to_s
-      end
-
-      # +lhs & rhs+: folded when both are concrete, and otherwise named as the
-      # operation itself, since no base+offset expresses it (see {Lambda.operation}).
+      # +lhs & rhs+, or an abort when the result is nothing this emulator can name.
       def mask_result(lhs, rhs)
-        return lhs & rhs if lhs.is_a?(Integer) && rhs.is_a?(Integer)
-
-        raise_unsupported('and', lhs, rhs) unless lhs.is_a?(OneGadget::Emulators::Lambda)
-
-        OneGadget::Emulators::Lambda.operation(lhs, '&', rhs)
+        operation_result(:&, lhs, rhs) || raise_unsupported('and', lhs, rhs)
       end
 
       def inst_sub(dst, src)
