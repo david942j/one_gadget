@@ -261,6 +261,8 @@ module OneGadget
       # Resolve an operand to its current value, modelling +pc+ symbolically.
       # +pc+ reads as its own address plus the pipeline bias; everything else is
       # an ordinary operand (see {ArmFamily#value_of}).
+      # @param [String] arg The operand, as written.
+      # @return [OneGadget::Emulators::Lambda, Integer] Its current value.
       def value_of(arg)
         return pc_value if arg == pc
 

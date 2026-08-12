@@ -519,8 +519,12 @@ module OneGadget
         assembly.scan(/^([\da-f]+):/)[0][0].to_i(16)
       end
 
-      # A single (non-disjunctive) branch condition comparing a value with
-      # itself: +X == X+ / +X >= X+ is always true; +X != X+ / +X < X+ never is.
+      # Whether a single (non-disjunctive) branch condition already settles itself,
+      # asking nothing of the caller: +X == X+ is always true, +X != X+ never is,
+      # and so on for any two sides {#comparable_values} can put a number to.
+      # @param [String] con One constraint.
+      # @return [Boolean, nil] Whether the relation holds, or nil when it depends
+      #   on something the caller arranges -- i.e. it is a real constraint.
       def trivial_relation(con)
         return nil if con.include?(' || ')
 
@@ -541,7 +545,10 @@ module OneGadget
       # Offsets are only comparable undereferenced. +[r1]+ and +[r1+0x4]+ address
       # different slots, but the values in them are unrelated -- nothing says they
       # differ.
-      # @return [(Numeric, Numeric), nil]
+      # @param [String] lhs The relation's left side, cast already stripped.
+      # @param [String] rhs The relation's right side.
+      # @return [(Numeric, Numeric), nil] Both sides as numbers, or nil when they
+      #   cannot be compared without knowing what the caller supplies.
       def comparable_values(lhs, rhs)
         return [0, 0] if lhs == rhs
 

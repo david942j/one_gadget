@@ -120,14 +120,36 @@ constraints:
       expect(new(['x2 == 0x1']).score).to be_within(eps).of 0.4          # equality
       expect(new(['(u64)x0 >= 0x400']).score).to be_within(eps).of 0.6   # inequality
       expect(new(['[x1+0x8] != 0']).score).to be_within(eps).of 0.54     # deref penalised
-      expect(new(['(x3 & 0x10) == 0']).score).to be_within(eps).of 0.4 # bit-test, parses to x3+0x10
-      expect(new(['(x0 & x1) != 0']).score).to be_within(eps).of 0.6 # distinct regs: lhs unparseable
-      expect(new(['(s64)(x0 + 0x10) < 0']).score).to be_within(eps).of 0.6 # cmn compare: lhs unparseable
+      expect(new(['(x3 & 0x10) == 0']).score).to be_within(eps).of 0.4  # bit-test, nothing dereferenced
+      expect(new(['(x0 & x1) != 0']).score).to be_within(eps).of 0.6    # ..and neither is a distinct-register one
+      expect(new(['(s64)(x0 + 0x10) < 0']).score).to be_within(eps).of 0.6 # nor a cmn compare
+    end
+
+    # The stack pointer's low bits holding a fixed value is free -- the caller
+    # picks where the stack sits. A masked *value* renders similarly but is a
+    # requirement the caller has to arrange, and scores as the relation it is.
+    it 'tells stack alignment from a masked value' do
+      expect(new(['rsp & 0xf == 0x0']).score).to be_within(eps).of 0.95
+      expect(new(['sp & 0xf == 0x8']).score).to be_within(eps).of 0.95
+      expect(new(['(eax & 0xf000) == 0x2000']).score).to be_within(eps).of 0.4
+    end
+
+    # A pointer a gadget masks before writing through is scored by what it is
+    # derived from: rounding the stack pointer down still lands on the stack,
+    # while rounding an attacker register down is as hard as the register was.
+    it 'scores a masked pointer by the register it derives from' do
+      expect(new(['writable: (rsp+0xf & 0xfffffffffffffff0)']).score).to be_within(eps).of 0.95
+      expect(new(['writable: (rax & 0xfffffffffffffff0)']).score).to be_within(eps).of 0.81
+      expect(new(['{"sh", r15, [(rsi & 0xfffffffffffffff0)+0x10], ...} is a valid argv']).score)
+        .to be_within(eps).of 0.2
     end
 
     it 'level 3' do
       expect(new(['[[x4+0xad0]] == NULL']).score).to be_within(eps).of 0.9**3
       expect(new(['x4+0xad0 == NULL']).score).to be_within(eps).of 0.1
+      # Both loads count: the offset one nests in the lambda representation, so
+      # only the rendering states the depth the caller actually has to arrange.
+      expect(new(['[[x0+0x438]+0xe8] == 0x0']).score).to be_within(eps).of 0.4 * 0.9**2
     end
 
     it 'more than one' do

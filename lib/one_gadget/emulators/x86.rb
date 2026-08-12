@@ -280,6 +280,9 @@ module OneGadget
       end
 
       # +lhs & rhs+, or an abort when the result is nothing this emulator can name.
+      # @param [Lambda, Integer] lhs The value being masked.
+      # @param [Lambda, Integer] rhs The mask.
+      # @return [Lambda, Integer] The masked value.
       def mask_result(lhs, rhs)
         operation_result(:&, lhs, rhs) || raise_unsupported('and', lhs, rhs)
       end

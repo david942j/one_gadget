@@ -645,9 +645,10 @@ module OneGadget
       # neither -- an operation on something this emulator cannot name, which the
       # caller reports against its own mnemonic.
       # @param [Symbol] op A Ruby operator that doubles as how the operation renders.
-      # @param [Lambda, Integer] lhs
-      # @param [Lambda, Integer] rhs
-      # @return [Lambda, Integer, nil]
+      # @param [Lambda, Integer] lhs The value operated on.
+      # @param [Lambda, Integer] rhs The value it is operated on with.
+      # @return [Lambda, Integer, nil] The result, or nil when it is not one this
+      #   emulator can name.
       # @example (amd64) +and rax, 0xf+ with rax unknown leaves +(rax & 0xf)+
       #   operation_result(:&, registers['rax'], 0xf)
       def operation_result(op, lhs, rhs)
