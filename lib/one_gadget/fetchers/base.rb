@@ -121,6 +121,7 @@ module OneGadget
         return if options[:constraints].any? { |c| contradiction?(c) }
 
         options[:constraints] = options[:constraints].reject { |c| tautology?(c) }
+        options[:closed_fds] = processor.closed_fds
         OneGadget::Gadget::Gadget.new(offset_of(lines.first), **options)
       end
 

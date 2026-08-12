@@ -23,10 +23,12 @@ module OneGadget
         # __sigaction also writes back through +oldact+ (arg 2), so oldact must be NULL.
         'sigprocmask' => { 1 => :nullable_deref },
         '__sigaction' => { 1 => :nullable_deref, 2 => :null },
-        # __close takes no pointer argument (nothing to constrain). unsetenv reads its
-        # name (arg 0); +:global_var?+ may over-constrain it (readable would suffice),
-        # but no current fixture reaches unsetenv near an exec to verify -- left as-is.
-        '__close' => {},
+        # Record the descriptor __close closes: which one it is decides whether the
+        # spawned shell keeps its I/O (see {Processor#note_closed_fd}).
+        '__close' => { 0 => :closed_fd },
+        # unsetenv reads its name (arg 0); +:global_var?+ may over-constrain it
+        # (readable would suffice), but no current fixture reaches unsetenv near an
+        # exec to verify -- left as-is.
         'unsetenv' => { 0 => :global_var? },
         # setsigmask/setsigdefault copy *set into the attr unconditionally, so the
         # source (arg 1) must be readable and the attr they write (arg 0) writable.
