@@ -20,11 +20,15 @@ module OneGadget
       include Conditional
 
       attr_reader :registers # @return [RegisterFile] The current registers' state.
-      attr_reader :sp_based_stack # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Stack content based on sp.
       attr_reader :sp # @return [String] Stack pointer.
       attr_reader :pc # @return [String] Program counter.
       attr_reader :bp # @return [String, nil] Frame pointer, or nil when this arch tracks none.
-      attr_reader :bp_based_stack # @return [Hash{Integer => Lambda}, nil] Stack content based on {#bp}, or nil.
+
+      # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Memory written through +sp+.
+      def sp_based_stack = get_corresponding_stack(sp)
+
+      # @return [Hash{Integer => Lambda}, nil] Memory written through {#bp}, or nil when the arch has none.
+      def bp_based_stack = bp && get_corresponding_stack(bp)
 
       # Instantiate a {Processor} object.
       # @param [Array<String>] registers
@@ -41,7 +45,6 @@ module OneGadget
         @closed_fds = []     # where each descriptor closed before the terminal call comes from
         @flags = nil     # last compare, for a following conditional branch
         @pending = nil   # a conditional branch awaiting one-line-ahead resolution
-        @sp_based_stack = tracked_stack(sp)
       end
 
       # Enable frame-pointer stack tracking with +bp+ as the frame register, so a
@@ -51,7 +54,6 @@ module OneGadget
       # @return [void]
       def setup_frame_pointer(bp)
         @bp = bp
-        @bp_based_stack = tracked_stack(bp) unless bp.nil?
       end
 
       # Function names whose call ends a gadget: the real +exec*+ entry points.
@@ -252,86 +254,38 @@ module OneGadget
         [get_corresponding_stack(base), offset]
       end
 
-      # The stack that +obj+ addresses -- +sp+-based, {#bp}-based, a per-register
-      # write history ({#reg_based_stack}) for any other register the candidate has
-      # written through, or a per-value one ({#value_based_stack}) when no register
-      # names the base at all.
-      # @param [String, Lambda] obj A lambda object or its string.
-      # @return [Hash{Integer => Lambda}, nil] The corresponding stack, or nil.
-      # @example
-      #   get_corresponding_stack('sp+0x10')  #=> sp_based_stack
-      #   get_corresponding_stack('x29+0x40') #=> bp_based_stack (when bp is x29)
-      #   get_corresponding_stack('x21')      #=> nil, or a write history if written through
-      def get_corresponding_stack(obj)
-        # Matched before the register names below: such a base's imm is an offset
-        # from the value it names, not from any register, so a substring check on
-        # its rendered form ("[rbp-0x78]" contains "rbp") would mistrack it as
-        # bp-relative.
-        return value_based_stack(obj) if obj.is_a?(OneGadget::Emulators::Lambda)
-
-        s = obj.to_s
-        return sp_based_stack if s.include?(sp)
-        return bp_based_stack if bp && s.include?(bp)
-
-        reg_based_stack(s)
-      end
-
-      # A write history for a base that is a value rather than a register -- a
-      # pointer the candidate derived and then built an array through, which no
-      # register names. It addresses one place for as long as it names the same
-      # value, so its writes are tracked like a register's, keyed by how it
-      # renders. Only a store that overwrites what the base itself reads from
-      # would invalidate that, which a candidate short enough to be a gadget
-      # doesn't do.
+      # The memory +base+ addresses: what this candidate has written through it,
+      # keyed by offset. Every base gets one -- the stack pointer, the frame
+      # pointer, any other register, and a value no register names at all (a
+      # pointer the candidate derived and then built an array through).
       #
-      # Without this the stores such a candidate makes are invisible, and the
-      # argv it builds in place reads as an opaque "is a valid argv" whose NULL
-      # alternatives the candidate itself overwrites.
+      # Keyed by how the base renders, which is what makes one store enough: a
+      # register that gets reassigned addresses somewhere else and renders
+      # differently, so it lands on a different key without any invalidation to
+      # arrange. Only a store overwriting what the base itself reads from would
+      # break that, which a candidate short enough to be a gadget doesn't do.
+      # @example a register
+      #   get_corresponding_stack('x21')
       # @example a pointer rounded down before use
-      #   (rsi & 0xfffffffffffffff0)
-      # @example a pointer loaded from the frame
-      #   [rbp-0x48]
-      # @param [OneGadget::Emulators::Lambda] lmda A value used as a base.
-      # @return [Hash{Integer => Lambda}]
-      def value_based_stack(lmda)
-        key = lmda.to_s
-        @value_stacks ||= {}
-        @value_stacks[key] ||= tracked_stack(key)
-      end
+      #   get_corresponding_stack(Lambda.parse('(rsi & 0xfffffffffffffff0)'))
+      # @param [String, Lambda] base A base, as {#resolve_address} yields it --
+      #   not an offset expression, whose offset belongs in the key it indexes.
+      # @return [Hash{Integer => Lambda}, nil] nil when +base+ names nothing this
+      #   emulator tracks memory for.
+      def get_corresponding_stack(base)
+        return nil unless base.is_a?(OneGadget::Emulators::Lambda) || registers.key?(base.to_s)
 
-      # A per-register write history for a register that ISN'T the arch's
-      # dedicated stack/frame pointer (those get an always-on tracked stack; see
-      # the +get_corresponding_stack+ overrides in {ArmFamily}/{X86}). Lets a
-      # subclass's +get_corresponding_stack+ fall back to this for any other
-      # register a candidate happens to write through and immediately reuse
-      # (e.g. an argv array staged via an incoming register, not sp/bp).
-      #
-      # Valid only while +reg+'s CURRENT value is the exact object it was when
-      # the tracked writes happened: a later reassignment (e.g. +mov x4, x9+)
-      # transparently starts a fresh, empty history instead of returning stale
-      # content. sp/bp never needed this because they're essentially never
-      # reassigned mid-candidate; an arbitrary register can be.
-      # @param [String] reg A register name; returns +nil+ if it isn't a real one.
-      # @return [Hash{Integer => Lambda}, nil]
-      def reg_based_stack(reg)
-        return nil unless reg.is_a?(String) && registers.key?(reg)
-
-        identity = registers[reg]
-        @reg_stacks ||= {}
-        cached = @reg_stacks[reg]
-        return cached[:mem] if cached && cached[:identity].equal?(identity)
-
-        mem = Hash.new do |h, k|
-          h[k] = OneGadget::Emulators::Lambda.new(reg).tap do |l|
-            l.immi = k
-            l.deref!
-          end
-        end
-        @reg_stacks[reg] = { identity:, mem: }
-        mem
+        tracked_memory[base.to_s]
       end
 
       private
+
+      # Every base this candidate has written through, each mapped to the memory
+      # it addresses. See {#get_corresponding_stack}, which is how it is reached.
+      # @return [Hash{String => Hash{Integer => Lambda}}]
+      def tracked_memory
+        @tracked_memory ||= Hash.new { |memory, base| memory[base] = tracked_stack(base) }
+      end
 
       # Split +address+ into the base it is offset from and that offset, in the
       # forms {#get_corresponding_stack} and a tracked stack expect.
@@ -560,18 +514,17 @@ module OneGadget
       end
 
       # Whether +val+ points into memory already known mapped from a store
-      # through its base register during emulation -- either an explicit
-      # +writable+ constraint (a store {#get_corresponding_stack} couldn't
-      # place, e.g. a compound destination), or a tracked write history (see
-      # {#reg_based_stack}; a store the emulator *could* place -- the same
-      # evidence, a different bookkeeping path).
+      # through its base during emulation -- either an explicit +writable+
+      # constraint (a store {#get_corresponding_stack} couldn't place, e.g. a
+      # compound destination), or memory tracked against that base (a store it
+      # could place -- the same evidence, a different bookkeeping path).
       def writable_pointer?(val)
         return false unless val.is_a?(OneGadget::Emulators::Lambda) && val.deref_count.zero?
 
         base = val.obj.to_s
         return true if @constraints.any? { |type, obj| type == :writable && obj.obj.to_s == base }
 
-        stack = reg_based_stack(base)
+        stack = get_corresponding_stack(base)
         !!stack && !stack.empty?
       end
 

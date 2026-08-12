@@ -234,12 +234,20 @@ describe OneGadget::Emulators::Arm do
     end
 
     it 'get_corresponding_stack' do
-      expect(@processor.get_corresponding_stack('sp+0x10')).to be(@processor.sp_based_stack)
+      expect(@processor.get_corresponding_stack('sp')).to be(@processor.sp_based_stack)
       # A real register with nothing written through it yet: a usable (empty)
-      # write history, not nil -- so the FIRST write through it can still be
-      # captured (see Processor#reg_based_stack).
+      # store, not nil -- so the FIRST write through it can still be captured.
       expect(@processor.get_corresponding_stack('r4')).to eq({})
       expect(@processor.get_corresponding_stack('not_a_register')).to be_nil
+    end
+
+    # A pointer derived from a register addresses somewhere else than the
+    # register does, so the two never share a store.
+    it 'gives a derived pointer a store of its own' do
+      derived = OneGadget::Emulators::Lambda.parse('[r4]')
+      @processor.get_corresponding_stack(derived)[0] = 'written'
+      expect(@processor.get_corresponding_stack('r4')).to eq({})
+      expect(@processor.get_corresponding_stack(derived)).to eq({ 0 => 'written' })
     end
 
     it 'is 32-bit' do
