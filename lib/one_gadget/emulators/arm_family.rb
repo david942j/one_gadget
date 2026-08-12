@@ -71,8 +71,13 @@ module OneGadget
 
       # Apply a data-processing instruction and store its result. Both families
       # allow the 2-operand shorthand, so +src+ may be the only operand given.
-      # @param [String] name The mnemonic, for the abort a value we cannot name raises.
+      # @param [String] name The mnemonic, and the {DATA_OPS} key naming its operator.
+      # @param [String] dst The destination register.
+      # @param [String] src The left operand, or the only one given (see {#shorthand}).
+      # @param [String, nil] op2 The right operand, or nil in the 2-operand form.
       # @return [void]
+      # @raise [OneGadget::Error::UnsupportedInstructionArgumentError]
+      #   When the result is nothing this emulator can name.
       def data_op(name, dst, src, op2)
         check_register!(dst)
         src, op2 = shorthand(dst, src, op2)
@@ -84,6 +89,8 @@ module OneGadget
         registers[dst] = result.is_a?(Integer) ? result & width_mask : result
       end
 
+      # Each {DATA_OPS} mnemonic handled the one way, since they differ only in the
+      # operator applied (see {#data_op} for the operands).
       %w[and orr eor lsl lsr].each do |name|
         define_method(:"inst_#{name}") { |dst, src, op2 = nil| data_op(name, dst, src, op2) }
       end
@@ -91,12 +98,19 @@ module OneGadget
       # +bic dst, src, op2+ clears the bits +op2+ sets, which is +and+ against its
       # complement -- the form a constraint should read as, since that complement
       # is the mask the caller has to arrange.
+      # @param [String] dst The destination register.
+      # @param [String] src The value to clear bits of, or the only operand given.
+      # @param [String, nil] op2 The bits to clear, or nil in the 2-operand form.
+      # @return [void]
       def inst_bic(dst, src, op2 = nil)
         src, op2 = shorthand(dst, src, op2)
         data_op('and', dst, src, OneGadget::Helper.hex(complement('bic', op2, dst, src, op2)))
       end
 
       # +mvn dst, op2+ is that complement on its own.
+      # @param [String] dst The destination register.
+      # @param [String] op2 The value to complement.
+      # @return [void]
       def inst_mvn(dst, op2)
         check_register!(dst)
 
@@ -107,7 +121,9 @@ module OneGadget
       # emulator can name; a symbolic one aborts rather than being recorded as a
       # mask it isn't.
       # @param [String] name The mnemonic to report an abort against.
-      # @return [Integer]
+      # @param [String] op2 The operand to complement.
+      # @param [Array<String>] reported The operands to name in that abort.
+      # @return [Integer] +op2+ complemented, within the register width.
       def complement(name, op2, *reported)
         value = value_of(op2)
         raise_unsupported(name, *reported) unless value.is_a?(Integer)
@@ -116,15 +132,23 @@ module OneGadget
       end
 
       # Every bit of a register, for masking a result back to its width.
+      # @return [Integer]
       def width_mask = (1 << self.class.bits) - 1
 
       # The value of an operand. {Arm} overrides it for +pc+, whose value depends
       # on the address of the instruction reading it.
+      # @param [String] arg The operand, as written.
+      # @return [OneGadget::Emulators::Lambda, Integer] Its current value.
       def value_of(arg) = arg_to_lambda(arg)
 
       # Expand a 2-operand data-processing form into its (src, op2) operands:
       # +add dst, op2+ is shorthand for +add dst, dst, op2+, while an explicit
       # 3-operand form is passed through unchanged.
+      # @param [String] dst The destination register, which the 2-operand form
+      #   also reads as its left operand.
+      # @param [String] src The left operand, or the right one in the 2-operand form.
+      # @param [String, nil] op2 The right operand, or nil in the 2-operand form.
+      # @return [(String, String)] The left and right operands.
       # @example
       #   shorthand('r0', 'r4', nil) # 2-operand: add r0, r4
       #   #=> ['r0', 'r4']
@@ -135,6 +159,7 @@ module OneGadget
       end
 
       # An instruction with no effect this emulator models anything of.
+      # @return [void]
       def inst_nop(*); end
 
       # A +bl+/+blx+ call: record the terminal +exec*+ target, accept a known-safe
