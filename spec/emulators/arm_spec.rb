@@ -214,7 +214,13 @@ describe OneGadget::Emulators::Arm do
 
     it 'rejects a non-integer index' do
       expect(@processor.process('0: ldr r0, [r1], r2')).to be false
-      expect(@processor.process('4: sub r0, r1, r2')).to be false
+    end
+
+    # Neither operand is known, so the difference is no offset from either --
+    # it is named as the operation it is, and the candidate continues.
+    it 'names a difference of two unknown registers' do
+      expect(@processor.process('4: sub r0, r1, r2')).to be true
+      expect(@processor.registers['r0'].to_s).to eq '(r1 - r2)'
     end
 
     it 'rejects a PC-relative load without file data' do

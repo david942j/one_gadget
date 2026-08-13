@@ -69,6 +69,78 @@ module OneGadget
         OneGadget::Helper.hex(m[1] == 'lsl' ? value << Integer(m[2]) : value >> Integer(m[2]))
       end
 
+      # +add+/+sub+, shared by both families. Each allows the 2-operand shorthand,
+      # and each may carry a modifier on +op2+ -- a shift, or (aarch64) a
+      # sign-extension of its low half.
+      # @param [String] dst The destination register.
+      # @param [String] src The value added to, or the only operand given.
+      # @param [String, nil] op2 The value to add, or nil in the 2-operand form.
+      # @param [String, nil] mode A modifier applied to +op2+ (see {#modified_operand}).
+      # @return [void]
+      def inst_add(dst, src, op2 = nil, mode = nil) = arith(:+, dst, src, op2, mode)
+
+      # +sub dst, src, op2+. See {#inst_add} for the operands.
+      # @return [void]
+      def inst_sub(dst, src, op2 = nil, mode = nil) = arith(:-, dst, src, op2, mode)
+
+      # Add or subtract, and store the result.
+      #
+      # A sum of two values neither of which is known folds into no base+offset,
+      # so it is named as the operation it is -- a candidate deriving a pointer
+      # that way still says what the caller has to arrange. That is the only
+      # fallback: an offset from a known base stays a base+offset, which the rest
+      # of the emulator can resolve against tracked memory.
+      # @param [Symbol] op +:++ or +:-+.
+      # @return [void]
+      # @raise [OneGadget::Error::UnsupportedInstructionArgumentError]
+      #   When the modifier, or the result, is not one this emulator can name.
+      def arith(op, dst, src, op2, mode)
+        check_register!(dst)
+        src, op2 = shorthand(dst, src, op2)
+        lhs = value_of(src)
+        rhs = modified_operand(value_of(op2), mode) { raise_unsupported(op, dst, src, op2, mode) }
+
+        result = offset_result(op, lhs, rhs)
+        # The stack pointer has to stay an offset from itself: every tracked
+        # stack slot is keyed on it, and a candidate that reads one back after
+        # allocating a variable-size frame would be answered from the wrong
+        # place. Such a frame also puts the array a gadget builds at an address
+        # only a register the caller supplies decides, which no constraint this
+        # emulator emits states.
+        result ||= operation_result(op, lhs, rhs) unless dst == sp
+        raise_unsupported(op, dst, src, op2) if result.nil?
+
+        registers[dst] = result
+      end
+
+      # +lhs op rhs+ when the result is an offset from +lhs+'s base, which
+      # {Lambda} expresses directly. +nil+ when it is not, leaving the caller to
+      # name the operation instead.
+      # @return [Lambda, Integer, nil]
+      def offset_result(op, lhs, rhs)
+        return lhs.send(op, rhs) if rhs.is_a?(Integer)
+        # Adding a known offset to an unknown value is the same value shifted;
+        # subtracting from one is not, so only addition commutes here.
+        return rhs + lhs if op == :+ && lhs.is_a?(Integer)
+
+        nil
+      end
+
+      # +value+ with an operand modifier applied. +nil+ +mode+ is the bare
+      # operand. Yields, rather than returning, for a modifier this emulator does
+      # not model, so an unmodelled one aborts instead of being silently dropped.
+      # @example (aarch64) +add x0, x1, w2, sxtw+ -- +mode+ is +"sxtw"+
+      # @example (arm) +add r0, r1, r2, lsl 3+ -- +mode+ is +"lsl 3"+
+      # @return [Lambda, Integer]
+      def modified_operand(value, mode)
+        return value if mode.nil? || mode == 'sxtw' # a sign-extension we take whole
+
+        shifted = shifted_operand(value_str(value), mode)
+        return yield if shifted.nil?
+
+        Integer(shifted)
+      end
+
       # Apply a data-processing instruction and store its result. Both families
       # allow the 2-operand shorthand, so +src+ may be the only operand given.
       # @param [String] name The mnemonic, and the {DATA_OPS} key naming its operator.

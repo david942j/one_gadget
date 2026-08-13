@@ -10,12 +10,12 @@ describe 'one_gadget_arm' do
 
     it 'libc-2.23' do
       path = data_path('arm-libc-2.23.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x2c626, 0x84dc4]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x2c5f4, 0x2c626, 0x84dc4]
     end
 
     it 'libc-2.27' do
       path = data_path('arm-libc-2.27.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x2d39c, 0x73f7a, 0x73f96]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x2d39c, 0x73f7a, 0x73f98, 0x73f9a]
     end
 
     it 'libc-2.39' do
@@ -26,13 +26,16 @@ describe 'one_gadget_arm' do
     it 'libc-2.43' do
       path = data_path('libc-2.43-8c7af7f227b3871d6afba752cbb617f317023de5.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
-        .to eq [0x3afdc, 0x3affc, 0x3b000, 0x3b002, 0x3b004, 0x543d2, 0x8d94a, 0xa42c8, 0xa4334, 0xa4338]
+        .to eq [0x3afde, 0x3affc, 0x3b000, 0x3b002, 0x3b004, 0x543d4, 0x543d8, 0x8d94a, 0xa42c8, 0xa4334,
+                0xa4338]
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3b004, 0x8d94a, 0xa4338]
     end
 
     it 'constrains the GOT base register on arm-libc-2.43 environ gadgets' do
       path = data_path('libc-2.43-8c7af7f227b3871d6afba752cbb617f317023de5.so')
-      by_offset = OneGadget.gadgets(file: path, force_file: true, details: true, level: 1)
+      # Level 2 keeps every gadget, so this stays about the constraint rather than
+      # about which sibling currently out-ranks which.
+      by_offset = OneGadget.gadgets(file: path, force_file: true, details: true, level: 2)
                            .to_h { |g| [g.offset, g] }
       # Two environ gadgets whose GOT base lives in different registers.
       expect(by_offset[0x3afdc].constraints).to include('r6 is the GOT address of libc')
@@ -69,7 +72,9 @@ describe 'one_gadget_arm' do
 
     it 'resolves argv through a register written via str, not just sp/bp' do
       path = data_path('arm-libc-2.27.so')
-      gadgets = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+      # Level 2 keeps every gadget, so this stays about the constraint rather than
+      # about which sibling currently out-ranks which.
+      gadgets = OneGadget.gadgets(file: path, force_file: true, level: 2, details: true)
       # 0x73f96 builds argv on the stack via `str reg, [r7, #imm]`; the array's
       # first element (r7's own target) must be tracked so r0 -- an untracked
       # entry the code writes into the array too -- surfaces as a real
