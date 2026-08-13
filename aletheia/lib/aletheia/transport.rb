@@ -213,7 +213,13 @@ module Aletheia
       def plan_text(plan)
         lines = ["default #{default_fill(plan)}"]
         (plan['regs'] || {}).each do |name, val|
-          num = name[/\d+/] or next
+          # The stub addresses registers by number, so a role name has to be
+          # resolved to one first (arm's +fp+ is +r11+). Dropping a register the
+          # plan asked for would run the gadget without a value it requires and
+          # report the resulting miss as the gadget's fault, so this raises.
+          num = @arch.normalize_reg(name)[/\d+/]
+          raise ArgumentError, "plan sets #{name}, which the stub cannot address" if num.nil?
+
           lines << reg_line(num, val)
         end
         (plan['mem'] || {}).each { |off, val| lines << mem_line('mem', off, val) }
