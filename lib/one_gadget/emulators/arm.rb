@@ -153,24 +153,6 @@ module OneGadget
         registers[dst] = value_of(src)
       end
 
-      # 2-operand form (+add dst, op2+) is shorthand for +add dst, dst, op2+.
-      def inst_add(dst, src, op2 = nil)
-        check_register!(dst)
-        src, op2 = shorthand(dst, src, op2)
-
-        registers[dst] = combine(value_of(src), value_of(op2))
-      end
-
-      def inst_sub(dst, src, op2 = nil)
-        check_register!(dst)
-        src, op2 = shorthand(dst, src, op2)
-
-        op2 = value_of(op2)
-        raise_unsupported('sub', dst, src, op2) unless op2.is_a?(Integer)
-
-        registers[dst] = combine(value_of(src), -op2)
-      end
-
       def inst_ldr(dst, src, index = 0)
         check_register!(dst)
         raise_unsupported('ldr', dst, src, index) unless OneGadget::Helper.integer?(index)
@@ -267,11 +249,6 @@ module OneGadget
         return pc_value if arg == pc
 
         super
-      end
-
-      # Add two operand values, keeping any {Lambda} on the left of the sum.
-      def combine(a, b)
-        a.is_a?(Integer) ? b + a : a + b
       end
 
       # Parse an ARM register-list operand (as written by +push+/+pop+/+ldm+/+stm+)
