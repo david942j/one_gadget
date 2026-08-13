@@ -444,6 +444,17 @@ module OneGadget
       def global_var?(_str); raise NotImplementedError
       end
 
+      # Whether +str+ names a value derived from a libc-relative base rather than
+      # being one: an operation applied to it (see {OneGadget::Emulators::Lambda.operation}).
+      # +$base+0x10+ is a fixed address whose content can be read out of the file;
+      # +(r3 + $base+0x10)+ is that address plus whatever the caller puts in +r3+,
+      # so it names no particular byte and must not be resolved as though it did.
+      # @param [String] str A rendered value.
+      # @return [Boolean]
+      def derived_from_global?(str)
+        str.match?(/\A\[*\(.* .* .*\)/)
+      end
+
       def str_bin_sh?(_str); raise NotImplementedError
       end
 
