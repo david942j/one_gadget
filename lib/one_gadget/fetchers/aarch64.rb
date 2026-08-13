@@ -56,7 +56,7 @@ module OneGadget
       end
 
       def global_var?(str)
-        str.include?('$base')
+        str.include?('$base') && !derived_from_global?(str)
       end
     end
   end

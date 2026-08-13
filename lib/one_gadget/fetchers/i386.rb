@@ -56,7 +56,7 @@ module OneGadget
 
       # +@base_reg+ should always be set in resolve()
       def global_var?(str)
-        str.include?(@base_reg)
+        str.include?(@base_reg) && !derived_from_global?(str)
       end
 
       # i386 PIC reaches a libc global through the GOT register, so a fixed string
