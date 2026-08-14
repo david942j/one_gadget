@@ -130,18 +130,10 @@ module OneGadget
         dst = arg_to_lambda(dst)
         # dup: add_writable ref!s its argument, and dst is reused below.
         add_writable(dst.dup.ref!)
-        return if dst.deref_count != 1
-
-        # get_corresponding_stack takes a base (obj), not the whole pointer
-        # Lambda -- consistent with every other call site (aarch64.rb, base.rb).
-        stack = get_corresponding_stack(dst.obj)
-        return if stack.nil?
-
-        dst.ref!
-        # dst's base is a tracked register (sp/bp always resolve to 0 in
-        # eval_dict, and any other tracked register is offset-only the same
-        # way -- see Processor#reg_based_stack), so the immediate IS the offset.
-        stack[dst.immi] = src
+        # resolve_address takes the address the store writes to, i.e. the operand
+        # with the store's own dereference peeled off.
+        stack, offset = resolve_address(dst.ref!)
+        stack&.store(offset, src)
       end
 
       # +movsxd dst, src+: +src+'s low 32 bits, sign-extended into the 64-bit +dst+.
