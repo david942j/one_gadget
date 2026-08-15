@@ -103,6 +103,11 @@ module OneGadget
         @score ||= constraints.reduce(1.0) { |s, c| s * calculate_score(c) }
       end
 
+      # Every architecture's register names, for {#base_register} to recognise one
+      # by. Keyed for lookup: it is asked once per token of every constraint scored.
+      REGISTER_NAMES = OneGadget::ABI.all.to_h { |reg| [reg, true] }.freeze
+      private_constant :REGISTER_NAMES
+
       private
 
       # REG: OneGadget::ABI.all
@@ -122,9 +127,9 @@ module OneGadget
       # Expr: <Expr> || <Expr>
       def calculate_score(expr)
         return expr.split(' || ').map(&method(:calculate_score)).max if expr.include?(' || ')
+        return 0.95 if stack_alignment?(expr)
 
         case expr
-        when / & 0xf/ then 0.95
         when /GOT address/ then 0.9
         when /^writable/ then calculate_writable_score(expr.sub('writable: ', ''))
         when / == NULL$/ then calculate_null_score(expr.sub(' == NULL', ''))
@@ -139,6 +144,17 @@ module OneGadget
         end
       end
 
+      # Whether +expr+ is the alignment an aligned store imposes (see
+      # {OneGadget::Emulators::X86#inst_movaps}): the stack pointer's low bits
+      # must hold a fixed value, which is free -- the caller picks where the
+      # stack sits. Matched exactly, so a masked value the caller has to arrange
+      # stays the branch relation it is.
+      # @example matches +rsp & 0xf == 0x0+; not +(eax & 0xf000) == 0x2000+
+      def stack_alignment?(expr)
+        reg = expr[/\A(\S+) & 0xf == 0x[0-9a-f]+\z/, 1]
+        !reg.nil? && OneGadget::ABI.stack_register?(reg)
+      end
+
       # Score a branch-derived relational constraint such as +x2 == 0x1+ or
       # +(u64)x0 >= 0x400+: an equality on one specific value is harder than an
       # inequality/range, and a dereferenced left-hand side is harder still.
@@ -146,37 +162,48 @@ module OneGadget
         op = expr[/ (==|!=|<=|>=|<|>) /, 1]
         lhs = expr.split(/ #{Regexp.escape(op)} /, 2).first.sub(/\A\([su]\d+\)/, '')
         base = op == '==' ? 0.4 : 0.6
-        base * 0.9**lhs_deref_count(lhs)
+        base * 0.9**deref_depth(lhs)
       end
 
-      # Dereference depth of a relation's left side, used to weight the score.
-      # A compound expression (e.g. +(a & b)+ from +tst+, +(a + b)+ from +cmn+) is
-      # not a plain lambda and has no dereference, so it scores as depth 0.
-      def lhs_deref_count(lhs)
-        lmda = OneGadget::Emulators::Lambda.parse(lhs)
-        lmda.is_a?(OneGadget::Emulators::Lambda) ? lmda.deref_count : 0
-      rescue OneGadget::Error::Error
-        0
+      # How many dereferences +identity+ is behind, read off the rendering that
+      # produced it -- a lambda emits one +[+ per dereference.
+      # @example deref_depth('[[ebp+0x10]]') #=> 2
+      def deref_depth(identity)
+        identity[/\A\[*/].size
+      end
+
+      # The register +identity+ is derived from: the first one it names, since a
+      # rendering puts its base ahead of whatever is applied to it. +nil+ when it
+      # names none, e.g. a libc-relative +$base+0x10+.
+      # @example base_register('[(rsi & 0xfffffffffffffff0)+0x10]') #=> 'rsi'
+      def base_register(identity)
+        identity.scan(/\w+/).find { |token| REGISTER_NAMES.key?(token) }
+      end
+
+      # Whether +identity+ is a register itself rather than a value derived from
+      # one. Asked of an undereferenced identity, where being the register is
+      # what makes a requirement on it cheap to meet.
+      # @example bare_register?('rax') #=> true
+      # @example bare_register?('rax+0x10'), bare_register?('(rax & 0xf0)') #=> false
+      def bare_register?(identity)
+        identity == base_register(identity)
       end
 
       def calculate_writable_score(identity)
-        lmda = OneGadget::Emulators::Lambda.parse(identity)
-        return 0.81 if lmda.deref_count != 0
+        return 0.81 unless deref_depth(identity).zero?
 
-        OneGadget::ABI.stack_register?(lmda.obj) ? 0.95 : 0.81
+        OneGadget::ABI.stack_register?(base_register(identity)) ? 0.95 : 0.81
       end
 
       def calculate_null_score(identity)
-        # remove <CAST>
-        identity.sub!(/^\([s|u]\d+\)/, '')
-        # Thank God we are already able to parse this
-        lmda = OneGadget::Emulators::Lambda.parse(identity)
+        identity = identity.sub(/\A\([su]\d+\)/, '') # remove <CAST>
+        depth = deref_depth(identity)
         # rax == 0 is easy; rax + 0x10 == 0 is damn hard.
-        return lmda.immi.zero? ? 0.9 : 0.1 if lmda.deref_count.zero?
+        return bare_register?(identity) ? 0.9 : 0.1 if depth.zero?
 
         # [sp+xx] == NULL is easy.
-        base = OneGadget::ABI.stack_register?(lmda.obj) ? 0 : 1
-        0.9**(lmda.deref_count + base)
+        base = OneGadget::ABI.stack_register?(base_register(identity)) ? 0 : 1
+        0.9**(depth + base)
       end
 
       def merge_constraints
