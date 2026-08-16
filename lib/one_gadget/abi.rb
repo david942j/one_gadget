@@ -15,8 +15,10 @@ module OneGadget
     AARCH64 = %w[xzr wzr sp] + 0.upto(30).map { |i| ["x#{i}", "w#{i}"] }.flatten
 
     # Registers of ARM (32-bit).
-    # +r13+/+r14+/+r15+ are always shown by objdump as +sp+/+lr+/+pc+.
-    ARM = %w[sp lr pc] + 0.upto(12).map { |i| "r#{i}" }
+    # objdump never prints the numbered name of a register that has a role name:
+    # +r10+-+r15+ always appear as +sl+/+fp+/+ip+/+sp+/+lr+/+pc+, so those are
+    # what this list holds.
+    ARM = %w[sl fp ip sp lr pc] + 0.upto(9).map { |i| "r#{i}" }
 
     # Names that address part of a wider register rather than storage of their
     # own, mapped to the register they name part of. A write through either name
@@ -45,9 +47,9 @@ module OneGadget
       # AAPCS64: x0-x7 arguments and return, x9-x15 temporaries, x16/x17 the
       # intra-procedure-call scratch, x18 the platform register.
       aarch64: (0.upto(7).to_a + 9.upto(18).to_a).map { |i| "x#{i}" },
-      # AAPCS: r0-r3 arguments and return, r12 (ip) the intra-procedure scratch,
+      # AAPCS: r0-r3 arguments and return, ip (r12) the intra-procedure scratch,
       # and lr, which the call itself overwrites with the return address.
-      arm: %w[r0 r1 r2 r3 r12 lr]
+      arm: %w[r0 r1 r2 r3 ip lr]
     }.freeze
 
     # The register each ABI leaves an integer return value in.
