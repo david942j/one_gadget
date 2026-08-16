@@ -37,9 +37,17 @@ module OneGadget
         [
           Instruction.new('add', 3..4),
           Instruction.new('adrp', 2),
+          Instruction.new('and', 3),
+          Instruction.new('bic', 3),
           Instruction.new('bl', 1),
+          Instruction.new('eor', 3),
           Instruction.new('ldr', 2..3),
+          Instruction.new('lsl', 3),
+          Instruction.new('lsr', 3),
           Instruction.new('mov', 2),
+          Instruction.new('mvn', 2),
+          Instruction.new('nop', 0..1),
+          Instruction.new('orr', 3),
           Instruction.new('stp', 3),
           Instruction.new('str', 2..3),
           Instruction.new('sub', 3..4)
