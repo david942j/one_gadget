@@ -24,10 +24,16 @@ module Aletheia
   class Runner
     ARCHES = { amd64: Arch::Amd64, i386: Arch::I386, arm: Arch::Arm, aarch64: Arch::AArch64 }.freeze
 
+    # The mapping granularity a loader rounds a segment up to. The smallest any
+    # target uses, so the spare tail it implies is mapped whatever the real page
+    # size turns out to be (a larger page only rounds further up).
+    PAGE_SIZE = 0x1000
+
     def initialize(target:, arch: nil, strict: false)
       @target = target
       @arch = arch || arch_of(target)
-      @satisfier = Satisfier.new(@arch, got_offset: got_offset(target), strict: strict)
+      @satisfier = Satisfier.new(@arch, got_offset: got_offset(target),
+                                        spare_writable: spare_writable(target), strict: strict)
       @oracle = Oracle.new(target: target, arch: @arch)
     end
 
@@ -43,6 +49,28 @@ module Aletheia
       File.open(target) do |f|
         ELFTools::ELFFile.new(f).segment_by_type(:dynamic)&.tag_by_type(:pltgot)&.value
       end
+    rescue StandardError
+      nil
+    end
+
+    # Libc offsets that are mapped writable but that libc itself does not use: the
+    # tail of the last page of its writable segment, past the end of .bss. The
+    # loader rounds that segment up to a page boundary and zero-fills the
+    # remainder, so the tail is real memory nothing else reads or writes -- the
+    # one place a store the harness must steer somewhere can go without
+    # corrupting the libc that is about to run.
+    # @return [Range, nil] nil when the segment ends on a page boundary, leaving
+    #   no tail (the constraint then has nowhere to go, and its gadget SKIPs).
+    def spare_writable(target)
+      end_of_data = File.open(target) do |f|
+        ELFTools::ELFFile.new(f).segments_by_type(:load).select(&:writable?)
+                         .map { |s| s.header.p_vaddr.to_i + s.header.p_memsz.to_i }.max
+      end
+      return nil unless end_of_data
+
+      first = (end_of_data + 0xf) & ~0xf # keep every slot pointer-aligned
+      last = ((end_of_data + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE
+      first < last ? (first...last) : nil
     rescue StandardError
       nil
     end

@@ -202,5 +202,18 @@ verified against in the commit that introduced this section.
   per-version sysroot (matching ld.so, cross-built stub) is fetched on demand, so 2.27 now
   verifies. A non-Ubuntu fixture (no fetchable deb, e.g. the 2.24) instead falls back to the
   host loader, which works only when it can load that libc.
+- **An address written as `(reg + $base+imm)`** -- arm code that offsets a PC-relative
+  address by a caller-controlled register (`add r1, pc`). A `writable:` target of that
+  shape is planned: the register is pinned to the literal that lands the sum in libc's
+  own spare writable data, the tail of the last page of its writable segment
+  (`Runner#spare_writable`). Two shapes are not:
+  - `(reg + $base+imm) == NULL` needs `reg = -(base + imm)`, a value only the stub knows
+    at inject time -- a new plan directive, not a literal. These SKIP.
+  - the same shape as an *argv element*. `apply_argv_list` cannot place it and currently
+    skips it silently, leaving the poisoned register in the array, so `execve` gets an
+    unmapped `argv[0]` and the gadget reports **FAIL where it should report SKIP**. Until
+    that is fixed, a FAIL whose chosen branch is an argv list containing such an element
+    is a harness limitation, not a one_gadget bug (arm-2.23 `0x2c5e8`/`0x2c5ea`, arm-2.27
+    `0x2d35e`..`0x2d366` and `0x73f98`..`0x73f9c`).
 - `x29`/frame-chain assumptions: poison leaves x29 poisoned; if a gadget needs a valid
   frame this shows up as a fault — treat with the discovery loop before calling it a bug.

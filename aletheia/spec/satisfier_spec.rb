@@ -323,6 +323,56 @@ RSpec.describe Aletheia::Satisfier do
     end
   end
 
+  # arm-2.27's 0x2d358 window runs `add r1, pc` and then stores through the sum,
+  # so one_gadget names the store target `(r1 + $base+0x2d364)`: a fixed libc
+  # address whose landing place only r1 decides. There is no pointer to hand out
+  # -- r1 has to carry the literal that puts the sum in libc's own spare
+  # writable data.
+  context 'a store through a register added to a fixed libc address' do
+    require 'aletheia/arch/arm'
+    subject(:satisfier) { described_class.new(Aletheia::Arch::Arm, spare_writable: spare) }
+
+    let(:spare) { 0xf7590...0xf8000 }
+
+    def gadget(constraints, offset: 0x2d358, effect: 'execve("/bin/sh", sp+0x20, environ)')
+      OpenStruct.new(offset: offset, effect: effect, constraints: constraints)
+    end
+
+    it 'pins the register so the sum lands in the spare writable data' do
+      plan = satisfier.satisfy(gadget(['writable: (r1 + $base+0x2d364)']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['r1'] + 0x2d364).to eq(spare.first)
+    end
+
+    it 'folds a trailing displacement into the literal' do
+      plan = satisfier.satisfy(gadget(['writable: (r1 + $base+0x2d364)+0x8']))
+      expect(plan.regs['r1'] + 0x2d364 + 0x8).to eq(spare.first)
+    end
+
+    it 'gives distinct areas to two such stores' do
+      plan = satisfier.satisfy(gadget(['writable: (r1 + $base+0x100)', 'writable: (r2 + $base+0x200)']))
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['r1'] + 0x100).not_to eq(plan.regs['r2'] + 0x200)
+    end
+
+    it 'SKIPs when the libc has no spare writable room to steer the store into' do
+      plan = described_class.new(Aletheia::Arch::Arm).satisfy(gadget(['writable: (r1 + $base+0x2d364)']))
+      expect(plan.status).to eq('skip')
+    end
+
+    it 'SKIPs when the register is not one the plan can set' do
+      plan = satisfier.satisfy(gadget(['writable: (lr + $base+0x2c5ee)']))
+      expect(plan.status).to eq('skip')
+    end
+
+    # Every other constraint form keeps refusing the shape rather than planning
+    # it as if the fixed address weren't there (see Satisfier#safe_parse).
+    it 'SKIPs a NULL requirement on such a sum' do
+      plan = satisfier.satisfy(gadget(['(r2 + $base+0x47a68) == NULL']))
+      expect(plan.status).to eq('skip')
+    end
+  end
+
   context 'i386 backend' do
     require 'aletheia/arch/i386'
     subject(:satisfier) { described_class.new(Aletheia::Arch::I386, got_offset: 0x1d5000) }
