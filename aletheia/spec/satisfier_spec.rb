@@ -371,6 +371,29 @@ RSpec.describe Aletheia::Satisfier do
       plan = satisfier.satisfy(gadget(['(r2 + $base+0x47a68) == NULL']))
       expect(plan.status).to eq('skip')
     end
+
+    # The same steering serves an argv element: the sum lands on the zero fill,
+    # which reads as the valid empty string argv[0] only has to be. arm-2.27's
+    # 0x2d35e shape, where the gadget supplies the "-c" and the command follows.
+    it 'places an argv[0] built the same way, and still seeds the command' do
+      plan = satisfier.satisfy(gadget(['{(ip + $base+0x2d36a), "-c", fp, r3, ...} is a valid argv']))
+      expect(plan.status).to eq('ok')
+      expect(spare).to cover(plan.regs['r12'] + 0x2d36a)
+      expect(plan.regs['fp']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
+    end
+
+    # A terminator has to be NULL, which asks the register to cancel the libc
+    # address out -- no literal does that, and planning around it would leave the
+    # element holding whatever the driver filled its register with.
+    it 'refuses such an element where the array has to end' do
+      plan = satisfier.satisfy(gadget(['{(ip + $base+0x100), (r7 + $base+0x200), fp, r3, ...} is a valid argv']))
+      expect(plan.status).to eq('skip')
+    end
+
+    it 'refuses such an element on a register the plan cannot set' do
+      plan = satisfier.satisfy(gadget(['{(lr + $base+0x2c5fe), "-c", r6, r3, ...} is a valid argv']))
+      expect(plan.status).to eq('skip')
+    end
   end
 
   context 'i386 backend' do

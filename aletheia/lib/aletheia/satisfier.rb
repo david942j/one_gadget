@@ -87,7 +87,7 @@ module Aletheia
     #   "+<reg> is the GOT address of libc+" constraint (see {GOT}).
     # @param [Range, nil] spare_writable libc offsets that are mapped writable but
     #   that libc itself does not use, where a store through an address only a
-    #   register decides is steered (see {#apply_spare_writable}).
+    #   register decides is steered (see {#pin_sum_into_spare}).
     # @param [Boolean] strict when true, uncontrolled registers are poisoned
     #   (unmapped) so any unlisted dependency faults -- a completeness test for
     #   the constraint list. When false, they point at readable scratch.
@@ -321,7 +321,7 @@ module Aletheia
 
     # Whether a +writable:+ target already references writable memory. A base sum
     # never does on its own: only pinning its register puts the address anywhere
-    # in particular (see {#apply_spare_writable}).
+    # in particular (see {#pin_sum_into_spare}).
     def writable_satisfied?(plan, text)
       return false if base_sum(text)
 
@@ -634,17 +634,19 @@ module Aletheia
     end
 
     def apply_writable_target(plan, text)
-      if (sum = base_sum(text)) then apply_spare_writable(plan, *sum)
+      if (sum = base_sum(text)) then pin_sum_into_spare(plan, *sum)
       elsif (op = writable_target(text)) then apply_writable(plan, op)
       else false
       end
     end
 
-    # Steer a store through +(reg + $base+imm)+ into libc's own spare writable
-    # data by pinning the register to the literal that puts the sum there. The
-    # address is a fixed libc one, so unlike a scratch target there is no pointer
-    # to hand out: the register carries the whole displacement.
-    def apply_spare_writable(plan, reg, off)
+    # Steer +(reg + $base+off)+ into libc's own spare data by pinning the register
+    # to the literal that puts the sum there. The address is a fixed libc one, so
+    # unlike a scratch target there is no pointer to hand out: the register
+    # carries the whole displacement. The region is mapped, zeroed and used by
+    # nothing, so it serves as somewhere harmless to store and as a valid empty
+    # string alike.
+    def pin_sum_into_spare(plan, reg, off)
       slot = spare_writable_slot(plan, reg) or return false
 
       set_reg(plan, reg, (slot - off) & MASK64)
@@ -728,18 +730,18 @@ module Aletheia
       elements.each do |e|
         seen_c ||= (e == '"-c"')
         # A fixed string the gadget supplies needs nothing, but still occupies a
-        # position, as does an element this cannot place.
+        # position.
         placement = e.start_with?('"') ? nil : argv_element_placement(plan, e)
         break if placement == :terminator
+        return false if placement == :refuse
         if placement.nil?
           index += 1
           next
         end
 
-        op, target = placement
         pool = argv_pool(index, seen_c, command_set)
         command_set ||= (pool == COMMAND_POOL)
-        return false unless place_argv_element(plan, target, op, pool)
+        return false unless place_argv_element(plan, placement, pool)
         break if pool.nil? # the array ends here
 
         index += 1
@@ -759,25 +761,52 @@ module Aletheia
       nil
     end
 
-    # The parsed element and where its value has to go, +:terminator+ when the
-    # array already ends there, or nil when it is nothing this can place.
+    # Where an element's value has to be put, together with the operand it came
+    # from; +:terminator+ when the array already ends there, nil when there is
+    # nothing to place, and +:refuse+ when the element must be placed but cannot
+    # be. Refusing matters as much as placing: an element left unplaced keeps
+    # whatever the driver filled its register with, which under +--strict+ is
+    # unmapped -- so the array reaches +execve+ with a bad pointer and the gadget
+    # reports FAIL for a plan that was never complete.
+    # @return [(Symbol, Object, Aletheia::Operand), :terminator, :refuse, nil]
     def argv_element_placement(plan, element)
       return :terminator if element == 'NULL'
 
-      op = safe_parse(element) or return nil
+      op = parse_operand(element) or return nil
+      unless op.base_imm.zero?
+        return :refuse unless op.reg && settable?(op.reg)
+
+        return [:sum, xreg(op.reg), op]
+      end
+
       placement = argv_placement(plan, op)
       return placement if placement == :terminator || placement.nil?
 
-      [op, placement]
+      [*placement, op]
     end
 
     # Put +pool+ (a scratch offset, or nil for the array terminator) where an argv
     # element is read from.
-    def place_argv_element(plan, placement, op, pool)
-      kind, target = placement
-      return set_mem(plan, target, pool.nil? ? 0 : { 'scratch_off' => pool }) if kind == :mem
+    def place_argv_element(plan, placement, pool)
+      kind, target, op = placement
+      case kind
+      when :sum then place_base_sum_element(plan, target, op, pool)
+      when :mem then set_mem(plan, target, pool.nil? ? 0 : { 'scratch_off' => pool })
+      else set_reg(plan, target, pool.nil? ? 0 : { 'scratch_off' => pool - op.imm })
+      end
+    end
 
-      set_reg(plan, target, pool.nil? ? 0 : { 'scratch_off' => pool - op.imm })
+    # An element whose value is a register added to a fixed libc address carries
+    # no pointer to store anywhere -- the register alone decides where the sum
+    # lands, so it is pinned to put it in libc's spare data, whose zero fill is a
+    # valid empty string. That meets a readable-string position and no other: a
+    # terminator would need the register to cancel the libc address out, and the
+    # command a +"-c"+ position wants lives in scratch -- neither is a value a
+    # literal can name, since only the driver knows the load base.
+    def place_base_sum_element(plan, reg, op, pool)
+      return false unless pool == STRING_POOL
+
+      pin_sum_into_spare(plan, reg, op.base_imm + op.imm)
     end
 
     # Where an argv element's string pointer has to go for the callee to find it:

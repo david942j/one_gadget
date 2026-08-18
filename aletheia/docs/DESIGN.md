@@ -209,11 +209,10 @@ verified against in the commit that introduced this section.
   (`Runner#spare_writable`). Two shapes are not:
   - `(reg + $base+imm) == NULL` needs `reg = -(base + imm)`, a value only the stub knows
     at inject time -- a new plan directive, not a literal. These SKIP.
-  - the same shape as an *argv element*. `apply_argv_list` cannot place it and currently
-    skips it silently, leaving the poisoned register in the array, so `execve` gets an
-    unmapped `argv[0]` and the gadget reports **FAIL where it should report SKIP**. Until
-    that is fixed, a FAIL whose chosen branch is an argv list containing such an element
-    is a harness limitation, not a one_gadget bug (arm-2.23 `0x2c5e8`/`0x2c5ea`, arm-2.27
-    `0x2d35e`..`0x2d366` and `0x73f98`..`0x73f9c`).
+  - the same shape at a position that has to hold NULL -- an argv *terminator*, which
+    again wants the register to cancel the libc address out. As an argv[0] it is placed
+    (the zero fill reads as the empty string argv[0] only has to be); anywhere the array
+    must end, `apply_argv_list` refuses and the gadget SKIPs (arm-2.27 `0x2d364`/`0x2d366`,
+    arm-2.23 `0x2c5f0`).
 - `x29`/frame-chain assumptions: poison leaves x29 poisoned; if a gadget needs a valid
   frame this shows up as a fault — treat with the discovery loop before calling it a bug.
