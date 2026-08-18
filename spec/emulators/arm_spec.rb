@@ -33,6 +33,23 @@ describe OneGadget::Emulators::Arm do
     end
   end
 
+  describe 'note_instruction_set' do
+    # The incremental rule only learns Thumb from a line already seen, so a
+    # candidate's first instruction would otherwise be judged with no evidence --
+    # and `add rX, pc` reads a different pc in each mode.
+    it 'reads pc as address + 4 when the candidate shows Thumb' do
+      @processor.note_instruction_set(['73f2a: add r3, pc', '73f2c: ldr r5, [pc, #128]'])
+      @processor.process('73f2a: add r3, pc')
+      expect(@processor.registers['r3'].to_s).to eq '(r3 + $base+0x73f2e)'
+    end
+
+    it 'leaves A32 alone: no width suffix and no 2-byte stride' do
+      @processor.note_instruction_set(['73f2a: add r3, pc', '73f2e: mov r0, r1'])
+      @processor.process('73f2a: add r3, pc')
+      expect(@processor.registers['r3'].to_s).to eq '(r3 + $base+0x73f32)'
+    end
+  end
+
   describe 'process' do
     it 'libc-2.23 gadget (Thumb PIC /bin/sh idiom)' do
       # ldr rX, [pc, #imm] loads a literal-pool word; add rX, pc turns it into a
