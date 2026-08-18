@@ -173,7 +173,9 @@ __attribute__((noreturn)) static void jump_inj(struct inj *g) {
 
 /* Apply the plan and jump. Plan grammar (one directive per line):
  *   default benign|poison|null   fill for registers the plan doesn't set
- *   reg <n> s|l|b <hex>          r<n> = scratch+hex (s) | literal (l) | base+hex (b)
+ *   reg <n> s|l|b|n <hex>        r<n> = scratch+hex (s) | literal (l) | base+hex (b)
+ *                                | -(base+hex) (n), the value that makes the gadget's
+ *                                own `add r<n>, pc` come out zero
  *   mem <hex-off> s|l <hex>      *(scratch+off) = scratch+val (s) | literal (l)
  *   bmem <hex-off> s|l <hex>     *(base+off) = scratch+val (s) | literal (l),
  *                                for a constraint on a libc global
@@ -203,6 +205,7 @@ static void self_inject(unsigned long base, unsigned char *scratch, const char *
         if (sscanf(line, "reg %u %c %lx", &n, &kind, &v) == 3 && n < 13) {
             rv[n] = (unsigned int)(kind == 's' ? (unsigned long)scratch + v
                                  : kind == 'b' ? base + v
+                                 : kind == 'n' ? -(base + v)
                                  : v);
             rset[n] = 1;
         } else if (sscanf(line, "mem %lx %c %lx", &off, &kind, &v) == 3) {

@@ -210,10 +210,11 @@ verified against in the commit that introduced this section.
   operand built on it then reads as the plain `$base+off` it has become, which the rest
   of the satisfier already resolves -- so a store, a read, a chained read and a readable
   target all work without a case of their own (`Satisfier#steer_base_sums`).
-  One shape is not planned: the sum required to be **NULL**, whether written
-  `(reg + $base+imm) == NULL` or implied by an argv *terminator*. That needs
-  `reg = -(base + imm)`, a value only the driver knows at inject time -- a new plan
-  directive, not a literal. Those SKIP (arm-2.23 `0x2c5f0`/`0x46276`/`0x46278`,
-  arm-2.27 `0x2d364`/`0x2d366`/`0x47a5e`/`0x47a60`/`0x47a62`).
+  The sum required to be **NULL** instead -- written `(reg + $base+imm) == NULL`, or
+  implied by an argv *terminator* -- cannot be steered anywhere: only `-(base + imm)`
+  makes a libc address vanish, and that value is not known until the library is loaded.
+  The plan names it (`{'neg_base_off' => imm}`) and the driver and stub resolve it, the
+  way they already do a scratch or load-base offset. It is ranked below the array
+  builder, so emptying an argv stays a last resort rather than a cost preference.
 - `x29`/frame-chain assumptions: poison leaves x29 poisoned; if a gadget needs a valid
   frame this shows up as a fault — treat with the discovery loop before calling it a bug.

@@ -238,13 +238,11 @@ module Aletheia
       end
 
       def reg_line(num, val)
-        if val.is_a?(Hash)
-          return "reg #{num} s #{hex(val['scratch_off'])}" if val.key?('scratch_off')
+        return "reg #{num} l #{hex(val)}" unless val.is_a?(Hash)
+        return "reg #{num} s #{hex(val['scratch_off'])}" if val.key?('scratch_off')
+        return "reg #{num} n #{hex(val['neg_base_off'])}" if val.key?('neg_base_off')
 
-          "reg #{num} b #{hex(val['base_off'])}"
-        else
-          "reg #{num} l #{hex(val)}"
-        end
+        "reg #{num} b #{hex(val['base_off'])}"
       end
 
       def hex(val) = format('0x%x', val & 0xffffffff)

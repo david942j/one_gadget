@@ -86,6 +86,8 @@ for reg, val in plan.get("regs", {}).items():
             val = scratch + val["scratch_off"]        # a scratch pointer
         elif "base_off" in val:
             val = base + val["base_off"]              # a libc load-base offset (i386 GOT)
+        elif "neg_base_off" in val:
+            val = -(base + val["neg_base_off"])       # cancels a libc address the gadget adds
     set_reg(reg, int(val))
 
 # Scratch-relative memory writes (a pointer value, keyed by the offset to write

@@ -276,6 +276,11 @@ module Aletheia
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
         base = Regexp.last_match(1)
         return nil if @null_unsafe_bases&.include?(base)
+        # Ranked just BELOW the array builder above: taking this branch empties the
+        # array, and which shape yields an observable shell varies per gadget, so
+        # cost must not be what decides it. It is reached when the array cannot be
+        # built -- an element only cancelling the address could place.
+        return 0.55 if cancelling_sum(base)
 
         (op = address_operand(base)) && null_cost(op)
       # Cost is unchanged by which array shape this is: whether a built argv or a
@@ -441,7 +446,10 @@ module Aletheia
         reg, _mask, want = parse_alignment(branch)
         (stack_reg?(reg) && want.zero?) || (want.zero? && scratch?(plan, reg))
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
-        (op = address_operand(Regexp.last_match(1))) && deref_reads_zero?(plan, op)
+        text = Regexp.last_match(1)
+        if (sum = cancelling_sum(text)) then plan.regs[sum.first] == { 'neg_base_off' => sum.last }
+        else (op = address_operand(text)) && deref_reads_zero?(plan, op)
+        end
       when GOT
         base_relative?(plan.regs[branch[GOT, 1]])
       else
@@ -542,15 +550,7 @@ module Aletheia
       when /\Areadable: (.+)\z/
         (op = address_operand(Regexp.last_match(1))) ? apply_pointer(plan, op) : false
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
-        op = address_operand(Regexp.last_match(1))
-        if op.nil? then false
-        elsif op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
-        elsif op.deref == 1 && base_reg?(op) then set_base_mem(plan, op.imm, 0) # zero the libc global
-        elsif op.deref == 1 && stack_reg?(op.reg) then true # sp-relative slot is already zeroed scratch
-        elsif op.deref == 1 && op.reg then set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm })
-        elsif op.deref >= 2 then apply_deep_null(plan, op)
-        else false
-        end
+        apply_null(plan, Regexp.last_match(1))
       when /\A\{(.*)\} is a valid (?:argv|envp)\z/ then apply_argv_list(plan, Regexp.last_match(1))
       when /is a valid (?:argv|envp)\z/            then apply_pointer(plan, pointer_form(disjunct))
       when ALIGN                                   then apply_alignment(plan, disjunct)
@@ -564,6 +564,38 @@ module Aletheia
         else apply_relation(plan, disjunct)
         end
       end
+    end
+
+    # Make what +text+ names read as zero.
+    def apply_null(plan, text)
+      if (sum = cancelling_sum(text))
+        return set_reg(plan, sum.first, { 'neg_base_off' => sum.last })
+      end
+
+      op = address_operand(text)
+      if op.nil? then false
+      elsif op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
+      elsif op.deref == 1 && base_reg?(op) then set_base_mem(plan, op.imm, 0) # zero the libc global
+      elsif op.deref == 1 && stack_reg?(op.reg) then true # sp-relative slot is already zeroed scratch
+      elsif op.deref == 1 && op.reg then set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm })
+      elsif op.deref >= 2 then apply_deep_null(plan, op)
+      else false
+      end
+    end
+
+    # A +(reg + $base+imm)+ that has to come out zero. Nothing the register can be
+    # *added* to makes a libc address vanish, so the register has to hold that
+    # address negated -- a value only the driver knows once the library is loaded,
+    # so the plan names it rather than computing it. Distinct from a base sum used
+    # as an address, which is steered instead (see {#steer_base_sums}).
+    # @return [(String, Integer), nil] the register to pin and the offset its value
+    #   has to cancel; nil when this isn't that shape, or the register isn't one
+    #   the plan can set.
+    def cancelling_sum(text)
+      op = parse_operand(text)
+      return nil unless op && !op.base_imm.zero? && op.deref.zero? && op.reg && settable?(op.reg)
+
+      [xreg(op.reg), op.base_imm + op.imm]
     end
 
     # Satisfy a dereferenced +== <imm>+ (nonzero) by pinning +op.reg+ to a fresh
@@ -826,9 +858,15 @@ module Aletheia
     # command a +"-c"+ position wants lives in scratch -- neither is a value a
     # literal can name, since only the driver knows the load base.
     def place_base_sum_element(plan, reg, op, pool)
+      off = op.base_imm + op.imm
+      # The terminator has to be NULL, which only cancelling the libc address out
+      # achieves; a readable-string position is met by steering the sum into
+      # libc's spare data, whose zero fill is the empty string argv[0] needs. The
+      # command a +"-c"+ position wants lives in scratch, which is neither.
+      return set_reg(plan, reg, { 'neg_base_off' => off }) if pool.nil?
       return false unless pool == STRING_POOL
 
-      pin_sum_into_spare(plan, reg, op.base_imm + op.imm)
+      pin_sum_into_spare(plan, reg, off)
     end
 
     # Where an argv element's string pointer has to go for the callee to find it:

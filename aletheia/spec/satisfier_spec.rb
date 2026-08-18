@@ -397,11 +397,12 @@ RSpec.describe Aletheia::Satisfier do
       expect(plan.status).to eq('skip')
     end
 
-    # Every other constraint form keeps refusing the shape rather than planning
-    # it as if the fixed address weren't there (see Satisfier#safe_parse).
-    it 'SKIPs a NULL requirement on such a sum' do
+    # A sum required to be NULL cannot be steered anywhere -- only the negation
+    # of the libc address makes it vanish, and only the driver knows that value.
+    it 'names the value that cancels the libc address for a NULL requirement' do
       plan = satisfier.satisfy(gadget(['(r2 + $base+0x47a68) == NULL']))
-      expect(plan.status).to eq('skip')
+      expect(plan.status).to eq('ok')
+      expect(plan.regs['r2']).to eq('neg_base_off' => 0x47a68)
     end
 
     # The same steering serves an argv element: the sum lands on the zero fill,
@@ -414,12 +415,23 @@ RSpec.describe Aletheia::Satisfier do
       expect(plan.regs['fp']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
     end
 
-    # A terminator has to be NULL, which asks the register to cancel the libc
-    # address out -- no literal does that, and planning around it would leave the
-    # element holding whatever the driver filled its register with.
-    it 'refuses such an element where the array has to end' do
+    # An element that has to end the array is NULL, so it takes the cancelling
+    # value too, where argv[0] before it is merely steered at a readable string.
+    it 'cancels the address for such an element where the array has to end' do
       plan = satisfier.satisfy(gadget(['{(ip + $base+0x100), (r7 + $base+0x200), fp, r3, ...} is a valid argv']))
-      expect(plan.status).to eq('skip')
+      expect(plan.status).to eq('ok')
+      expect(spare).to cover(plan.regs['r12'] + 0x100)
+      expect(plan.regs['r7']).to eq('neg_base_off' => 0x200)
+    end
+
+    # Emptying the array and building it are different shapes, and which one
+    # yields an observable shell varies per gadget -- so where both are open the
+    # builder still wins, exactly as before the cancelling value existed.
+    it 'still builds the array when a NULL branch is also open' do
+      plan = satisfier.satisfy(gadget(['(ip + $base+0x2d36a) == NULL || ' \
+                                       '{(ip + $base+0x2d36a), "-c", fp, r3, ...} is a valid argv']))
+      expect(plan.branches['c0']).to start_with('{')
+      expect(spare).to cover(plan.regs['r12'] + 0x2d36a)
     end
 
     it 'refuses such an element on a register the plan cannot set' do
