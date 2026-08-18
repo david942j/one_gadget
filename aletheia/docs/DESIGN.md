@@ -203,16 +203,17 @@ verified against in the commit that introduced this section.
   verifies. A non-Ubuntu fixture (no fetchable deb, e.g. the 2.24) instead falls back to the
   host loader, which works only when it can load that libc.
 - **An address written as `(reg + $base+imm)`** -- arm code that offsets a PC-relative
-  address by a caller-controlled register (`add r1, pc`). A `writable:` target of that
-  shape is planned: the register is pinned to the literal that lands the sum in libc's
-  own spare writable data, the tail of the last page of its writable segment
-  (`Runner#spare_writable`). Two shapes are not:
-  - `(reg + $base+imm) == NULL` needs `reg = -(base + imm)`, a value only the stub knows
-    at inject time -- a new plan directive, not a literal. These SKIP.
-  - the same shape at a position that has to hold NULL -- an argv *terminator*, which
-    again wants the register to cancel the libc address out. As an argv[0] it is placed
-    (the zero fill reads as the empty string argv[0] only has to be); anywhere the array
-    must end, `apply_argv_list` refuses and the gadget SKIPs (arm-2.27 `0x2d364`/`0x2d366`,
-    arm-2.23 `0x2c5f0`).
+  address by a caller-controlled register (`add r1, pc`). Where the sum lands is the
+  register's to decide, so each register used that way is pinned once, up front, to put
+  its sums in libc's own spare writable data: the tail of the last page of its writable
+  segment (`Runner#spare_writable`), which is mapped, zeroed and used by nothing. Every
+  operand built on it then reads as the plain `$base+off` it has become, which the rest
+  of the satisfier already resolves -- so a store, a read, a chained read and a readable
+  target all work without a case of their own (`Satisfier#steer_base_sums`).
+  One shape is not planned: the sum required to be **NULL**, whether written
+  `(reg + $base+imm) == NULL` or implied by an argv *terminator*. That needs
+  `reg = -(base + imm)`, a value only the driver knows at inject time -- a new plan
+  directive, not a literal. Those SKIP (arm-2.23 `0x2c5f0`/`0x46276`/`0x46278`,
+  arm-2.27 `0x2d364`/`0x2d366`/`0x47a5e`/`0x47a60`/`0x47a62`).
 - `x29`/frame-chain assumptions: poison leaves x29 poisoned; if a gadget needs a valid
   frame this shows up as a fault — treat with the discovery loop before calling it a bug.

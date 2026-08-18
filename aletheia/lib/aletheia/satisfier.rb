@@ -23,7 +23,7 @@ module Aletheia
     #   pointer at +[sp]+ instead of the zero-fill a single dereference relies on.
     Plan = Struct.new(:offset, :effect, :constraints, :regs, :mem, :base_mem, :scratch_size, :sp_offset,
                       :benign_default, :poison_default, :null_default, :branches, :status,
-                      :reason, :writable_count, :spare_writable, keyword_init: true)
+                      :reason, :writable_count, keyword_init: true)
 
     SCRATCH_SIZE    = 0x20000
     # Headroom below sp: some gadgets land inside a function whose own prologue
@@ -45,9 +45,9 @@ module Aletheia
     COMMAND_RESERVED = 0x40    # generous window at COMMAND_POOL treated as non-zero
     WRITABLE_BASE   = 0x12000  # write-areas live above the stack region (sp is at SP_OFFSET)
     WRITABLE_STRIDE = 0x800
-    # Room reserved per base-sum store target inside libc's spare writable data,
-    # so two stores in one gadget can't land on top of each other.
-    SPARE_WRITABLE_STRIDE = 0x80
+    # Room reserved per register inside libc's spare data, so two base sums in
+    # one gadget can't land on top of each other (see {#spare_slot}).
+    SPARE_STRIDE    = 0x80
     WORD            = 8        # conservative pointer width for a "reads zero" check
     MASK64          = (1 << 64) - 1
     IMM             = /-?(?:0x[0-9a-fA-F]+|\d+)/
@@ -71,9 +71,20 @@ module Aletheia
     # +[(rsi & ~0xf)] == NULL+ (see {#unmask_address}).
     MASKED_INNER = /\((\w+(?:[+-]#{IMM})?) & (#{IMM})\)/
 
+    # An equality between two operands, neither of them a literal. The operands
+    # are matched loosely rather than as non-space runs: a steered base sum
+    # renders with spaces in it (+[[$base+0x1000]+0x38]+ only after
+    # {#steer_base_sums} rewrites it), and each side is validated by parsing it
+    # anyway, so a wrong split yields no operand rather than a wrong one.
+    RELATION = /\A(?:\([su]\d+\))?(.+?) (==|!=) (?:\([su]\d+\))?(.+)\z/
+
     # +<reg> is the GOT address of libc+ (i386 PIC): the register must hold the
     # libc GOT base, i.e. +base + PLTGOT offset+.
     GOT = /\A(\w+) is the GOT address of libc\z/
+
+    # A +(reg + $base+imm)+ used as an address rather than a value: dereferenced,
+    # or named as a +writable:+/+readable:+ target (see {#steer_base_sums}).
+    BASE_SUM_ADDRESS = /(?:\[|writable: |readable: )\((\w+) \+ \$base([+-](?:0x[0-9a-fA-F]+|\d+))\)/
 
     # +writable: [base]+imm+ (a compound base -- offset from a *dereferenced*
     # value, not a bare register, e.g. a store through a pointer read off the
@@ -105,13 +116,16 @@ module Aletheia
         offset: format('%#x', gadget.offset), effect: gadget.effect,
         constraints: gadget.constraints.dup, regs: {}, mem: {}, base_mem: {}, scratch_size: SCRATCH_SIZE,
         sp_offset: SP_OFFSET, benign_default: !@strict, poison_default: @strict,
-        branches: {}, status: 'ok', reason: nil, writable_count: 0, spare_writable: {}
+        branches: {}, status: 'ok', reason: nil, writable_count: 0
       )
       # A `writable: [base]+imm` constraint can only be checked once `base`'s own
       # content is pinned by its own (argv/envp) constraint -- deferred to run
       # last. That constraint must not pick its NULL branch for `base`: with
       # base == NULL, `[base]+imm` is a fixed low address (e.g. 0x10), an
       # unmapped-page write in reality, not a merely-untracked one.
+      unsteerable = steer_base_sums(plan, gadget.constraints)
+      return skip(plan, "unsupported-or-unsat: #{unsteerable}") if unsteerable
+
       ordered = order_constraints(gadget.constraints)
       @null_unsafe_bases = ordered.grep(WRITABLE_COMPOUND) { Regexp.last_match(1) }
       @nonzero_witnesses = []
@@ -183,6 +197,44 @@ module Aletheia
       plan
     end
 
+    # +(reg + $base+imm)+ where the sum is used as an ADDRESS -- the target of a
+    # +writable:+/+readable:+, or a dereference. Where it lands is the register's
+    # to decide, so each such register is pinned once, up front, to put its sums
+    # in libc's spare data; every operand built on it then reads as the plain
+    # +$base+off+ it has become (see {#safe_parse}), which the rest of this
+    # satisfier already resolves.
+    #
+    # Pinning up front is only sound because the address uses are unconditional:
+    # a sum inside a disjunction is a *value* (an argv element, or a +== NULL+),
+    # whose treatment depends on which branch is taken and so cannot be settled
+    # here. One appearing as an address inside a disjunction is refused rather
+    # than pinned, since pinning a register a rejected branch asked for would
+    # hand a poisoned register a valid value and weaken the strict test.
+    # @return [String, nil] the constraint that could not be steered, or nil.
+    def steer_base_sums(plan, constraints)
+      @steered = {}
+      constraints.each do |constraint|
+        base_sum_addresses(constraint).each do |reg, off|
+          slot = constraint.include?(' || ') ? nil : spare_slot(reg)
+          return constraint unless slot && set_reg(plan, reg, (slot - off) & MASK64)
+
+          @steered[reg] = slot
+        end
+      end
+      nil
+    end
+
+    # Every +(reg + $base+imm)+ in +constraint+ that names an address, as
+    # [register, offset] pairs. An occupied +[+ before it makes it a dereference;
+    # a +writable:+/+readable:+ prefix makes it that constraint's target.
+    def base_sum_addresses(constraint)
+      pairs = constraint.to_enum(:scan, BASE_SUM_ADDRESS).map do
+        m = Regexp.last_match
+        [xreg(m[1]), Integer(m[2])]
+      end
+      pairs.select { |reg, _| settable?(reg) }
+    end
+
     # Order constraints so each runs once its inputs are settled and so a
     # register-pinning constraint wins over a mere bound on the same register:
     # * a plain `writable: reg+imm` runs FIRST -- it pins `reg` to a (nonzero,
@@ -217,7 +269,8 @@ module Aletheia
     def evaluate(disjunct)
       case disjunct
       when WRITABLE_COMPOUND then 0.9 # deferred; see #order_compound_writable_last
-      when /\Awritable: (.+)\z/ then writable_evaluate(Regexp.last_match(1))
+      when /\Awritable: (.+)\z/
+        (op = writable_target(Regexp.last_match(1))) && writable_cost(op)
       when /\Areadable: (.+)\z/
         (op = address_operand(Regexp.last_match(1))) && op.reg && 0.4 # point it at scratch
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
@@ -309,30 +362,11 @@ module Aletheia
       [xreg(m[1]), Integer(m[2]), Integer(m[3])]
     end
 
-    # Cost of a +writable:+ target: a base sum is steered into libc's own spare
-    # writable data, which costs the register the literal that puts it there;
-    # anything else is placed in scratch.
-    # @return [Float, nil]
-    def writable_evaluate(text)
-      return @spare_writable && 0.3 if base_sum(text)
-
-      (op = writable_target(text)) && writable_cost(op)
-    end
-
-    # Whether a +writable:+ target already references writable memory. A base sum
-    # never does on its own: only pinning its register puts the address anywhere
-    # in particular (see {#pin_sum_into_spare}).
-    def writable_satisfied?(plan, text)
-      return false if base_sum(text)
-
-      op = writable_target(text)
-      if op.deref == 1 && op.reg then pointer_resolved?(plan, op)
-      else op.deref.zero? && op.reg && (stack_reg?(op.reg) || scratch?(plan, op.reg))
-      end
-    end
-
     # @return [Float, nil]
     def writable_cost(op)
+      # A steered base sum: a fixed libc address in a region that is writable by
+      # construction, so there is nothing further to arrange (see {#steer_base_sums}).
+      return 0.05 if op.deref.zero? && base_reg?(op)
       return 0.05 if op.deref.zero? && op.reg && stack_reg?(op.reg) # already in scratch via sp
       return 0.25 if op.deref == 1 && op.reg # store the pointer it must go through
 
@@ -394,7 +428,11 @@ module Aletheia
       when WRITABLE_COMPOUND
         compound_writable_satisfied?(plan, Regexp.last_match(1))
       when /\Awritable: (.+)\z/
-        writable_satisfied?(plan, Regexp.last_match(1))
+        op = writable_target(Regexp.last_match(1))
+        if op.nil? then false
+        elsif op.deref == 1 && op.reg then pointer_resolved?(plan, op)
+        else op.deref.zero? && op.reg && (base_reg?(op) || stack_reg?(op.reg) || scratch?(plan, op.reg))
+        end
       when /\Areadable: (.+)\z/
         (op = address_operand(Regexp.last_match(1))) && pointer_resolved?(plan, op)
       when /is a valid (?:argv|envp)\z/
@@ -500,7 +538,7 @@ module Aletheia
       when WRITABLE_COMPOUND
         compound_writable_satisfied?(plan, Regexp.last_match(1))
       when /\Awritable: (.+)\z/
-        apply_writable_target(plan, Regexp.last_match(1))
+        (op = writable_target(Regexp.last_match(1))) ? apply_writable(plan, op) : false
       when /\Areadable: (.+)\z/
         (op = address_operand(Regexp.last_match(1))) ? apply_pointer(plan, op) : false
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
@@ -633,13 +671,6 @@ module Aletheia
       set_reg(plan, reg, { 'scratch_off' => STRING_POOL }) # a 16-aligned readable slot
     end
 
-    def apply_writable_target(plan, text)
-      if (sum = base_sum(text)) then pin_sum_into_spare(plan, *sum)
-      elsif (op = writable_target(text)) then apply_writable(plan, op)
-      else false
-      end
-    end
-
     # Steer +(reg + $base+off)+ into libc's own spare data by pinning the register
     # to the literal that puts the sum there. The address is a fixed libc one, so
     # unlike a scratch target there is no pointer to hand out: the register
@@ -647,21 +678,9 @@ module Aletheia
     # nothing, so it serves as somewhere harmless to store and as a valid empty
     # string alike.
     def pin_sum_into_spare(plan, reg, off)
-      slot = spare_writable_slot(plan, reg) or return false
+      slot = spare_slot(reg) or return false
 
       set_reg(plan, reg, (slot - off) & MASK64)
-    end
-
-    # The libc offset this target's store is steered to, one area per register, or
-    # nil when the libc has no spare writable room left to hand out.
-    def spare_writable_slot(plan, reg)
-      return plan.spare_writable[reg] if plan.spare_writable[reg]
-      return nil unless @spare_writable
-
-      slot = @spare_writable.first + plan.spare_writable.size * SPARE_WRITABLE_STRIDE
-      return nil unless @spare_writable.cover?(slot + SPARE_WRITABLE_STRIDE - 1)
-
-      plan.spare_writable[reg] = slot
     end
 
     # +writable: [X]+ (a bare dereference, no trailing displacement -- the compound
@@ -669,6 +688,8 @@ module Aletheia
     # at X to reference writable memory, so point that slot at scratch, exactly as
     # a pointer-form argv/envp constraint does.
     def apply_writable(plan, op)
+      return true if op.deref.zero? && base_reg?(op) # steered into libc's spare data
+
       if op.deref == 1 && op.reg
         addr_off = level1_addr_off(plan, op, allocate: true) or return false
 
@@ -734,6 +755,7 @@ module Aletheia
         placement = e.start_with?('"') ? nil : argv_element_placement(plan, e)
         break if placement == :terminator
         return false if placement == :refuse
+
         if placement.nil?
           index += 1
           next
@@ -841,7 +863,9 @@ module Aletheia
     # hence NULL-terminated empty array).
     def apply_pointer(plan, op)
       return false unless op
+      return true if op.deref.zero? && base_reg?(op) # a fixed libc address is mapped
       return set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL }) if op.deref.zero?
+      return set_base_mem(plan, op.imm, { 'scratch_off' => STRING_POOL }) if base_reg?(op)
 
       addr_off = mem_addr_off(plan, op)
       addr_off && set_mem(plan, addr_off, { 'scratch_off' => STRING_POOL })
@@ -850,10 +874,11 @@ module Aletheia
     # Whether a pointer-form +X is a valid argv/envp+ operand already resolves to
     # scratch: +X+ itself (deref 0), or the memory +X+ dereferences (deref 1).
     def pointer_resolved?(plan, op)
-      return scratch?(plan, op.reg) if op.deref.zero?
+      return base_reg?(op) || scratch?(plan, op.reg) if op.deref.zero?
+      return pointer_value?(plan.base_mem[op.imm]) if base_reg?(op)
 
       addr_off = mem_addr_off(plan, op)
-      addr_off && plan.mem[addr_off].is_a?(Hash) && plan.mem[addr_off].key?('scratch_off')
+      addr_off && pointer_value?(plan.mem[addr_off])
     end
 
     def apply_relation(plan, disjunct)
@@ -1040,7 +1065,7 @@ module Aletheia
     # written.
     # @return [(Aletheia::Operand, String, Aletheia::Operand), nil]
     def reg_mem_relation(disjunct)
-      m = disjunct.match(/\A(?:\([su]\d+\))?(\S+) (==|!=) (?:\([su]\d+\))?(\S+)\z/) or return nil
+      m = disjunct.match(RELATION) or return nil
       lhs, op, rhs = m.captures
       return nil if [lhs, rhs].any? { |s| s.match?(/\A#{IMM}\z/) }
 
@@ -1057,7 +1082,7 @@ module Aletheia
     # literal, the value has to be matched in memory on both sides.
     # @return [(Aletheia::Operand, String, Aletheia::Operand), nil]
     def mem_mem_relation(disjunct)
-      m = disjunct.match(/\A(?:\([su]\d+\))?(\S+) (==|!=) (?:\([su]\d+\))?(\S+)\z/) or return nil
+      m = disjunct.match(RELATION) or return nil
       lhs, op, rhs = m.captures
       return nil if [lhs, rhs].any? { |s| s.match?(/\A#{IMM}\z/) }
 
@@ -1232,8 +1257,31 @@ module Aletheia
     # explicitly (see {#base_sum}); every other consumer would otherwise plan it
     # as if the fixed address weren't there.
     def safe_parse(str)
-      op = parse_operand(str)
-      op if op&.base_imm&.zero?
+      op = parse_operand(str) or return nil
+      op.base_imm.zero? ? op : steered(op)
+    end
+
+    # The plain libc-global operand a base sum becomes once its register is
+    # pinned: +(reg + $base+B)+I+ addresses +$base+(slot+I)+, and a dereference
+    # of it reads that libc memory. nil when the register was not steered, so a
+    # sum used as a *value* still reaches only the constraint forms that know
+    # what to make of it, rather than being read as an address it isn't.
+    # @return [Aletheia::Operand, nil]
+    def steered(op)
+      slot = op.reg && @steered && @steered[xreg(op.reg)] or return nil
+
+      Operand.new('$base', slot + op.imm, op.deref, op.cast_bits, op.inner_imm, 0)
+    end
+
+    # The libc offset base sums on +reg+ are steered to: one fixed area per
+    # register, so the same sum always lands in the same place and two registers
+    # never overlap. nil when the spare region has no area for that register.
+    def spare_slot(reg)
+      index = @arch.gprs.index(reg)
+      return nil unless index && @spare_writable
+
+      slot = @spare_writable.first + index * SPARE_STRIDE
+      slot if @spare_writable.cover?(slot + SPARE_STRIDE - 1)
     end
 
     def parse_operand(str)
@@ -1242,23 +1290,11 @@ module Aletheia
       nil
     end
 
-    # A register added to a fixed libc address, with any trailing displacement
-    # folded in: where the value lands is the register's to decide, so it is
-    # planned by pinning the register rather than by pointing it at scratch.
-    # @example +(r1 + $base+0x2d364)+ -- arm's +add r1, pc+
-    # @return [(String, Integer), nil] the register to pin and the offset the sum
-    #   adds to it; nil when the operand isn't that shape or the register isn't
-    #   one the plan can set.
-    def base_sum(text)
-      op = parse_operand(text)
-      return nil unless op && !op.base_imm.zero? && op.deref.zero? && op.reg && settable?(op.reg)
-
-      [xreg(op.reg), op.base_imm + op.imm]
-    end
-
     # A register the plan points at scratch (a readable+writable, zero-filled ptr).
+    # A register holding some *other* resolved address -- the libc GOT, say -- is
+    # not one: its scratch offset is what every caller goes on to read.
     def scratch?(plan, reg)
-      plan.regs[reg].is_a?(Hash)
+      pointer_value?(plan.regs[reg])
     end
 
     def global?(reg)

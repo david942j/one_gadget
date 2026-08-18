@@ -341,18 +341,50 @@ RSpec.describe Aletheia::Satisfier do
     it 'pins the register so the sum lands in the spare writable data' do
       plan = satisfier.satisfy(gadget(['writable: (r1 + $base+0x2d364)']))
       expect(plan.status).to eq('ok')
-      expect(plan.regs['r1'] + 0x2d364).to eq(spare.first)
+      expect(spare).to cover(plan.regs['r1'] + 0x2d364)
     end
 
+    # The register carries the whole displacement, so a trailing one only shifts
+    # where inside its area the sum lands -- it stays in the spare region.
     it 'folds a trailing displacement into the literal' do
       plan = satisfier.satisfy(gadget(['writable: (r1 + $base+0x2d364)+0x8']))
-      expect(plan.regs['r1'] + 0x2d364 + 0x8).to eq(spare.first)
+      expect(spare).to cover(plan.regs['r1'] + 0x2d364 + 0x8)
     end
 
     it 'gives distinct areas to two such stores' do
       plan = satisfier.satisfy(gadget(['writable: (r1 + $base+0x100)', 'writable: (r2 + $base+0x200)']))
       expect(plan.status).to eq('ok')
       expect(plan.regs['r1'] + 0x100).not_to eq(plan.regs['r2'] + 0x200)
+    end
+
+    # Once the register is pinned the sum is a fixed libc address, so a read
+    # through it is an ordinary libc-global read -- and lands on the zero fill.
+    it 'reads zero through a dereference of the sum' do
+      plan = satisfier.satisfy(gadget(['[(r1 + $base+0x50558)+0x8] == 0x0', 'writable: (r1 + $base+0x50558)']))
+      expect(plan.status).to eq('ok')
+      slot = plan.regs['r1'] + 0x50558
+      expect(spare).to cover(slot)
+      expect(plan.base_mem[slot + 0x8]).to eq(0) # written where the read lands
+    end
+
+    # A chained read needs a real pointer at the first level, which the driver
+    # writes into the libc global the sum resolved to.
+    it 'stages a pointer in libc for a chained dereference of the sum' do
+      plan = satisfier.satisfy(gadget(['[[(r2 + $base+0x50492)+0xc]+0xa4] == 0x0',
+                                       'r6 == [[(r2 + $base+0x50492)+0xc]+0x38]',
+                                       'readable: (r2 + $base+0x50492)+0xc']))
+      expect(plan.status).to eq('ok')
+      slot = plan.regs['r2'] + 0x50492 + 0xc
+      expect(plan.base_mem[slot]).to have_key('scratch_off')
+      expect(plan.regs['r6']).to eq(0)
+    end
+
+    # Pinning a register a rejected branch asked for would hand a poisoned
+    # register a valid value, so an address-shaped sum inside a disjunction is
+    # refused rather than steered (see Satisfier#steer_base_sums).
+    it 'refuses to steer a sum that only one branch of a disjunction needs' do
+      plan = satisfier.satisfy(gadget(['r4 == NULL || writable: (r1 + $base+0x100)']))
+      expect(plan.status).to eq('skip')
     end
 
     it 'SKIPs when the libc has no spare writable room to steer the store into' do
