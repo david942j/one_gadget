@@ -230,7 +230,7 @@ module OneGadget
       end
 
       def global_var?(str)
-        str.include?('$base')
+        base_relative?(str, '$base')
       end
     end
   end

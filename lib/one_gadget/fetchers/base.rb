@@ -444,6 +444,21 @@ module OneGadget
       def global_var?(_str); raise NotImplementedError
       end
 
+      # Whether +str+ names a value at a fixed offset from +base+, i.e. an address
+      # whose content can be read out of the file. An operation applied to such an
+      # address (see {OneGadget::Emulators::Lambda.operation}) is that address plus
+      # whatever the caller supplies, so it names no particular byte and must not be
+      # resolved as though it did.
+      # @param [String] str A rendered value.
+      # @param [String] base The token a libc-relative address renders against.
+      # @return [Boolean]
+      # @example A fixed global, and the same global offset by a register.
+      #   base_relative?('$base+0x10', '$base')        #=> true
+      #   base_relative?('(r3 + $base+0x10)', '$base') #=> false
+      def base_relative?(str, base)
+        str.match?(/\A\[*#{Regexp.escape(base)}(?:[+-]0x[0-9a-f]+)?\]*\z/)
+      end
+
       def str_bin_sh?(_str); raise NotImplementedError
       end
 
