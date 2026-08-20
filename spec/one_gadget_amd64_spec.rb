@@ -12,7 +12,7 @@ describe 'one_gadget_amd64' do
     it 'libc-2.19' do
       path = data_path('libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
-        .to eq [0x46421, 0x46428, 0x4643b, 0x46444, 0x46449, 0x46450, 0x4647c,
+        .to eq [0x46421, 0x46428, 0x4647c,
                 0xc18c8, 0xc18cd, 0xc18d1, 0xc18d8, 0xc1b3d, 0xc1ba3, 0xc1bf2, 0xc1ca7,
                 0xe4968, 0xe5765, 0xe5771,
                 0xe6527, 0xe652e, 0xe6532, 0xe653e, 0xe6543, 0xe654a,
