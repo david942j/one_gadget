@@ -105,6 +105,7 @@ module OneGadget
       # +ldr rX, [pc]; add rX, pc+ setup so it resolves to +$base + got+.
       def emulate(cmds)
         emu = emulator
+        emu.note_instruction_set(cmds)
         @got_base_regs = seed_got_registers(emu, cmds)
         cmds.each_with_object(emu) { |cmd, obj| break obj unless obj.process(cmd) }
       end
@@ -129,14 +130,30 @@ module OneGadget
         res
       end
 
+      # A general-purpose register, by number or by the role name objdump prints.
+      REG = /r\d+|sl|fp|ip|lr/
+      private_constant :REG
+
       # Collect the registers used as a base in a register-offset load (+[rB, rX]+);
       # in glibc's PIC these +rB+ are the GOT base holding +$base + got+.
       # @example
       #   got_base_registers(['88ab2: ldr r2, [r1, r2]'])
       #   #=> ['r1']
       def got_base_registers(cmds)
-        cmds.flat_map { |c| c.scan(/\[(r\d+|sl|fp|ip|lr),\s*(?:r\d+|sl|fp|ip|lr)\]/) }
+        cmds.flat_map { |c| c.scan(/\[(#{REG}),\s*(?:#{REG})\]/) }
             .flatten.uniq
+      end
+
+      # Whether the candidate builds +reg+'s base itself, before the +[reg, rX]+
+      # that relies on it. Replaying a prologue setup for such a register would
+      # apply it twice -- once as the seed, once by emulating the window that
+      # contains it -- leaving a value no caller can supply, described by a
+      # constraint naming the register's *entry* value.
+      # @example arm-2.27's +0x73f2a+, whose first instruction is +add r3, pc+
+      def window_establishes?(reg, cmds)
+        use = cmds.index { |c| c.match?(/\[#{reg},\s*(?:#{REG})\]/) } or return false
+
+        cmds[0...use].any? { |c| c.match?(/:\s*add(?:\.w)?\s+#{reg}, pc$/) }
       end
 
       # Prime +emu+ with every GOT base register the candidate relies on, by
@@ -150,6 +167,8 @@ module OneGadget
         return [] if start.nil?
 
         got_base_registers(cmds).select do |reg|
+          next false if window_establishes?(reg, cmds)
+
           lines = got_setup_lines(reg, start) or next false
 
           lines.each { |line| emu.process(line) }

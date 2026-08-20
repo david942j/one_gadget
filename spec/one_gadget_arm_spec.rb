@@ -60,6 +60,20 @@ describe 'one_gadget_arm' do
       expect(gadget.constraints).to include('r3 is the GOT address of libc')
     end
 
+    # 0x73f2a's window OPENS with the `add r3, pc` that builds that base, so
+    # replaying the prologue setup would apply it twice: r3 would end up holding
+    # the GOT plus another whole load base, while the constraint went on naming
+    # the register's entry value. Nothing is seeded, and the load states what it
+    # actually needs. The offset also pins the pc bias -- Thumb reads pc as the
+    # instruction address + 4, and 0x73f2a + 4 is 0x73f2e.
+    it 'does not claim the GOT base for a window that establishes it itself' do
+      path = data_path('arm-libc-2.27.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, level: 1, details: true)
+                        .find { |g| g.offset == 0x73f2a }
+      expect(gadget.constraints).not_to include('r3 is the GOT address of libc')
+      expect(gadget.constraints).to include('readable: [(r3 + $base+0x73f2e)+0x148]')
+    end
+
     it 'resolves environ through the GOT base register and constrains it' do
       path = data_path('arm-libc-2.23.so')
       gadgets = OneGadget.gadgets(file: path, force_file: true, details: true)

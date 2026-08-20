@@ -97,6 +97,26 @@ module OneGadget
         sp_based_stack[(idx - 4) * size_t]
       end
 
+      # Settle Thumb vs A32 from a whole candidate, before any of it is emulated.
+      # {#track_mode} can only learn from lines already seen, so the FIRST
+      # instruction is judged on no evidence at all -- and when that instruction
+      # reads +pc+, the bias it picks decides an address the constraints go on to
+      # name. Applying the same evidence up front removes that dependence on
+      # whatever happened to be processed first.
+      #
+      # A32 is left alone: it shows neither a width suffix nor a 2-byte stride, so
+      # a genuinely A32 candidate keeps the whole-word bias. A single-instruction
+      # Thumb candidate offers no evidence either and is no better served than
+      # before.
+      # @param [Array<String>] lines The candidate's objdump lines.
+      def note_instruction_set(lines)
+        return if @thumb
+
+        addrs = lines.filter_map { |l| l[/\A\s*([0-9a-f]+):/, 1]&.to_i(16) }
+        @thumb = lines.any? { |l| l.match?(/\.[wn]\b/) } ||
+                 addrs.each_cons(2).any? { |a, b| b - a == 2 }
+      end
+
       private
 
       # Update {@thumb}/{@cur_addr} from the leading +ADDR:+ of an objdump line.
