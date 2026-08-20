@@ -67,9 +67,7 @@ module OneGadget
         # and everything after it) recurs across candidates; emulate each once.
         seen = {}
         candidates.each do |cand|
-          lines = cand.lines
-          (lines.size - 2).downto(0) do |i|
-            suffix = executed_window(lines[i..])
+          executed_windows(cand.lines) do |suffix|
             next if seen.key?(key = suffix.join)
 
             seen[key] = true
@@ -80,16 +78,26 @@ module OneGadget
         gadgets
       end
 
-      # The part of +lines+ that runs: emulation ends at the terminal call, so
-      # anything past it never executes. A suffix reaches beyond one when the
-      # function holds several terminal calls and the candidate was walked back
-      # from a later one. Bounding it here lets everything downstream -- {#emulate}
-      # and its overrides, the dedup key above -- read a window as executed code.
-      # @param [Array<String>] lines A candidate suffix.
-      # @return [Array<String>]
-      def executed_window(lines)
-        stop = lines.index { |line| terminal_call_line?(line) }
-        stop ? lines[..stop] : lines
+      # Every suffix of +lines+ -- a start line and everything after it, longest
+      # last -- cut down to the part that runs: emulation ends at the terminal
+      # call, so anything past one never executes. A suffix reaches beyond a
+      # terminal call when the function holds several and the candidate was walked
+      # back from a later one. Bounding each window here lets everything
+      # downstream -- {#emulate} and its overrides, the dedup key in {#find} --
+      # read a window as executed code.
+      #
+      # Each line is classified once per candidate rather than once per suffix
+      # containing it: walking the start backwards, the first terminal call at or
+      # after it only moves when the start is itself one.
+      # @param [Array<String>] lines One candidate, as a line list.
+      # @yieldparam [Array<String>] window
+      # @return [void]
+      def executed_windows(lines)
+        stop = lines.size - 1 if terminal_call_line?(lines.last)
+        (lines.size - 2).downto(0) do |i|
+          stop = i if terminal_call_line?(lines[i])
+          yield(stop ? lines[i..stop] : lines[i..])
+        end
       end
 
       # Whether +line+ is the call that ends a gadget, by the same rule the emulator
@@ -470,7 +478,7 @@ module OneGadget
 
       # Run a window through a fresh emulator, stopping at the first line it can't
       # process (an unsupported instruction, or the terminal call that ends the
-      # gadget). +cmds+ is an executed window (see {#executed_window}): every line
+      # gadget). +cmds+ is an executed window (see {#executed_windows}): every line
       # in it runs, so an override may read it as evidence of what the path does.
       # @param [Array<String>] cmds
       # @return [OneGadget::Emulators::Processor]
@@ -486,8 +494,15 @@ module OneGadget
       end
 
       def str_offset(str)
-        File.binread(file).index("#{str}\x00") ||
+        file_bytes.index("#{str}\x00") ||
           raise(Error::ArgumentError, "File #{file.inspect} doesn't contain string #{str.inspect}, not glibc?")
+      end
+
+      # The target's bytes, read once: a gadget names fixed strings by file offset,
+      # and every argv entry of every candidate asks for them again.
+      # @return [String]
+      def file_bytes
+        @file_bytes ||= File.binread(file)
       end
 
       # Render one argv/envp entry for a constraint. A libc global that points to a
@@ -510,7 +525,7 @@ module OneGadget
       def global_str_content(element)
         off = string_file_offset(element) or return nil
 
-        bytes = File.binread(file)
+        bytes = file_bytes
         return nil unless off.between?(0, bytes.size - 1)
 
         stop = bytes.index("\x00", off) or return nil
@@ -604,8 +619,8 @@ module OneGadget
       def branch_aware_candidates(&)
         cands = []
         re = /#{terminal_call_regexp}/
-        disasm_lines.each_index do |idx|
-          next unless disasm_lines[idx].match?(re)
+        disasm_lines.each_with_index do |line, idx|
+          next unless line.match?(re)
 
           back_walk(idx, 0, Set.new, []) { |lines| cands << lines.join("\n") }
         end
@@ -664,8 +679,7 @@ module OneGadget
       def branch_pred_map
         @branch_pred_map ||= Base.cached(:branch_pred, @objdump.command) do
           lead = branch_lead_regex
-          disasm_lines.each_index.with_object(Hash.new { |h, k| h[k] = [] }) do |i, map|
-            line = disasm_lines[i]
+          disasm_lines.each_with_index.with_object(Hash.new { |h, k| h[k] = [] }) do |(line, i), map|
             # Cheap precompiled reject (no per-line allocation) before the full test.
             next unless line.match?(lead)
             next unless %i[conditional unconditional].include?(branch_kind(line))
