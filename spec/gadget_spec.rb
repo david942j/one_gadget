@@ -86,6 +86,78 @@ constraints:
     end
   end
 
+  context 'prune settled constraints' do
+    def cons(list)
+      OneGadget::Gadget::Gadget.new(0, constraints: list).constraints
+    end
+
+    it 'drops a readability the dereference beside it already states' do
+      expect(cons(['readable: x1', '[x1] == 0x0'])).to eq ['[x1] == 0x0']
+      expect(cons(['readable: rbp-0x50', '[rbp-0x50] == 0x1'])).to eq ['[rbp-0x50] == 0x1']
+    end
+
+    it 'drops a readability implied by reading the pointer at that address' do
+      expect(cons(['readable: x1', 'readable: [x1]'])).to eq ['readable: [x1]']
+    end
+
+    it 'keeps a readability when the dereference is only one of several options' do
+      list = ['readable: r8', '[r8] == 0x0 || r8 is a valid envp']
+      expect(cons(list)).to eq list
+    end
+
+    it 'rules out a NULL option beside a readability it cannot hold with' do
+      # The dereference is optional, so it states nothing and the readability
+      # stays; the readability is not, so "r8 == NULL" can never be taken.
+      expect(cons(['readable: r8', '[r8] == NULL || r8 == NULL || r8 is a valid envp']))
+        .to eq ['readable: r8', '[r8] == NULL || r8 is a valid envp']
+    end
+
+    it 'drops a NULL option for an address required to be mapped' do
+      expect(cons(['writable: r8', 'r8 == NULL || (u16)[r8] == 0x0']))
+        .to eq ['writable: r8', '(u16)[r8] == 0x0']
+      expect(cons(['readable: rax', '[rax] == NULL || rax == NULL || rax is a valid argv']))
+        .to eq ['readable: rax', '[rax] == NULL || rax is a valid argv']
+    end
+
+    it 'keeps a NULL option when the address is only optionally mapped' do
+      list = ['rax == NULL || writable: rax']
+      expect(cons(list)).to eq list
+    end
+
+    it 'leaves a constraint whose every option is ruled out' do
+      list = ['writable: rax', 'rax == NULL']
+      expect(cons(list)).to eq list
+    end
+
+    it 'drops a non-NULL requirement on an address already required to be mapped' do
+      expect(cons(['rax != 0x0', 'writable: rax'])).to eq ['writable: rax']
+      expect(cons(['x1 != NULL', 'readable: x1'])).to eq ['readable: x1']
+    end
+
+    it 'drops a non-NULL requirement the dereference beside it already states' do
+      expect(cons(['[$base+0x10] != 0x0', '[[$base+0x10]+0xa4] == 0x0']))
+        .to eq ['[[$base+0x10]+0xa4] == 0x0']
+    end
+
+    it 'keeps a non-NULL requirement when the dereference could clear the first page' do
+      list = ['[$base+0x10] != 0x0', '[[$base+0x10]+0x2000] == 0x0']
+      expect(cons(list)).to eq list
+    end
+
+    it 'keeps a non-NULL requirement when the dereference is only one of several options' do
+      list = ['r8 != 0x0', '[r8] == 0x0 || r8 is a valid envp']
+      expect(cons(list)).to eq list
+    end
+
+    it 'settles what dropping an option exposes' do
+      # Dropping "r1 == NULL" leaves "writable: r2" holding outright, which then
+      # rules out the NULL option for r2, whose dereference then states the
+      # readability asked for separately.
+      expect(cons(['writable: r1', 'r1 == NULL || writable: r2', 'readable: r2', 'r2 == NULL || [r2] == 0x0']))
+        .to eq ['writable: r1', 'writable: r2', '[r2] == 0x0']
+    end
+  end
+
   context 'met_by?' do
     def gadget(cons)
       OneGadget::Gadget::Gadget.new(0, constraints: cons)

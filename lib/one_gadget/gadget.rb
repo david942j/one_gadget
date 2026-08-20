@@ -32,7 +32,7 @@ module OneGadget
       def initialize(offset, **options)
         @base = 0
         @offset = offset
-        @constraints = options[:constraints] || []
+        @constraints = prune_settled(options[:constraints] || [])
         @effect = options[:effect] || ''
         @closed_fds = options[:closed_fds] || []
       end
@@ -129,7 +129,110 @@ module OneGadget
       DISJUNCTION = ' || '
       private_constant :DISJUNCTION
 
+      # How far from an address a dereference can sit and still say the address
+      # is not NULL: within the smallest page, which a NULL base cannot reach out
+      # of.
+      PAGE_SIZE = 0x1000
+      private_constant :PAGE_SIZE
+
       private
+
+      # Drops what the rest of the list already settles, so a gadget asks for each
+      # thing once and never offers an option it rules out itself. Everything here
+      # follows from one reading: a constraint that accesses an address says that
+      # address is mapped memory (see {#mapped?}), which in turn says it is
+      # readable and not NULL. So:
+      # * A +readable:+ on an address a dereference already reaches repeats it.
+      # * A +== NULL+ option for a mapped address can never be taken.
+      # * A +!= NULL+ requirement on one is already met.
+      # Each needs the constraint doing the settling to hold outright: one inside a
+      # +||+ is an option among several and settles nothing. They run until the
+      # list stops changing, because dropping an option can leave a constraint
+      # holding outright and settle the next thing.
+      # @param [Array<String>] cons
+      # @return [Array<String>]
+      # @example An option the same list rules out.
+      #   prune_settled(['writable: r8', 'r8 == NULL || (u16)[r8] == 0x0'])
+      #   #=> ['writable: r8', '(u16)[r8] == 0x0']
+      # @example A readability the dereference beside it already states.
+      #   prune_settled(['readable: x1', '[x1] == 0x0']) #=> ['[x1] == 0x0']
+      # @example A non-NULL the dereference beside it already states.
+      #   prune_settled(['[$base+0x10] != 0x0', '[[$base+0x10]+0xa4] == 0x0'])
+      #   #=> ['[[$base+0x10]+0xa4] == 0x0']
+      def prune_settled(cons)
+        loop do
+          settled = drop_stated_readable(drop_settled_non_null(drop_ruled_out_null(cons)))
+          return cons if settled == cons
+
+          cons = settled
+        end
+      end
+
+      # The constraints that hold outright, as opposed to naming several options.
+      # @param [Array<String>] cons
+      # @return [Array<String>]
+      def unconditional(cons)
+        cons.reject { |c| c.include?(DISJUNCTION) }
+      end
+
+      # Whether the list requires +identity+ to be mapped memory: a constraint
+      # holding outright either names it as one, or accesses it -- at the address
+      # itself, or near enough that a NULL one could not be what is accessed.
+      # @param [Array<String>] cons
+      # @param [String] identity
+      # @return [Boolean]
+      def mapped?(cons, identity)
+        deref = "[#{identity}]"
+        near = /\[#{Regexp.escape(identity)}([+-]0x[0-9a-f]+)\]/
+        unconditional(cons).any? do |con|
+          con == "readable: #{identity}" || con == "writable: #{identity}" || con.include?(deref) ||
+            (off = con[near, 1]) && off.to_i(16).abs < PAGE_SIZE
+        end
+      end
+
+      # Drops every option that asks an address the list requires to be mapped
+      # memory to be NULL. A constraint whose every option goes is left alone: it
+      # says the gadget is impossible, which is not this pass's call to make.
+      # @param [Array<String>] cons
+      # @return [Array<String>]
+      def drop_ruled_out_null(cons)
+        cons.map do |con|
+          options = con.split(DISJUNCTION)
+          next con if options.size == 1
+
+          kept = options.reject do |opt|
+            identity = opt[/\A(.+) == NULL\z/, 1]
+            !identity.nil? && mapped?(cons, identity)
+          end
+          kept.empty? ? con : kept.join(DISJUNCTION)
+        end
+      end
+
+      # Drops every requirement that an address the list requires to be mapped
+      # memory be non-NULL, which mapped memory never is.
+      # @param [Array<String>] cons
+      # @return [Array<String>]
+      def drop_settled_non_null(cons)
+        cons.reject do |con|
+          identity = con[/\A(.+) != (?:NULL|0x0)\z/, 1]
+          !identity.nil? && !identity.match?(/\A\([su]\d+\)/) && mapped?(cons, identity)
+        end
+      end
+
+      # Drops every +readable:+ whose address another constraint dereferences
+      # outright, which asks for that readability already. Unlike {#mapped?} this
+      # takes only the address itself: a dereference nearby says the page it lands
+      # on is mapped, not the one +identity+ sits on.
+      # @param [Array<String>] cons
+      # @return [Array<String>]
+      def drop_stated_readable(cons)
+        cons.reject do |con|
+          identity = con[/\Areadable: (.+)\z/, 1]
+          next false if identity.nil?
+
+          unconditional(cons).any? { |other| other.include?("[#{identity}]") }
+        end
+      end
 
       # REG: OneGadget::ABI.all
       # IMM: [+-]0x[\da-f]+
