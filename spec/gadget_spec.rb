@@ -86,6 +86,33 @@ constraints:
     end
   end
 
+  context 'met_by?' do
+    def gadget(cons)
+      OneGadget::Gadget::Gadget.new(0, constraints: cons)
+    end
+
+    it 'holds when the other list names every constraint' do
+      easier = gadget(['rax == NULL'])
+      harder = gadget(['rax == NULL', 'writable: rbx'])
+      expect(easier.met_by?(harder)).to be true
+      expect(harder.met_by?(easier)).to be false
+    end
+
+    # libc-2.31 0x51e2b offers "rbp == NULL || (u16)[rbp] == 0x0"; 0x51e23 asks
+    # for the second option outright, so it asks for everything 0x51e2b does.
+    it 'holds when an option is required outright' do
+      easier = gadget(['rbp == NULL || (u16)[rbp] == 0x0'])
+      harder = gadget(['writable: rbp', '(u16)[rbp] == 0x0'])
+      expect(easier.met_by?(harder)).to be true
+    end
+
+    it 'does not hold when only a different option is required' do
+      easier = gadget(['rbp == NULL || (u16)[rbp] == 0x0'])
+      harder = gadget(['writable: rbp', '[rbp+0x8] == 0x0'])
+      expect(easier.met_by?(harder)).to be false
+    end
+  end
+
   context 'score' do
     def new(cons)
       OneGadget::Gadget::Gadget.new(0, constraints: cons)
