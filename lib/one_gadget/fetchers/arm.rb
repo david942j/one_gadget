@@ -134,14 +134,31 @@ module OneGadget
       REG = /r\d+|sl|fp|ip|lr/
       private_constant :REG
 
+      # A register-offset load, +[rB, rX]+.
+      REG_OFFSET_LOAD = /\[(#{REG}),\s*(?:#{REG})\]/
+      private_constant :REG_OFFSET_LOAD
+
       # Collect the registers used as a base in a register-offset load (+[rB, rX]+);
       # in glibc's PIC these +rB+ are the GOT base holding +$base + got+.
       # @example
       #   got_base_registers(['88ab2: ldr r2, [r1, r2]'])
       #   #=> ['r1']
       def got_base_registers(cmds)
-        cmds.flat_map { |c| c.scan(/\[(#{REG}),\s*(?:#{REG})\]/) }
+        cmds.flat_map { |c| c.scan(REG_OFFSET_LOAD) }
             .flatten.uniq
+      end
+
+      # The patterns naming one register: what uses it as a load base, and the
+      # +ldr+/+add+ pair that establishes it. Built once per register -- they are
+      # asked of every line of every window a candidate yields.
+      # @param [String] reg
+      # @return [Hash{Symbol => Regexp}]
+      def reg_patterns(reg)
+        (@reg_patterns ||= {})[reg] ||= {
+          use: /\[#{reg},\s*(?:#{REG})\]/,
+          add: /:\s*add(?:\.w)?\s+#{reg}, pc$/,
+          ldr: /:\s*ldr(?:\.w)?\s+#{reg}, \[pc[,\]]/
+        }
       end
 
       # Whether the candidate builds +reg+'s base itself, before the +[reg, rX]+
@@ -151,9 +168,10 @@ module OneGadget
       # constraint naming the register's *entry* value.
       # @example arm-2.27's +0x73f2a+, whose first instruction is +add r3, pc+
       def window_establishes?(reg, cmds)
-        use = cmds.index { |c| c.match?(/\[#{reg},\s*(?:#{REG})\]/) } or return false
+        pattern = reg_patterns(reg)
+        use = cmds.index { |c| c.match?(pattern[:use]) } or return false
 
-        cmds[0...use].any? { |c| c.match?(/:\s*add(?:\.w)?\s+#{reg}, pc$/) }
+        cmds[0...use].any? { |c| c.match?(pattern[:add]) }
       end
 
       # Prime +emu+ with every GOT base register the candidate relies on, by
@@ -179,18 +197,25 @@ module OneGadget
       # Locate the +ldr reg, [pc, ...]; add reg, pc+ pair that establishes +reg+
       # before address +before+. Returns the two objdump lines, or +nil+.
       def got_setup_lines(reg, before)
+        (@got_setup ||= {})[[reg, before]] ||= find_got_setup_lines(reg, before)
+      end
+
+      # {#got_setup_lines} without the memo: overlapping candidates ask the same
+      # register at the same address again and again, and the answer only depends
+      # on the disassembly.
+      def find_got_setup_lines(reg, before)
         pos = disasm_index[before]
         return if pos.nil?
 
-        add_re = /:\s*add(?:\.w)?\s+#{reg}, pc$/
-        add_at = pos.downto([0, pos - 400].max).find { |i| disasm_lines[i].match?(add_re) }
+        lines = disasm_lines
+        pattern = reg_patterns(reg)
+        add_at = pos.downto([0, pos - 400].max).find { |i| lines[i].match?(pattern[:add]) }
         return if add_at.nil?
 
-        ldr_re = /:\s*ldr(?:\.w)?\s+#{reg}, \[pc[,\]]/
-        ldr_at = add_at.downto([0, add_at - 4].max).find { |i| disasm_lines[i].match?(ldr_re) }
+        ldr_at = add_at.downto([0, add_at - 4].max).find { |i| lines[i].match?(pattern[:ldr]) }
         return if ldr_at.nil?
 
-        [disasm_lines[ldr_at], disasm_lines[add_at]]
+        [lines[ldr_at], lines[add_at]]
       end
 
       def branch_lead_chars
