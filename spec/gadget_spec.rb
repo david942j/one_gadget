@@ -129,6 +129,26 @@ constraints:
       expect(cons(list)).to eq list
     end
 
+    it 'drops a non-NULL requirement on an address already required to be mapped' do
+      expect(cons(['rax != 0x0', 'writable: rax'])).to eq ['writable: rax']
+      expect(cons(['x1 != NULL', 'readable: x1'])).to eq ['readable: x1']
+    end
+
+    it 'drops a non-NULL requirement the dereference beside it already states' do
+      expect(cons(['[$base+0x10] != 0x0', '[[$base+0x10]+0xa4] == 0x0']))
+        .to eq ['[[$base+0x10]+0xa4] == 0x0']
+    end
+
+    it 'keeps a non-NULL requirement when the dereference could clear the first page' do
+      list = ['[$base+0x10] != 0x0', '[[$base+0x10]+0x2000] == 0x0']
+      expect(cons(list)).to eq list
+    end
+
+    it 'keeps a non-NULL requirement when the dereference is only one of several options' do
+      list = ['r8 != 0x0', '[r8] == 0x0 || r8 is a valid envp']
+      expect(cons(list)).to eq list
+    end
+
     it 'settles what dropping an option exposes' do
       # Dropping "r1 == NULL" leaves "writable: r2" holding outright, which then
       # rules out the NULL option for r2, whose dereference then states the
