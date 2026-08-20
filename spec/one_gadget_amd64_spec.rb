@@ -89,11 +89,11 @@ describe 'one_gadget_amd64' do
     it 'libc-2.31' do
       path = data_path('libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
       expect(OneGadget.gadgets(file: path, force_file: true,
-                               level: 1)).to eq [0x51df8, 0x51e2b, 0x51e32, 0x51e39, 0x51e40, 0x51e45, 0x51e55, 0x51e5a,
-                                                 0x51e62, 0x84165, 0x8416c, 0x84173, 0x84176, 0x8417b, 0x84180,
-                                                 0x8418c, 0x84192, 0x84199, 0xe3b2e, 0xe3b31, 0xe3b34, 0xe3d23,
-                                                 0xe3d26, 0xe3d88, 0xe3d92, 0xe3d99, 0xe3da0, 0xe3dd7, 0xe3de1,
-                                                 0x1075e7, 0x1075f1, 0x107cea]
+                               level: 1)).to eq [0x51df8, 0x51e23, 0x51e2b, 0x51e32, 0x51e39, 0x51e40, 0x51e45, 0x51e55,
+                                                 0x51e5a, 0x51e62, 0x84165, 0x8416c, 0x84173, 0x84176, 0x8417b,
+                                                 0x84180, 0x8418c, 0x84192, 0x84199, 0xe3b2e, 0xe3b31, 0xe3b34,
+                                                 0xe3d23, 0xe3d26, 0xe3d88, 0xe3d92, 0xe3d99, 0xe3da0, 0xe3dd7,
+                                                 0xe3de1, 0x1075e7, 0x1075f1, 0x107cea]
       expect(OneGadget.gadgets(file: path)).to eq [0xe3b2e, 0xe3b31, 0xe3b34]
     end
 
