@@ -225,6 +225,18 @@ RSpec.describe Aletheia::Satisfier do
     expect(plan.benign_default).to be(false)
   end
 
+  # A nested readable (aarch64-2.27 0xa3228) states the readability of its own
+  # base: reading the pointer AT x19+0xed8 requires that address readable. One
+  # gadget lists no shallower constraint saying so, so the satisfier has to give
+  # x19 somewhere to point before it can place the pointer.
+  it 'establishes its own base for "readable: [reg+imm]"' do
+    plan = satisfier.satisfy(gadget(['readable: [x19+0xed8]']))
+    expect(plan.status).to eq('ok')
+    pool = Aletheia::Satisfier::STRING_POOL
+    expect(plan.regs['x19']).to eq('scratch_off' => pool)
+    expect(plan.mem[pool + 0xed8]).to eq('scratch_off' => pool)
+  end
+
   context 'amd64 backend' do
     require 'aletheia/arch/amd64'
     subject(:satisfier) { described_class.new(Aletheia::Arch::Amd64) }

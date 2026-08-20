@@ -905,8 +905,17 @@ module Aletheia
       return set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL }) if op.deref.zero?
       return set_base_mem(plan, op.imm, { 'scratch_off' => STRING_POOL }) if base_reg?(op)
 
-      addr_off = mem_addr_off(plan, op)
+      addr_off = mem_addr_off(plan, op) || (point_base_at_scratch(plan, op) && mem_addr_off(plan, op))
       addr_off && set_mem(plan, addr_off, { 'scratch_off' => STRING_POOL })
+    end
+
+    # Give a single-deref operand's base register somewhere to point, so the
+    # memory it names has an address to live at. Reading the pointer AT an address
+    # requires that address readable, so a nested readable establishes its own
+    # base -- nothing shallower has to say it.
+    # @return [Boolean] false when the register is not one the plan may set.
+    def point_base_at_scratch(plan, op)
+      settable?(op.reg) && set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL })
     end
 
     # Whether a pointer-form +X is a valid argv/envp+ operand already resolves to
