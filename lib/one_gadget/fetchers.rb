@@ -62,14 +62,14 @@ module OneGadget
                .sort_by { |g| [g.offset, g.constraints.size] }
       end
 
-      # Unique, remove gadgets with harder constraints.
+      # Unique, remove gadgets whose constraints already meet an easier gadget's
+      # (see {OneGadget::Gadget::Gadget#met_by?}): that one is the better answer,
+      # and this one asks the reader for strictly more.
       def trim_gadgets(gadgets)
         gadgets = gadgets.uniq(&:constraints).sort_by { |g| g.constraints.size }
         res = []
         gadgets.each_with_index do |g, i|
-          res << g unless i.times.any? do |j|
-            (gadgets[j].constraints - g.constraints).empty?
-          end
+          res << g unless i.times.any? { |j| gadgets[j].met_by?(g) }
         end
         # The same offset can reach the call via more than one branch direction;
         # list it once, keeping the easiest (fewest-constraint) variant.
