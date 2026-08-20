@@ -103,6 +103,22 @@ module OneGadget
         @score ||= constraints.reduce(1.0) { |s, c| s * calculate_score(c) }
       end
 
+      # Whether +other+ asks for everything this gadget asks for, so listing this
+      # one beside it tells the reader nothing new. Each constraint here has to be
+      # met by +other+'s list: named there, or -- for one that offers several
+      # options -- an option of it required there outright.
+      # @param [Gadget] other
+      # @return [Boolean]
+      # @example An option required outright meets the constraint offering it.
+      #   met_by?(other) # where this asks "r8 == NULL || (u16)[r8] == 0x0"
+      #                  # and +other+ asks "(u16)[r8] == 0x0"
+      def met_by?(other)
+        constraints.all? do |con|
+          other.constraints.include?(con) ||
+            con.split(DISJUNCTION).any? { |option| other.constraints.include?(option) }
+        end
+      end
+
       # Every architecture's register names, for {#base_register} to recognise one
       # by. Keyed for lookup: it is asked once per token of every constraint scored.
       REGISTER_NAMES = OneGadget::ABI.all.to_h { |reg| [reg, true] }.freeze

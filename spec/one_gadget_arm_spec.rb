@@ -26,8 +26,8 @@ describe 'one_gadget_arm' do
     it 'libc-2.43' do
       path = data_path('libc-2.43-8c7af7f227b3871d6afba752cbb617f317023de5.so')
       expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
-        .to eq [0x3afd6, 0x3afdc, 0x3afde, 0x3affc, 0x3b000, 0x3b002, 0x3b004, 0x543d2, 0x543d4, 0x543d8,
-                0x8d94a, 0xa42c8, 0xa4334, 0xa4338]
+        .to eq [0x3afdc, 0x3afde, 0x3affc, 0x3b000, 0x3b002, 0x3b004, 0x543d2, 0x543d4, 0x543d8, 0x8d94a,
+                0xa42c8, 0xa4334, 0xa4338]
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3b004, 0x8d94a, 0xa4338]
     end
 
