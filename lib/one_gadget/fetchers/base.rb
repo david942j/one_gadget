@@ -71,6 +71,8 @@ module OneGadget
             next if seen.key?(key = suffix.join)
 
             seen[key] = true
+            next if refused_before_call?(suffix)
+
             gadget = resolve_suffix(suffix)
             gadgets << gadget unless gadget.nil?
           end
@@ -113,9 +115,24 @@ module OneGadget
         !name.nil? && OneGadget::Emulators::Processor::TERMINAL_CALL_RE.match?(name)
       end
 
+      # Whether emulating +window+ can only stop short of its terminal call: it
+      # runs a line the emulator has already refused (see
+      # {OneGadget::Emulators::Processor#refused_line}), and a window that never
+      # reaches the call is not a gadget. Refusal belongs to the line, so one
+      # learnt anywhere settles every window carrying it -- and overlapping
+      # candidates carry the same lines over and over.
+      # @param [Array<String>] window
+      # @return [Boolean]
+      def refused_before_call?(window)
+        return false if @refused.nil?
+
+        (window.size - 1).times.any? { |i| @refused.key?(window[i]) }
+      end
+
       # Emulate a candidate suffix and turn it into a gadget, or +nil+ if it isn't one.
       def resolve_suffix(lines)
         processor = emulate(lines)
+        (@refused ||= {})[processor.refused_line] = true if processor.refused_line
         # resolve reads argument registers, which may not be evaluable on an
         # exotic path; such a candidate simply isn't a gadget.
         options = begin

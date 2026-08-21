@@ -120,9 +120,19 @@ module OneGadget
       def process(cmd)
         process!(cmd)
       # rescue OneGadget::Error::UnsupportedError => e; p e # for debugging
+      rescue OneGadget::Error::UnsupportedInstructionError
+        @refused_line = cmd
+        false
       rescue OneGadget::Error::Error
         false
       end
+
+      # The line this emulator could not run at all: an instruction outside
+      # {#instructions}. Only what {#parse} reads decides that -- the mnemonic and
+      # the operands, never the state the emulator holds -- so the same line stops
+      # every emulation that reaches it.
+      # @return [String, nil]
+      attr_reader :refused_line
 
       # Method need to be implemented in inheritors.
       #
