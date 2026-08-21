@@ -14,68 +14,15 @@ module OneGadget
 
       private
 
-      # Locate the `bl` sites that call a terminal function *without* disassembling
-      # the whole libc - a full objdump of a Thumb-2 arm libc is ~4x slower than
-      # amd64/aarch64 (~1.1s vs ~0.3s), and only ~0.35% of it is ever needed.
-      #
-      # We take the exec*/posix_spawn* addresses from the symbol table and scan
-      # +.text+ for A32/Thumb `BL` instructions branching to them. This is exact
-      # for the direct `bl <exec*>` calls the search cares about (validated to
-      # match the objdump-grep sites on the arm-libc-2.23/2.27/2.39 fixtures);
-      # any false positive merely adds a harmless empty window, and if the scan
-      # finds nothing we fall back to a full disassembly.
-      def terminal_call_sites
-        File.open(file) do |f|
-          elf = ELFTools::ELFFile.new(f)
-          targets = terminal_symbol_addresses(elf)
-          return [] if targets.empty?
-
-          text = elf.section_by_name('.text')
-          return nil if text.nil?
-
-          scan_bl(text.header.sh_addr.to_i, text.data, targets)
-        end
-      rescue ELFTools::ELFError
-        nil # not something we can scan; disassemble everything
+      # An ARM function's symbol value carries the Thumb bit; the address is what
+      # is left of it.
+      def symbol_address(value)
+        value & ~1
       end
 
-      # Addresses (Thumb bit cleared) of exported/defined exec*/posix_spawn* funcs.
-      # A symbol table entry is four 32-bit words, the first two being the offset
-      # of its name and its value. Little-endian, as {#scan_bl} also assumes.
-      SYM_WORDS = 4
-      private_constant :SYM_WORDS
-      # What a terminal function's name starts with, and enough bytes of a name to
-      # tell: the string table is read as one blob, so a name is a slice of it.
-      TERMINAL_PREFIXES = %w[exec posix_spawn].freeze
-      TERMINAL_PREFIX_BYTES = 12
-      private_constant :TERMINAL_PREFIXES, :TERMINAL_PREFIX_BYTES
-
-      # Where the +exec*+/+posix_spawn*+ symbols live, keyed for lookup with the
-      # Thumb bit cleared. Unpacked in one go rather than built into an object per
-      # symbol: a libc has thousands, and only two fields of each are wanted.
-      # @param [ELFTools::ELFFile] elf
-      # @return [Hash{Integer => true}]
-      def terminal_symbol_addresses(elf)
-        addrs = {}
-        %w[.dynsym .symtab].each do |name|
-          sec = elf.section_by_name(name)
-          next if sec.nil?
-
-          strtab = elf.sections[sec.header.sh_link.to_i].data
-          sec.data.unpack('V*').each_slice(SYM_WORDS) do |st_name, st_value|
-            next if st_value.nil? || st_value.zero?
-
-            symbol = strtab.byteslice(st_name, TERMINAL_PREFIX_BYTES)
-            addrs[st_value & ~1] = true if symbol&.start_with?(*TERMINAL_PREFIXES)
-          end
-        end
-        addrs
-      end
-
-      # Scan +data+ (loaded at +base+) for A32/Thumb BL branches into +targets+.
-      # Over-approximates (a stray word may decode to a BL into a target); that is
-      # harmless - it just adds an empty window - as long as no real BL is missed.
-      def scan_bl(base, data, targets)
+      # A32 and Thumb both spell a direct call +BL+, in different encodings, and a
+      # Thumb one is not word-aligned, so every halfword has to be considered.
+      def scan_calls(base, data, targets)
         halves = data.unpack('v*') # 16-bit little-endian halfwords
         sites = []
         halves.each_with_index do |high, i|

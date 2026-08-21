@@ -12,6 +12,21 @@ module OneGadget
 
       private
 
+      # +BL imm26+ is AArch64's only direct call, one word wide and word-aligned,
+      # so the whole scan is a masked compare per word.
+      def scan_calls(base, data, targets)
+        sites = []
+        data.unpack('V*').each_with_index do |word, i|
+          next unless (word & 0xfc000000) == 0x94000000
+
+          imm = word & 0x03ffffff
+          imm -= 1 << 26 if imm.anybits?(1 << 25)
+          addr = base + (i * 4)
+          sites << addr if targets.key?(addr + (imm * 4))
+        end
+        sites
+      end
+
       def emulator
         OneGadget::Emulators::AArch64.new
       end

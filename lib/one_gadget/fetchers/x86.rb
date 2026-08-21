@@ -12,6 +12,30 @@ module OneGadget
 
       private
 
+      # A direct near call, +E8+ then a 32-bit displacement from the instruction
+      # after it.
+      CALL_REL32 = "\xe8".b.freeze
+      private_constant :CALL_REL32
+      CALL_REL32_SIZE = 5
+      private_constant :CALL_REL32_SIZE
+
+      # x86 instructions are variable length, so a byte in the middle of one can
+      # read as a call; that costs a window nothing is found in, where missing a
+      # real call would cost the gadgets around it.
+      def scan_calls(base, data, targets)
+        sites = []
+        pos = 0
+        while (pos = data.index(CALL_REL32, pos))
+          displacement = data.byteslice(pos + 1, 4)
+          break if displacement.nil? || displacement.bytesize < 4
+
+          addr = base + pos
+          sites << addr if targets.key?(addr + CALL_REL32_SIZE + displacement.unpack1('l<'))
+          pos += 1
+        end
+        sites
+      end
+
       def branch_lead_chars
         'j'
       end
