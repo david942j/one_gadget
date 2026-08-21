@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'elftools'
+
 require 'one_gadget/emulators/processor'
 require 'one_gadget/error'
 require 'one_gadget/fetchers/objdump'
@@ -18,6 +20,13 @@ module OneGadget
       # The absolute path to glibc.
       # @return [String] The filename.
       attr_reader :file
+
+      # What a terminal function's name starts with, and enough bytes of a name to
+      # tell: a symbol table's string table is read as one blob, so a name is a
+      # slice of it.
+      TERMINAL_PREFIXES = %w[exec posix_spawn].freeze
+      TERMINAL_PREFIX_BYTES = 12
+      private_constant :TERMINAL_PREFIXES, :TERMINAL_PREFIX_BYTES
 
       # Give up on a control-flow path once it has crossed this many conditional branches.
       MAX_FORKS = 4
@@ -823,11 +832,83 @@ module OneGadget
         end
       end
 
-      # Addresses of `bl`/`call` sites reaching a terminal function, found without a
-      # full disassembly. +nil+ (the default) means the arch has no cheap finder,
-      # so the whole file is disassembled.
+      # Addresses of the calls reaching a terminal function, found without
+      # disassembling anything: the +exec*+/+posix_spawn*+ symbols are read out of
+      # the ELF and +.text+ is scanned for direct calls into them (see
+      # {#scan_calls}). +nil+ when the file cannot be read that way, so the caller
+      # disassembles everything instead.
+      # @return [Array<Integer>, nil]
       def terminal_call_sites
-        nil
+        File.open(file) do |fd|
+          elf = ELFTools::ELFFile.new(fd)
+          return nil unless elf.endian == :little
+
+          targets = terminal_symbol_addresses(elf)
+          return [] if targets.empty?
+
+          text = elf.section_by_name('.text')
+          return nil if text.nil?
+
+          scan_calls(text.header.sh_addr.to_i, text.data, targets)
+        end
+      rescue ELFTools::ELFError
+        nil # not something we can scan; disassemble everything
+      end
+
+      # The addresses in +data+ (loaded at +base+) of direct calls into +targets+.
+      # Over-approximating is fine -- a false positive only adds a window nothing
+      # is found in -- while a missed call costs every gadget around it.
+      # @param [Integer] _base
+      # @param [String] _data
+      # @param [Hash{Integer => true}] _targets
+      # @return [Array<Integer>, nil] +nil+ from an arch with no cheap call finder,
+      #   which disassembles everything instead.
+      def scan_calls(_base, _data, _targets) = nil
+
+      # Where the +exec*+/+posix_spawn*+ symbols live, keyed for lookup. Read
+      # straight out of the tables rather than built into an object per symbol: a
+      # libc has thousands, and only two fields of each are wanted.
+      # @param [ELFTools::ELFFile] elf
+      # @return [Hash{Integer => true}]
+      def terminal_symbol_addresses(elf)
+        addrs = {}
+        %w[.dynsym .symtab].each do |name|
+          sec = elf.section_by_name(name)
+          next if sec.nil?
+
+          strtab = elf.sections[sec.header.sh_link.to_i].data
+          each_symbol(elf, sec) do |name_offset, value|
+            symbol = strtab.byteslice(name_offset, TERMINAL_PREFIX_BYTES)
+            addrs[symbol_address(value)] = true if symbol&.start_with?(*TERMINAL_PREFIXES)
+          end
+        end
+        addrs
+      end
+
+      # Each symbol's name offset and value, unpacked from the table's bytes. A
+      # 32-bit entry is four words with the value second; a 64-bit one is six, the
+      # value being the pair from the third.
+      # @param [ELFTools::ELFFile] elf
+      # @param [ELFTools::Sections::Section] section
+      # @yieldparam [Integer] name_offset
+      # @yieldparam [Integer] value
+      # @return [void]
+      def each_symbol(elf, section)
+        wide = elf.elf_class == 64
+        section.data.unpack('V*').each_slice(wide ? 6 : 4) do |words|
+          value = wide ? words[2] && words[3] && (words[2] | (words[3] << 32)) : words[1]
+          next if value.nil? || value.zero?
+
+          yield(words[0], value)
+        end
+      end
+
+      # The address a symbol's value names. Overridden where the value carries
+      # something besides the address (ARM keeps the Thumb bit in it).
+      # @param [Integer] value
+      # @return [Integer]
+      def symbol_address(value)
+        value
       end
 
       # Map from an instruction's address to its index in {#disasm_lines}, so a
