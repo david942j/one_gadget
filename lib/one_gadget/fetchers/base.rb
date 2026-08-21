@@ -27,18 +27,25 @@ module OneGadget
       # How much to disassemble around each terminal call when an architecture can
       # locate the calls cheaply (see {#terminal_call_sites} / {#windowed_disasm}).
       #
-      # The backward walk stays within {PATH_BUDGET} instructions and {MAX_FORKS}
-      # branch hops of the call, and a branch *into* that region comes from close
-      # by. Measured across real amd64/aarch64/arm libcs, the earliest line the
-      # walk reaches is <0x98b before the call and branches into it come from
-      # <0x8bb further - 0x1246 all told. WINDOW_BACK = 0x2000 leaves ~60% margin;
-      # a gadget whose code and branch-predecessors exceed it would be missed,
-      # which is why windowing is opt-in per arch (fast disassembly arches keep
-      # the full, exhaustive scan) and falls back to full disassembly if the call
-      # scan comes up empty.
-      WINDOW_BACK = 0x2000
-      # A little past the call, enough to cover the call instruction itself.
-      WINDOW_FWD = 0x80
+      # The walk runs backwards from the call, but what it reaches does not: a
+      # branch predecessor can sit *after* the call, so the window has to hold the
+      # loop or later block that jumps back into the region.
+      #
+      # Both directions were measured by windowing every architecture against its
+      # own full disassembly across the spec corpus. Gadgets start being lost below
+      # 0x400 either way, and a window too small to hold a predecessor invents them
+      # as well: the line before the first of a window is the last of another, and
+      # nothing about it follows. These leave 16x that, and still disassemble about
+      # a fifth of a libc -- terminal calls cluster into a handful of merged
+      # windows, so a wider one costs little.
+      #
+      # A gadget whose code and branch-predecessors exceed the window is missed,
+      # which is why windowing is opt-in per arch (fast disassembly arches keep the
+      # full, exhaustive scan) and falls back to full disassembly if the call scan
+      # comes up empty.
+      WINDOW_BACK = 0x4000
+      # As far past the call, for a predecessor that branches back into the region.
+      WINDOW_FWD = 0x4000
 
       # Cache values that are a deterministic function of an objdump command
       # (its output and everything derived from it), so re-analysing the same
