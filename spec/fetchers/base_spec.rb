@@ -24,6 +24,16 @@ describe OneGadget::Fetchers::Base do
     end
   end
 
+  describe '#resolve_suffix' do
+    # An exotic path can leave an argument register the resolver cannot evaluate,
+    # which raises rather than returning nil; such a candidate simply isn't a gadget.
+    it 'drops a candidate whose resolution raises' do
+      allow(fetcher).to receive(:emulate).and_return(processor)
+      allow(fetcher).to receive(:resolve).and_raise(OneGadget::Error::ArgumentError, 'unevaluable')
+      expect(fetcher.send(:resolve_suffix, ['1000: nop'])).to be_nil
+    end
+  end
+
   describe '#noexec_shell_argv?' do
     # execve's program is always "/bin/sh", so argv[1] is that shell's option
     # word. A fixed "-n" (noexec) bundle parses input but runs nothing; "-c"
