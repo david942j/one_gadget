@@ -40,15 +40,33 @@ module OneGadget
       end
 
       # Addresses (Thumb bit cleared) of exported/defined exec*/posix_spawn* funcs.
+      # A symbol table entry is four 32-bit words, the first two being the offset
+      # of its name and its value. Little-endian, as {#scan_bl} also assumes.
+      SYM_WORDS = 4
+      private_constant :SYM_WORDS
+      # What a terminal function's name starts with, and enough bytes of a name to
+      # tell: the string table is read as one blob, so a name is a slice of it.
+      TERMINAL_PREFIXES = %w[exec posix_spawn].freeze
+      TERMINAL_PREFIX_BYTES = 12
+      private_constant :TERMINAL_PREFIXES, :TERMINAL_PREFIX_BYTES
+
+      # Where the +exec*+/+posix_spawn*+ symbols live, keyed for lookup with the
+      # Thumb bit cleared. Unpacked in one go rather than built into an object per
+      # symbol: a libc has thousands, and only two fields of each are wanted.
+      # @param [ELFTools::ELFFile] elf
+      # @return [Hash{Integer => true}]
       def terminal_symbol_addresses(elf)
         addrs = {}
         %w[.dynsym .symtab].each do |name|
           sec = elf.section_by_name(name)
           next if sec.nil?
 
-          sec.each_symbols do |sym|
-            value = sym.header.st_value.to_i
-            addrs[value & ~1] = true if value.nonzero? && sym.name =~ /\A(exec|posix_spawn)/
+          strtab = elf.sections[sec.header.sh_link.to_i].data
+          sec.data.unpack('V*').each_slice(SYM_WORDS) do |st_name, st_value|
+            next if st_value.nil? || st_value.zero?
+
+            symbol = strtab.byteslice(st_name, TERMINAL_PREFIX_BYTES)
+            addrs[st_value & ~1] = true if symbol&.start_with?(*TERMINAL_PREFIXES)
           end
         end
         addrs
@@ -59,23 +77,32 @@ module OneGadget
       # harmless - it just adds an empty window - as long as no real BL is missed.
       def scan_bl(base, data, targets)
         halves = data.unpack('v*') # 16-bit little-endian halfwords
-        sites = halves.each_index.filter_map do |i|
+        sites = []
+        halves.each_with_index do |high, i|
+          low = halves[i + 1] or next
+
+          # Decoding a target is the expensive half, and a whole .text is hundreds
+          # of thousands of halfwords: ask what the encoding could be first.
           addr = base + i * 2
-          addr if call_targets_at(halves, i, addr).any? { |t| targets.key?(t) }
+          if thumb_bl?(high, low) && targets.key?(thumb_bl_target(addr, high, low) & ~1)
+            sites << addr
+            next
+          end
+          next unless i.even? && a32_bl?(low)
+
+          sites << addr if targets.key?(a32_bl_target(addr, high | (low << 16)))
         end
         sites.uniq
       end
 
-      # Masked target(s) of any A32/Thumb BL that could begin at halfword +i+.
-      def call_targets_at(halves, i, addr)
-        targets = []
-        targets << (thumb_bl_target(addr, halves[i], halves[i + 1]) & ~1) if thumb_bl?(halves, i)
-        targets << a32_bl_target(addr, halves[i] | (halves[i + 1] << 16)) if i.even? && halves[i + 1]
-        targets.compact
+      def thumb_bl?(high, low)
+        high.between?(0xf000, 0xf7ff) && low.allbits?(0xd000)
       end
 
-      def thumb_bl?(halves, i)
-        halves[i].between?(0xf000, 0xf7ff) && halves[i + 1]&.allbits?(0xd000)
+      # The +cond|101|1+ of an A32 BL, read off the word's top byte -- which is the
+      # top byte of its second halfword.
+      def a32_bl?(low)
+        ((low >> 8) & 0x0f) == 0x0b
       end
 
       def thumb_bl_target(addr, high, low)
@@ -88,8 +115,6 @@ module OneGadget
       end
 
       def a32_bl_target(addr, word)
-        return nil unless ((word >> 24) & 0x0f) == 0x0b # cond|101|1 => BL
-
         imm = (word & 0xffffff) << 2
         imm -= (1 << 26) if imm.anybits?(1 << 25)
         (addr + 8 + imm) & 0xffffffff
