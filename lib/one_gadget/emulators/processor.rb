@@ -88,17 +88,29 @@ module OneGadget
       # @return [(Instruction, Array<String>)]
       #   The parsing result.
       def parse(cmd)
-        list, index = self.class.instruction_table { instructions }
-        mnem = cmd[/\A[0-9a-f]+:\s*(\S+)/, 1] || cmd[/\A\s*(\S+)/, 1]
-        inst = index[mnem]
-        # Fall back to the original scan for any mnemonic that isn't a bare word.
-        inst ||= list.find { |i| i.match?(cmd) }
-        raise Error::UnsupportedInstructionError, "Not implemented instruction in #{cmd}" if inst.nil?
+        self.class.line_memo(:parse)[cmd] ||= begin
+          list, index = self.class.instruction_table { instructions }
+          mnem = cmd[/\A[0-9a-f]+:\s*(\S+)/, 1] || cmd[/\A\s*(\S+)/, 1]
+          inst = index[mnem]
+          # Fall back to the original scan for any mnemonic that isn't a bare word.
+          inst ||= list.find { |i| i.match?(cmd) }
+          raise Error::UnsupportedInstructionError, "Not implemented instruction in #{cmd}" if inst.nil?
 
-        [inst, inst.fetch_args(cmd)]
+          [inst, inst.fetch_args(cmd)]
+        end
       end
 
       class << self
+        # What a line always reads as, remembered per architecture and +kind+ of
+        # reading: a candidate is emulated once for every window it yields, so the
+        # same line is read thousands of times, and nothing about how it reads
+        # depends on the state the emulator holds.
+        # @param [Symbol] kind
+        # @return [Hash]
+        def line_memo(kind)
+          (@line_memo ||= Hash.new { |memo, k| memo[k] = {} })[kind]
+        end
+
         # The architecture's supported instructions, and the same set indexed by
         # mnemonic, built on first use and shared by every emulator of that
         # architecture: the set is fixed, while an emulator is made for each of the

@@ -37,8 +37,7 @@ module OneGadget
         resolve_pending_branch(cmd)
         line = cmd.strip
         track_mode(line)
-        body, @literal = split_line(line)
-        body = normalize(body)
+        body, @literal = decompose(line)
         mnem, rest = body.split(/\s+/, 2)
         return handle_compare(COMPARES[mnem], rest) if COMPARES.key?(mnem)
         return handle_branch(mnem, rest) != :fail if branch_mnem?(mnem)
@@ -136,6 +135,18 @@ module OneGadget
       # @example
       #   split_line('2c626: ldr r2, [pc, #128] @ (2c6a8 <x>)')
       #   #=> ['ldr r2, [pc, #128]', 0x2c6a8]
+      # The instruction body a line carries, in the plain form the generic parser
+      # expects, and the literal-pool address it points at. Both are decided by the
+      # text alone (see {Processor.line_memo}).
+      # @param [String] line
+      # @return [(String, Integer, nil)]
+      def decompose(line)
+        self.class.line_memo(:decompose)[line] ||= begin
+          body, literal = split_line(line)
+          [normalize(body), literal]
+        end
+      end
+
       def split_line(line)
         body = line.sub(/\A[0-9a-f]+:\s*/, '')
         literal = body[/@\s*\(?([0-9a-f]+)\s/, 1]&.to_i(16)
