@@ -24,6 +24,22 @@ describe OneGadget::Fetchers::Base do
     end
   end
 
+  describe '#predecessors' do
+    # A windowed disassembly is a run of separate regions, so the line before the
+    # first of a window is the last of the window before it -- a different part of
+    # the binary, which nothing follows from.
+    it 'does not fall through into the first line of a window' do
+      allow(fetcher).to receive_messages(disasm_lines: ['1000: mov rax,rbx', '2000: mov rcx,rdx'],
+                                         branch_pred_map: {})
+      allow(fetcher).to receive(:window_starts).and_return({ 0 => true })
+      expect(fetcher.send(:predecessors, 1)).to eq [[0, false]]
+
+      fetcher.instance_variable_set(:@predecessors, nil)
+      allow(fetcher).to receive(:window_starts).and_return({ 0 => true, 1 => true })
+      expect(fetcher.send(:predecessors, 1)).to be_empty
+    end
+  end
+
   describe '#resolve_suffix' do
     # An exotic path can leave an argument register the resolver cannot evaluate,
     # which raises rather than returning nil; such a candidate simply isn't a gadget.
