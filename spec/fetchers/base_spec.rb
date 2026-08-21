@@ -24,6 +24,18 @@ describe OneGadget::Fetchers::Base do
     end
   end
 
+  describe '#disasm_lines' do
+    # An architecture with no cheap way to find its call sites disassembles the
+    # whole file, and then every line does follow the one before it.
+    it 'falls back to the whole disassembly, with no window starts' do
+      allow(fetcher).to receive_messages(terminal_call_sites: nil, objdump_lines: ['1000: nop'])
+      objdump = instance_double(OneGadget::Fetchers::Objdump, command: 'objdump-for-the-fallback-spec')
+      fetcher.instance_variable_set(:@objdump, objdump)
+      expect(fetcher.send(:disasm_lines)).to eq ['1000: nop']
+      expect(fetcher.send(:window_starts)).to be_empty
+    end
+  end
+
   describe '#predecessors' do
     # A windowed disassembly is a run of separate regions, so the line before the
     # first of a window is the last of the window before it -- a different part of

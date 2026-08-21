@@ -116,7 +116,8 @@ Optional hooks (sensible defaults in `Base`):
 | Method | Default | Purpose |
 | --- | --- | --- |
 | `objdump_options` | `[]` | extra objdump flags, e.g. x86 returns `%w[-M intel]` |
-| `terminal_call_sites` | `nil` | if the calls can be located cheaply *without* disassembling everything, return their addresses for windowed disassembly (a big win when a full objdump is slow, as on Thumb-2 arm). `nil` = disassemble the whole file. See `Fetchers::Arm`. |
+| `scan_calls(base, data, targets)` | `nil` | find the direct calls into `targets` in `.text` (given as `data`, loaded at `base`), so only windows around them are disassembled instead of the whole file. One masked compare per instruction is usually enough; see `Fetchers::AArch64` for the simplest, `Fetchers::X86` for a variable-length one. Over-approximating is fine; a missed call costs the gadgets around it. `nil` = disassemble the whole file. |
+| `symbol_address(value)` | `value` | what a symbol's value names, where it carries more than the address (`Fetchers::Arm` masks off the Thumb bit). |
 
 ## The emulator — `Emulators::<Arch> < Emulators::Processor`
 
