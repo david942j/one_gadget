@@ -688,7 +688,9 @@ module OneGadget
       def predecessors(idx)
         (@predecessors ||= {})[idx] ||= begin
           preds = []
-          if idx.positive?
+          # Nothing falls through into the first line of a window: the line before
+          # it is the last of another window, a different part of the binary.
+          if idx.positive? && !window_starts.key?(idx)
             kind = branch_kind(disasm_lines[idx - 1])
             preds << [idx - 1, kind == :conditional] unless %i[unconditional terminator].include?(kind)
           end
@@ -756,10 +758,24 @@ module OneGadget
       def branch_lead_chars; raise NotImplementedError
       end
 
-      # The target's full objdump disassembly as stripped +"ADDR: insn"+ lines,
-      # cached for the lifetime of the fetcher.
+      # The target's objdump disassembly as stripped +"ADDR: insn"+ lines.
       def disasm_lines
-        @disasm_lines ||= Base.cached(:disasm, @objdump.command) do
+        disassembly[:lines]
+      end
+
+      # Where in {#disasm_lines} each window begins, keyed for lookup. Empty when
+      # the whole file was disassembled, since then every line does follow the one
+      # before it.
+      # @return [Hash{Integer => true}]
+      def window_starts
+        disassembly[:starts]
+      end
+
+      # The disassembly and the shape it was taken in, cached (per objdump command)
+      # for the lifetime of the fetcher.
+      # @return [Hash{Symbol => Array<String>, Hash}]
+      def disassembly
+        @disassembly ||= Base.cached(:disasm, @objdump.command) do
           sites = terminal_call_sites
           sites.nil? || sites.empty? ? full_disasm : windowed_disasm(sites)
         end
@@ -767,7 +783,7 @@ module OneGadget
 
       # Disassemble the whole file (the exhaustive default).
       def full_disasm
-        objdump_lines
+        { lines: objdump_lines, starts: {} }
       end
 
       # Disassemble only [call-WINDOW_BACK, call+WINDOW_FWD] around each call site,
@@ -775,7 +791,12 @@ module OneGadget
       # a full disassembly (the win on the slow-to-objdump Thumb-2 arm libcs).
       def windowed_disasm(sites)
         windows = sites.sort.map { |a| [[a - WINDOW_BACK, 0].max, a + WINDOW_FWD] }
-        merge_ranges(windows).flat_map { |lo, hi| objdump_lines(start: lo, stop: hi) }
+        starts = {}
+        lines = merge_ranges(windows).each_with_object([]) do |(lo, hi), acc|
+          starts[acc.size] = true
+          acc.concat(objdump_lines(start: lo, stop: hi))
+        end
+        { lines:, starts: }
       end
 
       # Merge a list of sorted [lo, hi] ranges, coalescing any that overlap.
