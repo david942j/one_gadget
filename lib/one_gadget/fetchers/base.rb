@@ -563,7 +563,7 @@ module OneGadget
       end
 
       def offset_of(assembly)
-        assembly.scan(/^([\da-f]+):/)[0][0].to_i(16)
+        assembly[/\A([\da-f]+):/, 1].to_i(16)
       end
 
       # Whether a single (non-disjunctive) branch condition already settles itself,
@@ -651,13 +651,13 @@ module OneGadget
       # +path+ is built in forward order (the terminal call stays last). Emits a
       # candidate at each leaf - {#find} then tries every start line within it.
       def back_walk(idx, forks, visited, path, &blk)
-        addr = disasm_addrs[idx]
+        addr = addr_at(idx)
         return if path.size >= PATH_BUDGET
 
         visited.add(addr)
         path.unshift(disasm_lines[idx])
         edges = predecessors(idx).reject do |pidx, cond|
-          visited.include?(disasm_addrs[pidx]) || (cond && forks >= MAX_FORKS)
+          visited.include?(addr_at(pidx)) || (cond && forks >= MAX_FORKS)
         end
         if edges.empty?
           blk.call(path.dup)
@@ -668,9 +668,11 @@ module OneGadget
         visited.delete(addr)
       end
 
-      # Address of each disassembly line, by index. Cached (per objdump command).
-      def disasm_addrs
-        @disasm_addrs ||= Base.cached(:addrs, @objdump.command) { disasm_lines.map { |l| offset_of(l) } }
+      # The address of the instruction at +idx+, remembered as it is asked for.
+      # Only the lines the backward walk reaches ever need one, a small part of a
+      # whole libc's disassembly.
+      def addr_at(idx)
+        (@addr_at ||= {})[idx] ||= offset_of(disasm_lines[idx])
       end
 
       # Predecessors of +disasm_lines[idx]+ as +[pred_index, conditional_edge?]+:
@@ -683,7 +685,7 @@ module OneGadget
             kind = branch_kind(disasm_lines[idx - 1])
             preds << [idx - 1, kind == :conditional] unless %i[unconditional terminator].include?(kind)
           end
-          (branch_pred_map[disasm_addrs[idx]] || []).each do |b|
+          (branch_pred_map[addr_at(idx)] || []).each do |b|
             preds << [b, branch_kind(disasm_lines[b]) == :conditional]
           end
           preds
@@ -780,8 +782,17 @@ module OneGadget
         end
       end
 
+      # An objdump line carries an instruction when it opens with its address.
+      DISASSEMBLED = /\A[0-9a-f]+:/
+      private_constant :DISASSEMBLED
+
       def objdump_lines(start: nil, stop: nil)
-        `#{@objdump.command(start:, stop:)}`.lines.map(&:strip).grep(/\A[0-9a-f]+:/)
+        # One pass, one string per line: a whole libc is hundreds of thousands of
+        # them, and only the instructions are wanted.
+        `#{@objdump.command(start:, stop:)}`.each_line.filter_map do |line|
+          line = line.strip
+          line if DISASSEMBLED.match?(line)
+        end
       end
 
       # Addresses of `bl`/`call` sites reaching a terminal function, found without a
