@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require 'net/http'
-require 'openssl'
 require 'pathname'
 require 'tempfile'
 
@@ -171,6 +169,12 @@ module OneGadget
     #   The request response body.
     #   If the response is +302 Found+, returns the location in header.
     def url_request(url)
+      # Asked for here rather than with the file: only reaching the build database
+      # over the network needs them, and together they are a quarter of what it
+      # takes to load one_gadget at all.
+      require 'net/http'
+      require 'openssl'
+
       uri = URI.parse(url)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
