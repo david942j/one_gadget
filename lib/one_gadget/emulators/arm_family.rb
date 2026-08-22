@@ -234,6 +234,13 @@ module OneGadget
       # @return [void]
       def inst_nop(*); end
 
+      # A memory barrier orders accesses without changing any value, so a path
+      # crossing one carries on unchanged. The operand naming its scope (+dmb ish+)
+      # says which accesses, not what they hold.
+      alias inst_dmb inst_nop
+      alias inst_dsb inst_nop
+      alias inst_isb inst_nop
+
       # A +bl+/+blx+ call: record the terminal +exec*+ target, accept a known-safe
       # syscall wrapper, or +:fail+ to abort the candidate.
       def inst_bl(addr)
@@ -255,6 +262,16 @@ module OneGadget
         stack, offset = resolve_address(dst_l)
         values.each_with_index { |v, i| stack[offset + size_t * i] = v } if stack
         add_writable(dst_l) unless stack.equal?(sp_based_stack)
+      end
+
+      # A byte load. The address is read like any other, so what the caller has to
+      # arrange about it is recorded the same way -- but one byte of a word is not
+      # a value this emulator can name, so the register holds what a call would
+      # have left: a path that goes on to depend on it is abandoned rather than
+      # described wrongly.
+      def inst_ldrb(dst, src, index = 0)
+        inst_ldr(dst, src, index)
+        registers[dst] = clobbered_value
       end
 
       # +cbz+/+cbnz+ (compare-and-branch-on-zero): identical decoding in ARM and
