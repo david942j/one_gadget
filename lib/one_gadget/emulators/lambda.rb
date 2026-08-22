@@ -156,9 +156,11 @@ module OneGadget
         #   Lambda.parse('[x0, -104]')
         #   #=> #<Lambda @obj='x0', @immi=-104, @deref_count=1>
         def parse(argument, predefined: {})
-          arg = argument.dup
+          arg = argument
           return 0 if arg.empty? || arg == '!'
-          return Integer(arg) if OneGadget::Helper.integer?(arg)
+
+          literal = Integer(arg, exception: false)
+          return literal unless literal.nil?
 
           # nested []
           if arg[0] == '['
