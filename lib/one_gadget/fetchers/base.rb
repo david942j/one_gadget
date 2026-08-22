@@ -800,10 +800,15 @@ module OneGadget
       # a full disassembly (the win on the slow-to-objdump Thumb-2 arm libcs).
       def windowed_disasm(sites)
         windows = sites.sort.map { |a| [[a - WINDOW_BACK, 0].max, a + WINDOW_FWD] }
+        # One objdump per window, all at once: they are separate processes that
+        # wait on each other for nothing, and a libc comes to a handful of windows.
+        disassembled = merge_ranges(windows)
+                       .map { |lo, hi| Thread.new { objdump_lines(start: lo, stop: hi) } }
+                       .map(&:value)
         starts = {}
-        lines = merge_ranges(windows).each_with_object([]) do |(lo, hi), acc|
+        lines = disassembled.each_with_object([]) do |window, acc|
           starts[acc.size] = true
-          acc.concat(objdump_lines(start: lo, stop: hi))
+          acc.concat(window)
         end
         { lines:, starts: }
       end
