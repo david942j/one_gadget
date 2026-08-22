@@ -250,9 +250,7 @@ module OneGadget
     #   Helper.integer? '0xheapoverflow'
     #   #=> false
     def integer?(str)
-      true if Integer(str)
-    rescue ArgumentError, TypeError
-      false
+      !Integer(str, exception: false).nil?
     end
 
     # Cross-platform way of finding an executable in +$PATH+.
