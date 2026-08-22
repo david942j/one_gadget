@@ -65,7 +65,11 @@ module Aletheia
 
       output = read_all(master)
       reap(pids)
-      log = File.read(log_path)
+      # Read as bytes: qemu's -strace prints an argv the gadget built out of
+      # whatever the libc holds there, which is not text, and every later
+      # match? / include? on the log would raise on the invalid encoding --
+      # arriving as a "harness error" against a gadget that ran fine.
+      log = File.binread(log_path)
       [log_path, stub_out].each { |p| File.unlink(p) rescue nil }
       base = log[/ALETHEIA base=(0x[0-9a-f]+)/, 1]
       l0 = log.include?('ALETHEIA_L0=pass')
@@ -112,8 +116,9 @@ module Aletheia
     end
 
     def read_all(master)
-      buf = +''
-      Timeout.timeout(@io_timeout) { loop { buf << master.readpartial(4096) } }
+      # Bytes again (see #drive): a shell fed a garbage argv can echo anything.
+      buf = +''.b
+      Timeout.timeout(@io_timeout) { loop { buf << master.readpartial(4096).b } }
       buf
     rescue Errno::EIO, EOFError, Timeout::Error
       buf

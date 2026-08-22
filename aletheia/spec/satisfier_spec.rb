@@ -423,8 +423,10 @@ RSpec.describe Aletheia::Satisfier do
     it 'places an argv[0] built the same way, and still seeds the command' do
       plan = satisfier.satisfy(gadget(['{(ip + $base+0x2d36a), "-c", fp, r3, ...} is a valid argv']))
       expect(plan.status).to eq('ok')
+      # Both are named by their AAPCS role in the constraint and assigned under
+      # the register that role denotes.
       expect(spare).to cover(plan.regs['r12'] + 0x2d36a)
-      expect(plan.regs['fp']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
+      expect(plan.regs['r11']).to eq('scratch_off' => Aletheia::Satisfier::COMMAND_POOL)
     end
 
     # An element that has to end the array is NULL, so it takes the cancelling

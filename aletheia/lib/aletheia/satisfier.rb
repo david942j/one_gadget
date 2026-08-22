@@ -163,7 +163,7 @@ module Aletheia
         if op.deref == 1
           off = mem_addr_off(plan, op)
           set_mem(plan, off, { 'int32' => SPARE_FD }) if off && plan.mem[off].nil?
-        elsif op.deref.zero? && op.reg && plan.regs[xreg(op.reg)].nil?
+        elsif op.deref.zero? && op.reg && reg_value(plan, op.reg).nil?
           set_reg(plan, xreg(op.reg), SPARE_FD)
         end
       end
@@ -447,11 +447,11 @@ module Aletheia
         (stack_reg?(reg) && want.zero?) || (want.zero? && scratch?(plan, reg))
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
         text = Regexp.last_match(1)
-        if (sum = cancelling_sum(text)) then plan.regs[sum.first] == { 'neg_base_off' => sum.last }
+        if (sum = cancelling_sum(text)) then reg_value(plan, sum.first) == { 'neg_base_off' => sum.last }
         else (op = address_operand(text)) && deref_reads_zero?(plan, op)
         end
       when GOT
-        base_relative?(plan.regs[branch[GOT, 1]])
+        base_relative?(reg_value(plan, branch[GOT, 1]))
       else
         if (op = deref_zero(branch))
           deref_reads_zero?(plan, op)
@@ -465,7 +465,7 @@ module Aletheia
           mem_mem_satisfied?(plan, *pair2)
         else
           reg, value = parse_relation(branch)
-          current = reg && plan.regs[reg]
+          current = reg && reg_value(plan, reg)
           if current.is_a?(Hash) then scratch_satisfies_relation?(branch)
           else reg && !current.nil? && current == (value & MASK64)
           end
@@ -505,13 +505,13 @@ module Aletheia
     # assignment (e.g. a +writable: reg+imm+) also satisfy a +[reg+imm] == NULL+ on
     # the same slot, instead of the two conflicting.
     def deref_reads_zero?(plan, op)
-      return plan.regs[op.reg] == 0 if op.deref.zero? && op.reg
+      return reg_value(plan, op.reg) == 0 if op.deref.zero? && op.reg
       return mem_value(plan, op)&.zero? || false if op.deref >= 2
       return false unless op.inner_imm.zero?
       return plan.base_mem[op.imm] == 0 if op.deref == 1 && base_reg?(op) # zeroed libc global
       return false unless op.deref == 1 && op.reg && scratch?(plan, op.reg)
 
-      zeroed_scratch?(plan.regs[op.reg]['scratch_off'] + op.imm)
+      zeroed_scratch?(reg_value(plan, op.reg)['scratch_off'] + op.imm)
     end
 
     # A +$base+<off>+ operand: a fixed libc-global address (the load base plus an
@@ -754,7 +754,7 @@ module Aletheia
     # or +nil+ when neither -- +base+ isn't resolved (yet).
     def mem_addr_off(plan, op)
       return SP_OFFSET + op.imm if stack_reg?(op.reg)
-      return plan.regs[op.reg]['scratch_off'] + op.imm if scratch?(plan, op.reg)
+      return reg_value(plan, op.reg)['scratch_off'] + op.imm if scratch?(plan, op.reg)
 
       nil
     end
@@ -890,8 +890,8 @@ module Aletheia
         # An element off the GOT base (i386 PIC) is a fixed libc address -- the
         # real "sh"/"-c" string the gadget passes -- so it is already valid;
         # re-pointing that register would only conflict with the GOT constraint.
-        return nil if base_relative?(plan.regs[op.reg])
-        return :terminator if op.imm.zero? && plan.regs[op.reg] == 0
+        return nil if base_relative?(reg_value(plan, op.reg))
+        return :terminator if op.imm.zero? && reg_value(plan, op.reg) == 0
 
         [:reg, op.reg]
       end
@@ -1221,7 +1221,7 @@ module Aletheia
 
     # Whether the register and the memory value already meet +op+.
     def reg_mem_satisfied?(plan, reg, op, mem)
-      current = plan.regs[xreg(reg.reg)]
+      current = reg_value(plan, reg.reg)
       value = mem_value(plan, mem)
       return false if current.nil? || value.nil? || current.is_a?(Hash) || value.is_a?(Hash)
 
@@ -1237,7 +1237,7 @@ module Aletheia
     # already pinned to a scratch pointer is left alone: its run-time address
     # isn't known here, so no stored literal can be shown to equal it.
     def apply_reg_mem_relation(plan, reg, op, mem)
-      current = plan.regs[xreg(reg.reg)]
+      current = reg_value(plan, reg.reg)
       return false if current.is_a?(Hash)
 
       # The comparison is on `reg + imm`, so the register itself carries the
@@ -1341,7 +1341,7 @@ module Aletheia
     # A register holding some *other* resolved address -- the libc GOT, say -- is
     # not one: its scratch offset is what every caller goes on to read.
     def scratch?(plan, reg)
-      pointer_value?(plan.regs[reg])
+      pointer_value?(reg_value(plan, reg))
     end
 
     def global?(reg)
@@ -1358,9 +1358,18 @@ module Aletheia
       @arch.normalize_reg(reg)
     end
 
+    # What the plan assigns +reg+, under whichever name it was written: a role
+    # name and the register it denotes are one register, and reading only the
+    # name asked for would miss an assignment made under the other.
+    # @example (arm) +fp+ and +r11+
+    def reg_value(plan, reg)
+      plan.regs[xreg(reg)]
+    end
+
     def set_reg(plan, reg, value)
       return false if reg.nil?
 
+      reg = xreg(reg)
       existing = plan.regs[reg]
       return false if existing && existing != value
 
