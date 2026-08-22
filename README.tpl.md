@@ -53,7 +53,7 @@ SHELL_OUTPUT_OF(one_gadget)
 ```
 
 ```bash
-SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6)
+SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so)
 ```
 ![x86_64](https://github.com/david942j/one_gadget/blob/master/examples/x86_64.png?raw=true)
 
@@ -80,36 +80,49 @@ you will have at least 1/16 chance of success.
 Reorder gadgets according to the distance of given functions.
 
 ```bash
-SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near exit,mkdir)
+SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --near exit,mkdir)
 ```
 ![near](https://github.com/david942j/one_gadget/blob/master/examples/near.png?raw=true)
 
 Regular expression is acceptable.
 ```bash
-SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near 'write.*' --raw)
+SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --near 'write.*' --raw)
 ```
 
 Pass an ELF file as the argument, OneGadget will take all GOT functions for processing.
 ```bash
-SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --near spec/data/test_near_file.elf --raw)
+SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --near spec/data/test_near_file.elf --raw)
 ```
 
-#### Show All Gadgets
+#### Show More Gadgets
 
-Sometimes `one_gadget` finds too many gadgets to show them in one screen,
-by default gadgets would be filtered automatically *according to the difficulty of constraints*.
+A libc holds far more gadgets than fit on a screen, and most of them ask more of you
+than a handful of others do. `--level` chooses how much of what was found to show.
 
-Use option `--level 1` to show all gadgets found instead of only those with higher probabilities.
+| Level | Shows | Use it when |
+| --- | --- | --- |
+| `0` (default) | the few gadgets whose constraints are easiest to arrange | always, first |
+| `1` | every gadget, one line per address, minus any that asks for everything an easier one asks for and more | none of the level-0 gadgets fit what you control |
+| `2` | everything found, including an address listed once per set of constraints it can be reached under | you want to see every way in, including the awkward ones |
+
+Level 1 drops a gadget when an easier one already asks for everything it does; level 0
+then scores what is left by how hard its constraints look and keeps only the best few;
+level 2 drops nothing. On the glibc 2.31 below that is 3, 35 and 97 entries -- the last
+over 96 addresses, since one of them is reachable two ways with different requirements.
+
+Level 2 also reads the libc you point at directly, where the levels below it answer
+from the pre-built gadget database when it knows the file's BuildID; the database only
+stores the trimmed set. Pass `-f` to search the file at every level.
 
 ```bash
-SHELL_OUTPUT_OF(one_gadget /lib/x86_64-linux-gnu/libc.so.6 --level 1)
+SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --level 1)
 ```
 
 #### Other Architectures
 
 ##### i386
 ```bash
-SHELL_OUTPUT_OF(one_gadget /lib32/libc.so.6)
+SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.27-63b3d43ad45e1b0f601848c65b067f9e9b40528b.so)
 ```
 ![i386](https://github.com/david942j/one_gadget/blob/master/examples/i386.png?raw=true)
 
@@ -130,7 +143,7 @@ Pass your exploit script as `one_gadget`'s arguments, it can
 try all gadgets one by one, so you don't need to try every possible gadgets manually.
 
 ```bash
-$ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
+$ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so -s 'echo "offset ->"'
 ```
 
 ![--script](https://github.com/david942j/one_gadget/blob/master/examples/script.png?raw=true)
@@ -138,9 +151,9 @@ $ one_gadget ./spec/data/libc-2.19.so -s 'echo "offset ->"'
 ### In Ruby Scripts
 ```ruby
 require 'one_gadget'
-RUBY_OUTPUT_OF(OneGadget.gadgets(file: '/lib/x86_64-linux-gnu/libc.so.6'))
+RUBY_OUTPUT_OF(OneGadget.gadgets(file: 'spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so'))
 # or in shorter way
-RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6', level: 1))
+RUBY_OUTPUT_OF(one_gadget('spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so', level: 1))
 # from build id
 RUBY_OUTPUT_OF(one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0'))
 ```
@@ -151,7 +164,7 @@ import subprocess
 def one_gadget(filename):
   return [int(i) for i in subprocess.check_output(['one_gadget', '--raw', filename]).decode().split(' ')]
 
-RUBY_OUTPUT_OF(one_gadget('/lib/x86_64-linux-gnu/libc.so.6'))
+RUBY_OUTPUT_OF(one_gadget('spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so'))
 ```
 
 ## Make OneGadget Better
