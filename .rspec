@@ -2,3 +2,4 @@
 --order rand
 --require spec_helper
 --warning
+--pattern {spec,aletheia/spec}/**/*_spec.rb

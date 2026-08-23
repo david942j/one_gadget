@@ -9,6 +9,9 @@ SimpleCov.start do
                                                        SimpleCov::Formatter::HTMLFormatter
                                                      ])
   skip '/spec/'
+  # The harness runs under gdb/qemu against real libcs, which CI has none of;
+  # its unit specs run here, but its coverage is not what this bar is about.
+  skip '/aletheia/'
   skip '/lib/one_gadget/builds/'
   # The suite covers every line, so anything less is a real gap rather than a
   # number to interpret -- and a new line arrives covered or the build says so.

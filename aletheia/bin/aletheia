@@ -1,0 +1,63 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Aletheia -- empirically verify that one_gadget gadgets launch a real shell.
+# Usage:
+#   aletheia verify <libc.so> [--offset 0x4bc00[,0x4bc04...]] [--json]
+
+require 'optparse'
+
+HERE = File.expand_path('..', __dir__)                 # aletheia/
+$LOAD_PATH.unshift(File.join(HERE, 'lib'))
+$LOAD_PATH.unshift(File.expand_path('../lib', HERE))   # repo one_gadget lib
+
+require 'aletheia/runner'
+
+$stdout.sync = true # flush per line so a killed sweep keeps its partial output
+
+options = { offsets: nil, json: false, strict: false, level: 0 }
+parser = OptionParser.new do |o|
+  o.banner = 'Usage: aletheia verify <libc.so> [options]'
+  o.on('--offset LIST', 'Comma-separated gadget offsets to check (default: all)') do |v|
+    options[:offsets] = v.split(',').map { |s| Integer(s, s.start_with?('0x') ? 16 : 10) }
+  end
+  o.on('--strict', 'Poison uncontrolled registers (test constraint completeness)') do
+    options[:strict] = true
+  end
+  o.on('--level N', Integer, 'one_gadget level: 0 = top gadgets (default), 1 = all') do |v|
+    options[:level] = v
+  end
+  o.on('--json', 'Emit JSON-lines instead of a table') { options[:json] = true }
+end
+parser.parse!(ARGV)
+
+command = ARGV.shift
+abort parser.help unless command == 'verify'
+target = ARGV.shift
+abort "target libc required\n\n#{parser.help}" unless target && File.file?(target)
+
+require 'json'
+
+# Stream each result as it is produced, so a long sweep shows progress and a
+# killed run keeps its partial output.
+printer = lambda do |r|
+  if options[:json]
+    puts JSON.generate(r)
+  else
+    label = r[:result] == 'EXEC' && r[:promotable] ? 'EXEC*' : r[:result]
+    puts format('%-10s %-6s %s', r[:offset], label, r[:effect])
+    puts "  reason: #{r[:reason]}" if r[:reason]
+  end
+end
+
+results = Aletheia::Runner.new(target: target, strict: options[:strict])
+                          .run(offsets: options[:offsets], level: options[:level], &printer)
+
+unless options[:json]
+  tally = results.group_by { |r| r[:result] }.transform_values(&:size)
+  puts "\n#{tally.map { |k, v| "#{k}=#{v}" }.join('  ')}"
+end
+
+# EXEC (reached execve("/bin/sh") but not L2-drivable) is a working gadget, not a
+# failure; only a true FAIL (no shell at all) sets a nonzero exit.
+exit(results.any? { |r| r[:result] == 'FAIL' } ? 1 : 0)

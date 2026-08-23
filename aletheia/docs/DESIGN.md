@@ -1,0 +1,220 @@
+# Aletheia design
+
+For a future maintainer (human or agent) picking this up cold. Read this, then
+`FINDINGS.md`, then the source under `lib/aletheia/`.
+
+## What is being verified
+
+one_gadget derives each gadget's `offset`, `effect`, and `constraints` by *static*
+emulation. Aletheia checks the claim empirically: if you jump to `base+offset` with state
+that satisfies the constraints, does a working shell actually start?
+
+## The pipeline
+
+```
+bin/aletheia
+  -> Runner (lib/aletheia/runner.rb)
+       enumerate gadgets:  OneGadget.gadgets(file:, force_file:true, details:true)
+       for each gadget:
+         Satisfier (lib/aletheia/satisfier.rb)  constraints -> injection Plan (JSON-able)
+         Oracle    (lib/aletheia/oracle.rb)     run the plan, decide PASS/FAIL
+                     |
+                     v
+   gdb -nx -batch -x driver.py --args park_stub <libc.so>   (on a pty)
+     driver.py (gdb-Python):
+       break at pause (libc fully initialized), read load base from /proc/pid/maps
+       mmap zeroed scratch; fill uncontrolled regs (benign or poison); apply plan regs;
+       set sp into scratch; set pc = base+offset; follow-fork child; continue
+     Oracle drives the pty: writes `ls /` + `exit`, validates output vs Dir.children('/')
+```
+
+`park_stub.c` `dlopen`s the target libc and parks in `for(;;) pause();`. Parking after
+init means relocations/TLS are done and `environ` is populated, and we hijack a thread
+whose state is disposable — we overwrite pc/sp/regs and point sp at fresh scratch, so we
+never corrupt the loader.
+
+## Transports (how the process is run and injected)
+
+`Transport.for` picks one from the *host* arch (`uname -m` vs each backend's `native_on?`),
+not a per-arch flag, so a backend runs natively on its own host and under qemu-user on any
+other. All share the self-describing `park_stub` (it reports its own load base + scratch, so
+the debugger needs no inferior calls or `/proc` access):
+
+- **Native** — the arch is the host's: one `gdb` runs the stub directly.
+- **Qemu** — a foreign arch: `qemu-user -g` exposes a gdbstub, `gdb-multiarch` attaches and
+  injects. This is where L0's `catch exec` and the fork-following live. `QEMU_LD_PREFIX` is
+  the arch's cross sysroot (`/usr/<triplet>`) — or the host root `/` when a *native* arch is
+  forced under qemu (see below).
+- **SelfInject** — no gdb at all: the stub reads the plan from `$ALETHEIA_SELFINJECT` and
+  applies it itself (a small asm trampoline loads the registers/sp and branches to the
+  gadget), so the whole run stays under plain `qemu-user`. Used by arm because qemu-arm's
+  gdbstub kills the fork'd child of a `posix_spawn` gadget, so the L2 shell never survives
+  the gdb path. Trade-off: no gdb means no L0 signal, so a SelfInject gadget is judged on
+  L2 alone (PASS) or its absence. qemu runs with `-strace` so the oracle can see an
+  unimplemented-syscall abort and report SKIP rather than FAIL.
+
+Set `ALETHEIA_FORCE_QEMU=1` to route a *native* arch through the Qemu transport too — e.g. to
+exercise the aarch64 qemu path on an aarch64 host. Both agree gadget-for-gadget (the aarch64
+2.43 set is 8/8 PASS native and forced-qemu).
+
+## The oracle: layered L0 + L2
+
+`driver.py` runs the injected gadget and reports two signals:
+
+- **L0** (deterministic): the gadget reaches `execve("/bin/sh")` with a readable argv/envp.
+  A straight-line `execve`/`execl` stops at the syscall entry, where the `"/bin/sh"` path
+  and pointers are checked directly. A `posix_spawn` execs in a vforked child that runs
+  straight through to the new image, so there L0 instead confirms `/proc/pid/exe` is a shell.
+- **L2** (the golden signal): the spawned shell actually ran `ls /` over a pty and the output
+  matches the live `Dir.children('/')`.
+
+Outcomes: **PASS** = L2; **EXEC** = L0 without L2 (the gadget works, but the harness can't
+drive `ls /` through that shell — a fixed `-c` command from a libc global, an uncontrolled
+`argv[1]` that `sh` treats as a script name, or a `posix_spawn` parent/child tty race);
+**FAIL** = neither (a candidate one_gadget bug, especially under `--strict`); **SKIP** = the
+satisfier produced no plan, or the emulator couldn't run the gadget (e.g. qemu-user hit a
+syscall it doesn't implement — see the clone3 limitation below). EXEC exists because "reaches a
+shell" and "we can drive that shell" are different questions — conflating them would mislabel
+working gadgets as failures.
+
+**Promotion (EXEC\*)**: an EXEC gadget is retried with the uncontrolled registers nulled
+(`null_default`). Many EXEC results are only inconclusive because the code writes an
+uncontrolled register as `argv[1]`, and the benign fill makes it a garbage-but-readable string
+that `sh` treats as a script name and exits. Nulling that register terminates argv, so the
+shell is interactive and runs `ls /`. If the null-fill retry PASSes, the gadget is reported
+EXEC\* — genuinely usable given that (attacker-controlled) input. If it still can't drive (a
+fixed `-c` command from a libc constant), it stays EXEC.
+
+## Independence principle (important)
+
+The tool under verification must not be its own judge. So:
+
+- **The verdict is empirical only**: PASS iff a real shell ran `ls /` and returned the real
+  root. No part of the decision consults one_gadget's belief about its constraints.
+- The operand parser (`lib/aletheia/operand.rb`) is written from scratch, not reused from
+  the emulator's `Lambda.parse`, so an emulator parsing bug can't mask itself in the checker.
+- Bugs are expected to live in the constraint list — most often a *missing* constraint.
+
+## The satisfier
+
+`Satisfier#satisfy` is the inverse of one_gadget's `gadget.rb#calculate_score`: same
+category dispatch, but it emits assignments instead of scores. For each constraint it
+splits on ` || `, scores each disjunct's cost (nil = unsatisfiable / unsupported), and
+takes the cheapest satisfiable branch. Memory model: one zeroed scratch region, `sp` set
+to `scratch + sp_offset`, so sp-relative NULL/writable requirements are free.
+
+Categories handled today: `writable: <reg+imm>` (point the register into a scratch
+write-area), `<op> == NULL` / `<op> <= 0x0` (bare reg -> 0; sp+imm -> unsatisfiable, so the
+other branch wins; a *single* sp-relative deref -> free via zero-fill). `is a valid
+argv/envp` (the full array-literal/content builder) is scored expensive and not built --
+every fixture so far always has a cheaper branch available.
+
+**Chained dereferences** (`[[X]] == NULL`, or deeper -- posix_spawn's argv/envp when
+passed as a pointer-to-pointer, e.g. `argv=[sp]` with `[[sp]] == NULL` meaning "argv[0] is
+NULL") are NOT automatically free like a single deref: `[X]` (the first level) is
+zero-filled, so dereferencing it *again* reads through NULL and faults. `apply_deep_null`
+builds a real pointer chain instead -- one `plan.mem` scratch write per extra level of
+indirection, terminating in the always-zero `STRING_POOL` -- so every level is a genuine,
+valid pointer. Costed above a single deref (it needs a scratch write the free case
+doesn't), so it's only chosen when no cheaper branch exists. `plan.mem` is applied by
+`driver.py` (a `write_memory` call per entry, arch-width via `word_size`) and by
+`park_stub.c`'s self-injection (a `mem <off> <val>` directive, arm-only, 4-byte writes) --
+see `Transport::SelfInject#plan_text` and `self_inject()`'s grammar comment in park_stub.c.
+
+## Benign vs poison (the completeness test)
+
+`driver.py` fills registers the plan doesn't set. **Benign** points them at readable
+scratch (reproduces a gadget under favorable state). **Poison** (`--strict`) sets them to
+an unmapped address so any *unlisted* dereference faults — this is what turns "the gadget
+works if you're lucky" into "the constraint list is complete". A poison fault with a fully
+satisfied plan is a candidate missing-constraint bug.
+
+## Constraint-discovery loop
+
+When a satisfied plan FAILs (esp. under poison), find the real precondition:
+
+1. `discover.py` runs the plan under poison and, on the fault, prints the faulting
+   instruction relative to base and all GPRs. That is the concrete lead.
+2. Set the implicated register to a plausible value, re-run; iterate until `ls /` works.
+   The delta between the failing and passing plan *is* the missing constraint.
+3. Root-cause in one_gadget (emulator/fetcher) and record in `FINDINGS.md`.
+
+`docs/FINDINGS.md`'s Finding 1 is a worked example (missing `sigprocmask` `set`-pointer
+constraint, traced to `emulators/arm_family.rb`'s `inst_bl` checker).
+
+## Result discriminator
+
+A FAIL is a one_gadget bug only if the plan was **complete, conflict-free, and fully
+satisfied**. A SKIP / conflict / unsatisfiable-branch / environment error (e.g. a libc
+that won't `dlopen`) is a harness limitation, not a verdict on the gadget.
+
+## Harness reliability fixes
+
+Bugs in Aletheia itself, not in one_gadget -- found the same way as a real finding (a
+result that looked wrong until traced to ground), but the defect was in the harness's own
+model. Recorded because `--strict` is only a trustworthy verdict on one_gadget once the
+harness underneath it is trusted; a harness bug here would otherwise get misread as a
+one_gadget bug there.
+
+- **`catch exec` corrupted qemu-aarch64 execution.** Landing mid-function via the gdbstub
+  with an exec catchpoint armed made some straight-line `execve`/`execl` gadgets SIGSEGV
+  inside libc under the qemu transport (reproduced: clean without the catchpoint, corrupts
+  with it). It was only ever useful natively anyway (it exists to catch a vforked
+  `posix_spawn` child's exec, and the qemu transport deliberately never follows the
+  child -- `follow-fork-mode parent` -- so the catchpoint could never usefully fire there).
+  Fixed: only armed when `connect == "run"` (native).
+- **Scratch headroom below `sp` was too tight.** `SP_OFFSET` (0x2000) left only 8KB below
+  `sp` before the scratch mmap's start. A gadget landing inside a function whose *own*
+  prologue allocates a large frame after the jump (aarch64 `execl`'s
+  `sub sp,sp,#0x2000; sub sp,sp,#0xd0`, ~8.4KB) could write past that boundary. Silently
+  absorbed by an adjacent mapping under native ASLR (so it never showed up natively), but
+  qemu-user's stricter layout faulted reliably -- and inconsistently across runs, since it
+  hinged on ASLR luck either way. Fixed: `SCRATCH_SIZE`/`SP_OFFSET`/`WRITABLE_BASE` widened
+  (128KB scratch, 64KB headroom below `sp`); `park_stub.c` and `discover.py`'s standalone
+  mmap kept in sync (see the "keep in sync" comments at each).
+- **Per-version sysroot stubs went stale silently.** A per-version sysroot's `park_stub` is
+  a cross-compile of `park_stub.c` cached under `sysroots/<arch>-<version>/`. `stub_built?`
+  only checked existence, not currency -- so editing `park_stub.c` (e.g. the `SCRATCH_SIZE`
+  fix above) left every already-built sysroot stub running the *old* layout while the
+  satisfier computed offsets against the *new* one, a silent mismatch that manifested as
+  seemingly random SIGSEGVs on exactly the arches/versions with a cached sysroot. Fixed:
+  `stub_built?` also compares mtimes and rebuilds when `park_stub.c` is newer.
+
+Net effect of the three together (they compounded, which is why this took real digging to
+untangle): an aarch64-2.23 `execl` gadget was flaky under qemu — passed once, then failed
+consistently — purely from ASLR luck on the headroom bug, misleadingly close to "looks like
+qemu itself is unreliable." It was two harness bugs plus a stale-cache issue, not qemu, not
+one_gadget. All three are now covered by rerunning every fixture (native + `ALETHEIA_FORCE_QEMU=1`)
+after any `park_stub.c`/`satisfier.rb` change -- see the per-arch counts these fixes were
+verified against in the commit that introduced this section.
+
+## Known limitations
+
+- **qemu-arm can't verify `posix_spawn` gadgets.** glibc 2.43's `posix_spawn` forks with
+  the `clone3` syscall (arm EABI 435), which qemu-arm 10.2 doesn't implement — it returns
+  ENOSYS, no child spawns, and `do_system` aborts on `wait4 == ECHILD`. So arm `posix_spawn`
+  gadgets are reported SKIP (the SelfInject `-strace` detects the unknown syscall); arm
+  `execve` gadgets (a plain syscall) verify fine. qemu-x86_64 does implement `clone3`, which
+  is why amd64/i386 `posix_spawn` gadgets PASS. This clears the moment qemu-arm gains 32-bit
+  `clone3` support (or on real arm hardware) — no Aletheia change needed.
+- Older libcs may not `dlopen` standalone under the host loader (e.g. `aarch64-libc-2.27.so`
+  aborts with SIGILL on glibc 2.43). Run them under qemu with `ALETHEIA_FORCE_QEMU=1`: a
+  per-version sysroot (matching ld.so, cross-built stub) is fetched on demand, so 2.27 now
+  verifies. A non-Ubuntu fixture (no fetchable deb, e.g. the 2.24) instead falls back to the
+  host loader, which works only when it can load that libc.
+- **An address written as `(reg + $base+imm)`** -- arm code that offsets a PC-relative
+  address by a caller-controlled register (`add r1, pc`). Where the sum lands is the
+  register's to decide, so each register used that way is pinned once, up front, to put
+  its sums in libc's own spare writable data: the tail of the last page of its writable
+  segment (`Runner#spare_writable`), which is mapped, zeroed and used by nothing. Every
+  operand built on it then reads as the plain `$base+off` it has become, which the rest
+  of the satisfier already resolves -- so a store, a read, a chained read and a readable
+  target all work without a case of their own (`Satisfier#steer_base_sums`).
+  The sum required to be **NULL** instead -- written `(reg + $base+imm) == NULL`, or
+  implied by an argv *terminator* -- cannot be steered anywhere: only `-(base + imm)`
+  makes a libc address vanish, and that value is not known until the library is loaded.
+  The plan names it (`{'neg_base_off' => imm}`) and the driver and stub resolve it, the
+  way they already do a scratch or load-base offset. It is ranked below the array
+  builder, so emptying an argv stays a last resort rather than a cost preference.
+- `x29`/frame-chain assumptions: poison leaves x29 poisoned; if a gadget needs a valid
+  frame this shows up as a fault — treat with the discovery loop before calling it a bug.
