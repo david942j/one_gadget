@@ -66,7 +66,15 @@ module OneGadget
       # (see {OneGadget::Gadget::Gadget#met_by?}): that one is the better answer,
       # and this one asks the reader for strictly more.
       def trim_gadgets(gadgets)
-        gadgets = gadgets.uniq(&:constraints).sort_by { |g| g.constraints.size }
+        # Order totally before anything is dropped: each step below keeps
+        # whichever of several equally good gadgets it meets first, so without a
+        # tie-break the answer depends on the order gadgets were discovered in
+        # rather than on the libc alone. Gadgets sharing a constraint set are
+        # interchangeable -- whoever satisfies one satisfies them all -- so the
+        # last of them represents the set: it is the one that reaches the call
+        # with the least code in between.
+        gadgets = gadgets.sort_by { |g| [g.constraints.size, -g.offset, g.constraints] }
+                         .uniq(&:constraints)
         res = []
         gadgets.each_with_index do |g, i|
           res << g unless i.times.any? { |j| gadgets[j].met_by?(g) }
