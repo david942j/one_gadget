@@ -263,12 +263,22 @@ constraints:
         .to be_within(eps).of 0.2
     end
 
+    it 'scores a masked comparison as the branch relation it is' do
+      # Some bits pinned leaves the rest free, whatever the right side reads --
+      # unlike "(u16)[x1] == 0x0", where the whole compared value must be zero.
+      expect(new(['(eax & 0xf000) == 0x2000']).score).to be_within(eps).of 0.4
+      expect(new(['eax & 0xf == 0x0']).score).to be_within(eps).of 0.4
+      expect(new(['(u16)[x1] == 0x0']).score).to be_within(eps).of 0.9**2
+    end
+
     it 'level 3' do
       expect(new(['[[x4+0xad0]] == NULL']).score).to be_within(eps).of 0.9**3
       expect(new(['x4+0xad0 == NULL']).score).to be_within(eps).of 0.1
       # Both loads count: the offset one nests in the lambda representation, so
       # only the rendering states the depth the caller actually has to arrange.
-      expect(new(['[[x0+0x438]+0xe8] == 0x0']).score).to be_within(eps).of 0.4 * 0.9**2
+      # And a value required to be zero is scored the same however it is spelled:
+      # this asks for what [[x4+0xad0]] == NULL asks for, at the same depth.
+      expect(new(['[[x0+0x438]+0xe8] == 0x0']).score).to be_within(eps).of 0.9**3
     end
 
     it 'more than one' do

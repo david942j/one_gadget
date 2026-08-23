@@ -323,21 +323,32 @@ module OneGadget
       def calculate_score(expr)
         return expr.split(' || ').map(&method(:calculate_score)).max if expr.include?(' || ')
         return 0.95 if stack_alignment?(expr)
+        # A requirement on some of a value's bits leaves every other bit free, so
+        # it is a branch relation whatever its right side reads -- including zero.
+        return calculate_relation_score(expr) if MASKED_COMPARISON.match?(expr)
 
         case expr
         when /GOT address/ then 0.9
         when /^writable/ then calculate_writable_score(expr.sub('writable: ', ''))
-        when / == NULL$/ then calculate_null_score(expr.sub(' == NULL', ''))
-        # A sized-cast value required to be zero -- (u16)[..] == 0x0, (s32)[..] <= 0x0 --
-        # is an easy "must be zero" like a NULL pointer, not a generic branch relation.
-        when /\A\([su]\d+\).+ == 0x0$/ then calculate_null_score(expr.sub(' == 0x0', ''))
-        when / <= 0x0$/ then calculate_null_score(expr.sub(' <= 0x0', ''))
+        # However a "must be zero" is spelled -- NULL where the value is a pointer,
+        # 0x0 where it is not, with or without a size cast, and <= for a signed
+        # field -- it asks for the same thing, and asking for zero is easier than a
+        # relation that names some other value.
+        when / == NULL$/, / == 0x0$/, / <= 0x0$/
+          calculate_null_score(expr.sub(/ (?:==|<=) (?:NULL|0x0)\z/, ''))
         # A register that just has to be a readable pointer -- a "readable: <reg>"
         # (a dereferenced call arg) or a valid argv/envp element -- is easy.
         when /^readable/, / is a valid (argv|envp)$/ then 0.2
         when / (==|!=|<=|>=|<|>) / then calculate_relation_score(expr) # a branch condition
         end
       end
+
+      # A requirement on some of a value's bits: +(eax & 0xf000) == 0x2000+, or the
+      # unparenthesised +rsp & 0xf == 0x0+ an alignment renders as. A mask *inside*
+      # what is compared (+[(rsi & 0xf0)] == NULL+) is not one of these: there the
+      # whole value still has to be zero.
+      MASKED_COMPARISON = /\A(?:\(.+ & .+\)|[\w$]+ & \S+) (?:==|!=|<=|>=|<|>) /
+      private_constant :MASKED_COMPARISON
 
       # Whether +expr+ is the alignment an aligned store imposes (see
       # {OneGadget::Emulators::X86#inst_movaps}): the stack pointer's low bits
