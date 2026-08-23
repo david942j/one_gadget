@@ -23,4 +23,21 @@ describe OneGadget::Fetchers do
       expect(described_class.send(:trim_gadgets, gadgets).map(&:offset)).to eq [0x1000]
     end
   end
+
+  describe '.from_build_id' do
+    let(:build_id) { '60131540dadc6796cab33388349e6e4e68692053' }
+
+    # A build-id lookup answers with the same set the very same libc would give
+    # as a file: the level says what to show, not where the answer came from.
+    it 'narrows the stored gadgets to the requested level' do
+      trimmed = described_class.from_build_id(build_id, remote: false, level: 1)
+      raw = described_class.from_build_id(build_id, remote: false, level: OneGadget::Fetchers::RAW_LEVEL)
+      expect(raw.size).to be >= trimmed.size
+      expect(trimmed).to eq described_class.send(:trim_gadgets, raw)
+    end
+
+    it 'returns nil for an unknown build id' do
+      expect(described_class.from_build_id('0' * 40, remote: false)).to be_nil
+    end
+  end
 end

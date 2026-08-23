@@ -21,11 +21,14 @@ module OneGadget
       # @param [String] build_id The targets' BuildID.
       # @param [Boolean] remote
       #   When local not found, try search in latest version?
+      # @param [Integer] level
+      #   Output level, interpreted as in {#from_file}.
       # @return [Array<OneGadget::Gadget::Gadget>?]
       #   +nil+ is returned if cannot find target id in database.
-      def from_build_id(build_id, remote: true)
+      def from_build_id(build_id, remote: true, level: 0)
         OneGadget::Helper.verify_build_id!(build_id)
-        OneGadget::Gadget.builds(build_id, remote:)
+        gadgets = OneGadget::Gadget.builds(build_id, remote:)
+        gadgets && for_level(gadgets, level)
       end
 
       # Fetch one-gadget offsets from file.
@@ -47,11 +50,18 @@ module OneGadget
         }[arch]
         raise Error::UnsupportedArchitectureError, arch if klass.nil?
 
-        gadgets = klass.new(file).find
-        level >= RAW_LEVEL ? all_gadgets(gadgets) : trim_gadgets(gadgets)
+        for_level(klass.new(file).find, level)
       end
 
       private
+
+      # Narrow a complete gadget set down to what an output level asks for.
+      # @param [Array<OneGadget::Gadget::Gadget>] gadgets
+      # @param [Integer] level
+      # @return [Array<OneGadget::Gadget::Gadget>]
+      def for_level(gadgets, level)
+        level >= RAW_LEVEL ? all_gadgets(gadgets) : trim_gadgets(gadgets)
+      end
 
       # Keep every distinct gadget, dropping only exact +(offset, constraints)+
       # repeats (the same suffix reached by more than one candidate path). Unlike
