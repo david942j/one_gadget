@@ -34,7 +34,7 @@ module OneGadget
     #   OneGadget.gadgets(build_id: '60131540dadc6796cab33388349e6e4e68692053')
     def gadgets(file: nil, build_id: nil, details: false, force_file: false, level: 0)
       ret = if build_id
-              OneGadget::Fetchers.from_build_id(build_id) || OneGadget::Logger.not_found(build_id)
+              OneGadget::Fetchers.from_build_id(build_id, level:) || OneGadget::Logger.not_found(build_id)
             else
               # level >= RAW_LEVEL wants every gadget, but the build-id database
               # only stores the trimmed set, so emulate the file instead of it.
@@ -57,15 +57,15 @@ module OneGadget
     # Try from build id first, then file
     def from_file(path, force: false, level: 0)
       OneGadget::Helper.verify_elf_file!(path)
-      gadgets = try_from_build(path) unless force
+      gadgets = try_from_build(path, level:) unless force
       gadgets || OneGadget::Fetchers.from_file(path, level:)
     end
 
-    def try_from_build(file)
+    def try_from_build(file, level:)
       build_id = OneGadget::Helper.build_id_of(file)
       return unless build_id
 
-      OneGadget::Fetchers.from_build_id(build_id, remote: false)
+      OneGadget::Fetchers.from_build_id(build_id, remote: false, level:)
     end
 
     # Remove hard-to-reach-constraints gadgets according to level

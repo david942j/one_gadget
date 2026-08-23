@@ -21,11 +21,14 @@ module OneGadget
       # @param [String] build_id The targets' BuildID.
       # @param [Boolean] remote
       #   When local not found, try search in latest version?
+      # @param [Integer] level
+      #   Output level, interpreted as in {#from_file}.
       # @return [Array<OneGadget::Gadget::Gadget>?]
       #   +nil+ is returned if cannot find target id in database.
-      def from_build_id(build_id, remote: true)
+      def from_build_id(build_id, remote: true, level: 0)
         OneGadget::Helper.verify_build_id!(build_id)
-        OneGadget::Gadget.builds(build_id, remote:)
+        gadgets = OneGadget::Gadget.builds(build_id, remote:)
+        gadgets && for_level(gadgets, level)
       end
 
       # Fetch one-gadget offsets from file.
@@ -47,11 +50,18 @@ module OneGadget
         }[arch]
         raise Error::UnsupportedArchitectureError, arch if klass.nil?
 
-        gadgets = klass.new(file).find
-        level >= RAW_LEVEL ? all_gadgets(gadgets) : trim_gadgets(gadgets)
+        for_level(klass.new(file).find, level)
       end
 
       private
+
+      # Narrow a complete gadget set down to what an output level asks for.
+      # @param [Array<OneGadget::Gadget::Gadget>] gadgets
+      # @param [Integer] level
+      # @return [Array<OneGadget::Gadget::Gadget>]
+      def for_level(gadgets, level)
+        level >= RAW_LEVEL ? all_gadgets(gadgets) : trim_gadgets(gadgets)
+      end
 
       # Keep every distinct gadget, dropping only exact +(offset, constraints)+
       # repeats (the same suffix reached by more than one candidate path). Unlike
@@ -66,7 +76,15 @@ module OneGadget
       # (see {OneGadget::Gadget::Gadget#met_by?}): that one is the better answer,
       # and this one asks the reader for strictly more.
       def trim_gadgets(gadgets)
-        gadgets = gadgets.uniq(&:constraints).sort_by { |g| g.constraints.size }
+        # Order totally before anything is dropped: each step below keeps
+        # whichever of several equally good gadgets it meets first, so without a
+        # tie-break the answer depends on the order gadgets were discovered in
+        # rather than on the libc alone. Gadgets sharing a constraint set are
+        # interchangeable -- whoever satisfies one satisfies them all -- so the
+        # last of them represents the set: it is the one that reaches the call
+        # with the least code in between.
+        gadgets = gadgets.sort_by { |g| [g.constraints.size, -g.offset, g.constraints] }
+                         .uniq(&:constraints)
         res = []
         gadgets.each_with_index do |g, i|
           res << g unless i.times.any? { |j| gadgets[j].met_by?(g) }
