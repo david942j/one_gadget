@@ -7,12 +7,6 @@ build_id = File.basename(__FILE__, '.rb').split('-').last
 GADGETS
 EOS
 
-GADGET_TEMPLATE = <<-EOS
-OneGadget::Gadget.add(build_id, OFFSET,
-                      constraints: CONSTRAINTS,
-                      effect: EFFECT)
-EOS
-
 namespace :builds do
   desc 'Generates lib/builds/*.rb from libc files'
   # bundle exec rake "builds:generate[../libcdb/libc/**/*]"
@@ -56,12 +50,19 @@ namespace :builds do
 
   def template(info, gadgets)
     info_str = info[:info].lines.map { |c| "# #{c}" }.join
-    gadgets_str = gadgets.map do |gadget|
-      %i[offset constraints effect].reduce(GADGET_TEMPLATE) do |str, attr|
-        str.sub(attr.to_s.upcase, gadget.__send__(attr).inspect)
-      end
-    end.join
+    gadgets_str = gadgets.map { |gadget| gadget_entry(gadget) }.join
     TEMPLATE.sub('INFO', info_str).sub('GADGETS', gadgets_str)
+  end
+
+  # @param [String] filename Path of the libc to read.
+  # @param [String] source Where that libc came from, recorded as the build file's first line.
+  # One +Gadget.add+ call. A gadget names the descriptors it closes only when it
+  # closes any, so an entry says no more than it has to.
+  def gadget_entry(gadget)
+    attrs = %i[constraints effect]
+    attrs << :closed_fds unless gadget.closed_fds.empty?
+    args = attrs.map { |attr| "                      #{attr}: #{gadget.__send__(attr).inspect}" }
+    "OneGadget::Gadget.add(build_id, #{gadget.offset},\n#{args.join(",\n")})\n"
   end
 
   def libc_info(filename)
