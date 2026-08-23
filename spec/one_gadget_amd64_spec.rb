@@ -121,7 +121,7 @@ describe 'one_gadget_amd64' do
       expect(OneGadget.gadgets(file: path, force_file: true,
                                level: 1)).to eq [0x5c20e, 0x5c213, 0x5c227, 0xf8640, 0xf87a3, 0x11d6c5, 0x11d7aa,
                                                  0x11d7b2, 0x11d7b7, 0x11d7bf, 0x11d7c9]
-      expect(OneGadget.gadgets(file: path)).to eq [0xf87a3, 0x11d7aa, 0x11d7b2, 0x11d7b7]
+      expect(OneGadget.gadgets(file: path)).to eq [0xf87a3, 0x11d6c5, 0x11d7aa, 0x11d7b2, 0x11d7b7]
     end
 
     # Level 2 keeps every distinct gadget, restoring ones level 1 trims as

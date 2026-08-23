@@ -17,12 +17,12 @@ describe 'one_gadget_aarch64' do
 
     it 'libc-2.24' do
       path = data_path('aarch64-libc-2.24.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3c92c, 0x3c930, 0x3c970]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3c970, 0x9cec8, 0x9cecc]
     end
 
     it 'libc-2.27' do
       path = data_path('aarch64-libc-2.27.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f160, 0x63e90, 0xa32e8]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x3f160, 0x63e90, 0xa321c, 0xa32e8]
     end
 
     it 'constrains argv[1] and the frame for an argv built off the frame pointer' do
@@ -41,7 +41,9 @@ describe 'one_gadget_aarch64' do
     # `set` argument; a gadget landing before that call must keep `set` NULL.
     it 'constrains the sigprocmask set argument to NULL' do
       path = data_path('aarch64-libc-2.24.so')
-      gadgets = OneGadget.gadgets(file: path, force_file: true, details: true)
+      # Level 1: what is asserted is the constraint each entry carries, not which
+      # of them the default level happens to rank highest.
+      gadgets = OneGadget.gadgets(file: path, force_file: true, details: true, level: 1)
       before_call = gadgets.find { |g| g.offset == 0x3c92c }
       after_call = gadgets.find { |g| g.offset == 0x3c970 }
       expect(before_call.constraints).to include('x21 == NULL')
@@ -53,7 +55,9 @@ describe 'one_gadget_aarch64' do
     # dominated by the entry that sets act up (0x3c930) and drops out.
     it 'constrains the sigaction act argument, dropping the dominated entry' do
       path = data_path('aarch64-libc-2.24.so')
-      offsets = OneGadget.gadgets(file: path, force_file: true)
+      # Level 1: dominance is what trims that level, so it is where the dropped
+      # entry's absence means something.
+      offsets = OneGadget.gadgets(file: path, force_file: true, level: 1)
       expect(offsets).to include(0x3c930)
       expect(offsets).not_to include(0x3c934)
     end

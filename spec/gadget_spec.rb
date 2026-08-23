@@ -239,18 +239,34 @@ constraints:
       expect(new(['x2 == 0x1']).score).to be_within(eps).of 0.4          # equality
       expect(new(['(u64)x0 >= 0x400']).score).to be_within(eps).of 0.6   # inequality
       expect(new(['[x1+0x8] != 0']).score).to be_within(eps).of 0.54     # deref penalised
-      expect(new(['(x3 & 0x10) == 0']).score).to be_within(eps).of 0.4  # bit-test, nothing dereferenced
-      expect(new(['(x0 & x1) != 0']).score).to be_within(eps).of 0.6    # ..and neither is a distinct-register one
       expect(new(['(s64)(x0 + 0x10) < 0']).score).to be_within(eps).of 0.6 # nor a cmn compare
     end
 
-    # The stack pointer's low bits holding a fixed value is free -- the caller
-    # picks where the stack sits. A masked *value* renders similarly but is a
-    # requirement the caller has to arrange, and scores as the relation it is.
-    it 'tells stack alignment from a masked value' do
+    # Zero is the easy value and every other one is hard, so a mask tells those
+    # apart rather than making anything easier: asking for zero in some of a
+    # value's bits is a little easier than zeroing all of it, and asking a mask
+    # for any other value is as hard as asking for that value anywhere. The stack
+    # pointer's alignment is free on top of that -- the caller picks where the
+    # stack sits.
+    it 'scores a mask by whether it asks for zero' do
+      expect(new(['eax & 0xf == 0x0']).score).to be_within(eps).of 0.92
+      expect(new(['(eax & 0xf000) == 0x0']).score).to be_within(eps).of 0.92
+      expect(new(['(eax & 0xf000) == 0x2000']).score).to be_within(eps).of 0.4
       expect(new(['rsp & 0xf == 0x0']).score).to be_within(eps).of 0.95
       expect(new(['sp & 0xf == 0x8']).score).to be_within(eps).of 0.95
-      expect(new(['(eax & 0xf000) == 0x2000']).score).to be_within(eps).of 0.4
+    end
+
+    # Asking for four of a register's bits to be zero cannot be harder than
+    # asking for all of them.
+    it 'scores a mask asking for zero above zeroing the whole value' do
+      expect(new(['eax & 0xf == 0x0']).score).to be > new(['eax == 0x0']).score
+    end
+
+    # Masking by a register pins no bit anyone knows, so it stays the relation it
+    # is -- for zero as much as for anything else.
+    it 'reads a mask by a register as a relation' do
+      expect(new(['(x0 & x1) == 0x0']).score).to be_within(eps).of 0.4
+      expect(new(['(x0 & x1) != 0']).score).to be_within(eps).of 0.6
     end
 
     # A pointer a gadget masks before writing through is scored by what it is
@@ -263,12 +279,21 @@ constraints:
         .to be_within(eps).of 0.2
     end
 
+    # A mask inside what is compared is not a masked comparison: there the whole
+    # compared value still has to be zero.
+    it 'reads a mask inside the compared value as the zero requirement it is' do
+      expect(new(['(u16)[x1] == 0x0']).score).to be_within(eps).of 0.9**2
+      expect(new(['[(rsi & 0xfffffffffffffff0)] == NULL']).score).to be_within(eps).of 0.81
+    end
+
     it 'level 3' do
       expect(new(['[[x4+0xad0]] == NULL']).score).to be_within(eps).of 0.9**3
       expect(new(['x4+0xad0 == NULL']).score).to be_within(eps).of 0.1
       # Both loads count: the offset one nests in the lambda representation, so
       # only the rendering states the depth the caller actually has to arrange.
-      expect(new(['[[x0+0x438]+0xe8] == 0x0']).score).to be_within(eps).of 0.4 * 0.9**2
+      # And a value required to be zero is scored the same however it is spelled:
+      # this asks for what [[x4+0xad0]] == NULL asks for, at the same depth.
+      expect(new(['[[x0+0x438]+0xe8] == 0x0']).score).to be_within(eps).of 0.9**3
     end
 
     it 'more than one' do

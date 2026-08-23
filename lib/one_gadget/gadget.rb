@@ -322,16 +322,26 @@ module OneGadget
       # Expr: <Expr> || <Expr>
       def calculate_score(expr)
         return expr.split(' || ').map(&method(:calculate_score)).max if expr.include?(' || ')
+
         return 0.95 if stack_alignment?(expr)
+        # Zero is the easy value to arrange and every other one is hard, so a mask
+        # tells them apart rather than making them easier: asking for zero in some
+        # of a value's bits is a little easier than zeroing all of it, while asking
+        # a mask for any other value is as hard as asking for that value anywhere.
+        return 0.92 if MASKED_ZERO.match?(expr)
+        # Any other mask asks for a particular value, which the mask does nothing
+        # to make easier, so it is the relation it looks like.
+        return calculate_relation_score(expr) if MASKED.match?(expr)
 
         case expr
         when /GOT address/ then 0.9
         when /^writable/ then calculate_writable_score(expr.sub('writable: ', ''))
-        when / == NULL$/ then calculate_null_score(expr.sub(' == NULL', ''))
-        # A sized-cast value required to be zero -- (u16)[..] == 0x0, (s32)[..] <= 0x0 --
-        # is an easy "must be zero" like a NULL pointer, not a generic branch relation.
-        when /\A\([su]\d+\).+ == 0x0$/ then calculate_null_score(expr.sub(' == 0x0', ''))
-        when / <= 0x0$/ then calculate_null_score(expr.sub(' <= 0x0', ''))
+        # However a "must be zero" is spelled -- NULL where the value is a pointer,
+        # 0x0 where it is not, with or without a size cast, and <= for a signed
+        # field -- it asks for the same thing, and asking for zero is easier than a
+        # relation that names some other value.
+        when / == NULL$/, / == 0x0$/, / <= 0x0$/
+          calculate_null_score(expr.sub(/ (?:==|<=) (?:NULL|0x0)\z/, ''))
         # A register that just has to be a readable pointer -- a "readable: <reg>"
         # (a dereferenced call arg) or a valid argv/envp element -- is easy.
         when /^readable/, / is a valid (argv|envp)$/ then 0.2
@@ -339,11 +349,24 @@ module OneGadget
         end
       end
 
+      # Some of a value's bits required to be zero: +(eax & 0xf000) == 0x0+, or the
+      # unparenthesised +eax & 0xf == 0x0+ an alignment renders as. A mask against
+      # any other value is not one of these -- that is as hard as asking for that
+      # value anywhere. Nor is a mask by a register (+(x0 & x1) == 0x0+), which
+      # pins no bit anyone knows, nor one inside what is compared
+      # (+[(rsi & 0xf0)] == NULL+), where the whole word still has to be zero.
+      MASKED_ZERO = /\A\(?[^()]+? & ~?(?:0x[0-9a-f]+|\d+)\)? == (?:NULL|0x0+)\z/
+      private_constant :MASKED_ZERO
+
+      # A comparison whose left side is masked, whatever it is compared with.
+      MASKED = /\A\(?[^()]+? & [^()]+?\)? (?:==|!=|<=|>=|<|>) /
+      private_constant :MASKED
+
       # Whether +expr+ is the alignment an aligned store imposes (see
       # {OneGadget::Emulators::X86#inst_movaps}): the stack pointer's low bits
       # must hold a fixed value, which is free -- the caller picks where the
       # stack sits. Matched exactly, so a masked value the caller has to arrange
-      # stays the branch relation it is.
+      # stays what it is.
       # @example matches +rsp & 0xf == 0x0+; not +(eax & 0xf000) == 0x2000+
       def stack_alignment?(expr)
         reg = expr[/\A(\S+) & 0xf == 0x[0-9a-f]+\z/, 1]

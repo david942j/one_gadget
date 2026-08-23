@@ -10,7 +10,7 @@ describe 'one_gadget_arm' do
 
     it 'libc-2.23' do
       path = data_path('arm-libc-2.23.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x2c5f4, 0x2c626, 0x84dc4]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x2c626, 0x84dc4, 0x8722c, 0x8722e, 0x87232]
     end
 
     it 'libc-2.27' do
