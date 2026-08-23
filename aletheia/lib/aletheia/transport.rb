@@ -58,7 +58,7 @@ module Aletheia
       def sysroot
         return @sysroot if defined?(@sysroot)
 
-        ver = File.basename(@target)[/(\d+\.\d+)/, 1]
+        ver = libc_version(@target)
         need = ver && @arch.version_strict? && ver != default_libc_version
         dir = need && File.join(ROOT, 'sysroots', "#{@arch.name}-#{ver}")
         @sysroot = dir && (stub_built?(dir) || build_sysroot(dir)) ? dir : nil
@@ -81,7 +81,19 @@ module Aletheia
       def default_libc_version
         libc = Dir[File.join(runtime_prefix, 'lib', '**', 'libc.so.6')].first ||
                Dir[File.join(runtime_prefix, 'lib', '*', 'libc.so.6')].first
-        libc && File.binread(libc)[/GLIBC (\d+\.\d+)/, 1]
+        libc && libc_version(libc)
+      end
+
+      # The glibc release a libc says it is. Every build states it the same way,
+      # whatever the vendor prefix, and it is the release -- not the name the file
+      # happens to carry -- that decides which sysroot can run it.
+      # @example
+      #   "GNU C Library (Ubuntu GLIBC 2.39-0ubuntu8.8) stable release version 2.39."
+      #   "GNU C Library (GNU libc) stable release version 2.26."
+      # @param [String] file
+      # @return [String?]
+      def libc_version(file)
+        File.binread(file)[/release version (\d+\.\d+)/, 1]
       end
 
       # Built, and not stale: a per-version stub is a cross-compile of park_stub.c
