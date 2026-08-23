@@ -138,13 +138,18 @@ module OneGadget
       private
 
       # Drops what the rest of the list already settles, so a gadget asks for each
-      # thing once and never offers an option it rules out itself. Everything here
-      # follows from one reading: a constraint that accesses an address says that
-      # address is mapped memory (see {#mapped?}), which in turn says it is
-      # readable and not NULL. So:
+      # thing once and never offers an option it rules out itself.
+      #
+      # Most of it follows from one reading: a constraint that accesses an address
+      # says that address is mapped memory (see {#mapped?}), which in turn says it
+      # is readable and not NULL. So:
       # * A +readable:+ on an address a dereference already reaches repeats it.
       # * A +== NULL+ option for a mapped address can never be taken.
       # * A +!= NULL+ requirement on one is already met.
+      # The last rule reads a value rather than an address: one the list pins to a
+      # literal answers every other comparison against it, so a bound that literal
+      # already satisfies asks for nothing.
+      #
       # Each needs the constraint doing the settling to hold outright: one inside a
       # +||+ is an option among several and settles nothing. They run until the
       # list stops changing, because dropping an option can leave a constraint
@@ -159,9 +164,13 @@ module OneGadget
       # @example A non-NULL the dereference beside it already states.
       #   prune_settled(['[$base+0x10] != 0x0', '[[$base+0x10]+0xa4] == 0x0'])
       #   #=> ['[[$base+0x10]+0xa4] == 0x0']
+      # @example A bound the pinned value already satisfies.
+      #   prune_settled(['r0 == NULL', '(u32)r0 <= 0xfffff000']) #=> ['r0 == NULL']
       def prune_settled(cons)
         loop do
-          settled = drop_stated_readable(drop_settled_non_null(drop_ruled_out_null(cons)))
+          settled = drop_stated_readable(
+            drop_settled_comparison(drop_settled_non_null(drop_ruled_out_null(cons)))
+          )
           return cons if settled == cons
 
           cons = settled
@@ -217,6 +226,68 @@ module OneGadget
           identity = con[/\A(.+) != (?:NULL|0x0)\z/, 1]
           !identity.nil? && !identity.match?(/\A\([su]\d+\)/) && mapped?(cons, identity)
         end
+      end
+
+      # A comparison against a literal: the cast that says how much of the value is
+      # compared and whether those bits read as signed, what is compared, and what
+      # it is compared with.
+      # @example +(u32)r0 <= 0xfffff000+, +[rbp-0x50] == 0x1+, +x2 == NULL+
+      COMPARISON = /\A(?:\(([su])(\d+)\))?(.+?) (==|!=|<=|>=|<|>) (NULL|-?(?:0x[0-9a-f]+|\d+))\z/
+      private_constant :COMPARISON
+
+      # Drops every comparison a value pinned elsewhere in the list already
+      # answers. Only an uncast equality pins a whole value -- +(u16)X == 0x0+
+      # leaves the rest of it unsaid -- and a comparison the pinned value does not
+      # satisfy is left alone: it says the gadget is impossible, which is not this
+      # pass's call to make.
+      # @param [Array<String>] cons
+      # @return [Array<String>]
+      def drop_settled_comparison(cons)
+        pinned = pinned_values(unconditional(cons))
+        return cons if pinned.empty?
+
+        cons.reject do |con|
+          parts = COMPARISON.match(con)
+          next false if parts.nil? || (parts[1].nil? && parts[4] == '==')
+
+          value = pinned[parts[3]]
+          !value.nil? && comparison_holds?(value, parts)
+        end
+      end
+
+      # What the list pins outright, by what is pinned.
+      # @param [Array<String>] held
+      # @return [Hash{String => Integer}]
+      def pinned_values(held)
+        held.each_with_object({}) do |con, pinned|
+          parts = COMPARISON.match(con)
+          next unless parts && parts[1].nil? && parts[4] == '=='
+
+          pinned[parts[3]] = literal_value(parts[5])
+        end
+      end
+
+      # Whether a comparison already holds for a value pinned to +value+.
+      # @param [Integer] value
+      # @param [MatchData] parts A {COMPARISON} match.
+      # @return [Boolean]
+      def comparison_holds?(value, parts)
+        value = as_cast(value, parts[1], parts[2]) if parts[1]
+        value.public_send(parts[4], literal_value(parts[5]))
+      end
+
+      # +value+ as a cast reads it: the low +bits+ of it, negative when those bits
+      # are read as signed and the top one is set.
+      def as_cast(value, sign, bits)
+        bits = Integer(bits)
+        low = value & ((1 << bits) - 1)
+        sign == 's' && low >= (1 << (bits - 1)) ? low - (1 << bits) : low
+      end
+
+      # @param [String] literal +NULL+ or a number, as a constraint writes it.
+      # @return [Integer]
+      def literal_value(literal)
+        literal == 'NULL' ? 0 : Integer(literal)
       end
 
       # Drops every +readable:+ whose address another constraint dereferences
