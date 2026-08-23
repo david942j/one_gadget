@@ -149,6 +149,26 @@ constraints:
       expect(cons(list)).to eq list
     end
 
+    it 'drops a comparison the value pinned beside it already answers' do
+      expect(cons(['r0 == NULL', '(u32)r0 <= 0xfffff000'])).to eq ['r0 == NULL']
+      expect(cons(['[rbp-0x50] == 0x1', '(s32)[rbp-0x50] >= 0x0'])).to eq ['[rbp-0x50] == 0x1']
+    end
+
+    # A pinned value answers every comparison against it, so the only other
+    # outcome is a contradiction -- these two cannot both hold. That says the
+    # gadget is impossible, which this pass leaves for someone else to notice
+    # rather than quietly dropping half of it.
+    it 'leaves a comparison the pinned value contradicts' do
+      list = ['[rbp-0x50] == 0x1', '(s32)[rbp-0x50] <= 0x0']
+      expect(cons(list)).to eq list
+    end
+
+    it 'keeps everything when only part of a value is pinned' do
+      # (u16)X == 0 says nothing about the bits above it.
+      list = ['(u16)[r8] == 0x0', '(u32)[r8] <= 0x5']
+      expect(cons(list)).to eq list
+    end
+
     it 'settles what dropping an option exposes' do
       # Dropping "r1 == NULL" leaves "writable: r2" holding outright, which then
       # rules out the NULL option for r2, whose dereference then states the
