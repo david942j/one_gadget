@@ -40,8 +40,13 @@ module OneGadget
           Instruction.new('and', 3),
           Instruction.new('bic', 3),
           Instruction.new('bl', 1),
+          Instruction.new('bti', 0..1),
+          Instruction.new('dmb', 0..1),
+          Instruction.new('dsb', 0..1),
           Instruction.new('eor', 3),
+          Instruction.new('isb', 0..1),
           Instruction.new('ldr', 2..3),
+          Instruction.new('ldrb', 2..3),
           Instruction.new('lsl', 3),
           Instruction.new('lsr', 3),
           Instruction.new('mov', 2),
@@ -53,6 +58,10 @@ module OneGadget
           Instruction.new('sub', 3..4)
         ]
       end
+
+      # A landing pad marks where an indirect branch may arrive; nothing about the
+      # state changes at one.
+      alias inst_bti inst_nop
 
       # Return the argument value of calling a function.
       # @param [Integer] idx The 0-based index of the argument.
