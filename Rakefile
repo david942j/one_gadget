@@ -5,6 +5,7 @@ require 'rspec/core/rake_task'
 require 'rubocop/rake_task'
 require 'yard'
 
+import 'tasks/aletheia.rake'
 import 'tasks/builds/generate.rake'
 import 'tasks/builds/list.rake'
 import 'tasks/readme.rake'
