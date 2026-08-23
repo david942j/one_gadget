@@ -21,7 +21,12 @@ Gem::Specification.new do |s|
   s.license       = 'MIT'
   s.authors       = ['david942j']
   s.email         = ['david942j@gmail.com']
-  s.files         = Dir['lib/**/*.rb'] + Dir['bin/*'] + %w[README.md]
+  # The gem carries gadgets for a curated set of libcs (see tasks/builds/refresh.rake);
+  # every other build file stays in the repository, where a remote lookup finds it.
+  shipped = File.readlines(File.expand_path('shipped_builds', __dir__), chomp: true)
+  s.files         = Dir['lib/**/*.rb'].grep_v(%r{\Alib/one_gadget/builds/}) +
+                    shipped.map { |name| "lib/one_gadget/builds/#{name}.rb" } +
+                    Dir['bin/*'] + %w[README.md]
   s.homepage      = 'https://github.com/david942j/one_gadget'
   s.executables   = ['one_gadget']
 

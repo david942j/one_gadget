@@ -76,9 +76,13 @@ SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f9
 
 #### Given BuildID
 ```bash
-SHELL_OUTPUT_OF(one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d)
+SHELL_OUTPUT_OF(one_gadget -b b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0)
 ```
 ![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
+
+The gem carries the gadgets of the libcs most likely to be asked for -- the glibc of
+every Ubuntu LTS still in standard support, and every libc the tests cover. Any other
+BuildID is fetched from this repository, which keeps them all.
 
 #### Gadgets Near Functions
 
@@ -124,12 +128,12 @@ than a handful of others do. `--level` chooses how much of what was found to sho
 
 Level 1 drops a gadget when an easier one already asks for everything it does; level 0
 then scores what is left by how hard its constraints look and keeps only the best few;
-level 2 drops nothing. On the glibc 2.31 below that is 3, 35 and 97 entries -- the last
+level 2 drops nothing. On the glibc 2.31 below that is 4, 32 and 97 entries -- the last
 over 96 addresses, since one of them is reachable two ways with different requirements.
 
-Level 2 also reads the libc you point at directly, where the levels below it answer
-from the pre-built gadget database when it knows the file's BuildID; the database only
-stores the trimmed set. Pass `-f` to search the file at every level.
+Level 2 reads the libc you point at directly, where the levels below it answer from the
+pre-built gadget database when it knows the file's BuildID -- the same gadgets either
+way. Pass `-f` to search the file at every level.
 
 ```bash
 SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --level 1)
