@@ -44,6 +44,23 @@ call, following conditional branches both ways. When a gadget is only reachable 
 
 The article introducing how I develop this tool can be found [on my blog](https://david942j.blogspot.com/2017/02/project-one-gadget-in-glibc.html).
 
+### Checked by running them
+
+Constraints are only worth as much as they are complete, so the gadgets this repository
+ships are verified by being run. [Aletheia](aletheia/README.md) loads the libc in a live
+process, arranges exactly what a gadget's constraints ask for, poisons every register and
+page they *don't* mention, jumps to the offset, and requires a real `/bin/sh` to come back
+and list the root directory. A gadget whose constraint list is missing something fails
+there instead of passing by luck -- which is how several missing constraints were found.
+
+```bash
+bundle exec rake aletheia:verify                # every libc under spec/data, level 0
+bundle exec rake "aletheia:verify[1, aarch64]"  # one output level, one architecture
+```
+
+Aletheia is development tooling: it lives outside `lib/` and `bin/`, so it is not part of
+the published gem.
+
 ## Usage
 
 ### Command Line Interface
