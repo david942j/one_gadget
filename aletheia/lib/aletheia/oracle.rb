@@ -70,7 +70,11 @@ module Aletheia
       # match? / include? on the log would raise on the invalid encoding --
       # arriving as a "harness error" against a gadget that ran fine.
       log = File.binread(log_path)
-      [log_path, stub_out].each { |p| File.unlink(p) rescue nil }
+      [log_path, stub_out].each do |p|
+        File.unlink(p)
+      rescue StandardError
+        nil
+      end
       base = log[/ALETHEIA base=(0x[0-9a-f]+)/, 1]
       l0 = log.include?('ALETHEIA_L0=pass')
 
@@ -108,8 +112,16 @@ module Aletheia
       Array(pids).each do |pid|
         Timeout.timeout(3) { Process.wait(pid) }
       rescue Timeout::Error
-        (Process.kill('-KILL', Process.getpgid(pid)) rescue nil)
-        (Process.wait(pid) rescue nil)
+        begin
+          Process.kill('-KILL', Process.getpgid(pid))
+        rescue StandardError
+          nil
+        end
+        begin
+          Process.wait(pid)
+        rescue StandardError
+          nil
+        end
       rescue Errno::ECHILD
         nil
       end

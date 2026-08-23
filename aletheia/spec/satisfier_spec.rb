@@ -2,18 +2,22 @@
 
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 
-require 'ostruct'
 require 'aletheia/arch/aarch64'
 require 'aletheia/satisfier'
 
 # gdb-free unit tests for the constraint satisfier: they assert the plan it emits
 # (register/memory assignments and chosen disjunction branch) for representative
 # constraints of each category.
+# The three things the satisfier reads off a gadget. A struct rather than the real
+# one: these constraint lists are what is under test, and building them through
+# one_gadget would let its own pruning rewrite them first.
+StubGadget = Struct.new(:offset, :effect, :constraints, keyword_init: true)
+
 RSpec.describe Aletheia::Satisfier do
   subject(:satisfier) { described_class.new(Aletheia::Arch::AArch64) }
 
   def gadget(constraints, offset: 0x1000, effect: 'execve("/bin/sh", x0, environ)')
-    OpenStruct.new(offset: offset, effect: effect, constraints: constraints)
+    StubGadget.new(offset: offset, effect: effect, constraints: constraints)
   end
 
   it 'sets a bare register to zero for "reg == NULL"' do
@@ -242,7 +246,7 @@ RSpec.describe Aletheia::Satisfier do
     subject(:satisfier) { described_class.new(Aletheia::Arch::Amd64) }
 
     def gadget(constraints, offset: 0x1000, effect: 'execve("/bin/sh", rsi, environ)')
-      OpenStruct.new(offset: offset, effect: effect, constraints: constraints)
+      StubGadget.new(offset: offset, effect: effect, constraints: constraints)
     end
 
     it 'satisfies a bare stack-alignment "rsp & 0xf == 0" by construction (no register set)' do
@@ -347,7 +351,7 @@ RSpec.describe Aletheia::Satisfier do
     let(:spare) { 0xf7590...0xf8000 }
 
     def gadget(constraints, offset: 0x2d358, effect: 'execve("/bin/sh", sp+0x20, environ)')
-      OpenStruct.new(offset: offset, effect: effect, constraints: constraints)
+      StubGadget.new(offset: offset, effect: effect, constraints: constraints)
     end
 
     it 'pins the register so the sum lands in the spare writable data' do
@@ -459,7 +463,7 @@ RSpec.describe Aletheia::Satisfier do
     subject(:satisfier) { described_class.new(Aletheia::Arch::I386, got_offset: 0x1d5000) }
 
     def gadget(constraints, offset: 0x1000, effect: 'execve("/bin/sh", esp+0x34, environ)')
-      OpenStruct.new(offset: offset, effect: effect, constraints: constraints)
+      StubGadget.new(offset: offset, effect: effect, constraints: constraints)
     end
 
     it 'sets the base register to the libc GOT (base + PLTGOT offset)' do

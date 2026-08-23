@@ -43,8 +43,10 @@ module Aletheia
 
       def stub_binary = 'park_stub_arm'
 
-      def qemu = { 'bin' => 'qemu-arm', 'ld_prefix' => '/usr/arm-linux-gnueabihf',
-                   'gdb_arch' => 'arm' }
+      def qemu
+        { 'bin' => 'qemu-arm', 'ld_prefix' => '/usr/arm-linux-gnueabihf',
+          'gdb_arch' => 'arm' }
+      end
 
       def driver_model
         { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'arm', 'word_size' => 4,

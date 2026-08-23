@@ -6,7 +6,7 @@ module Aletheia
   # Turns a gadget's constraint list into a concrete injection plan: which
   # registers to set, and how scratch memory is laid out. This is the inverse of
   # one_gadget's +calculate_score+ dispatch, but it *produces assignments* and
-  # its constraint semantics are written independently (see {Operand_}).
+  # its constraint semantics are written independently (see {OperandParser}).
   #
   # Memory model assumed by the plan: the driver allocates one zeroed, RW scratch
   # region and sets +sp+ to +scratch + sp_offset+. So any +sp+-relative
@@ -48,7 +48,7 @@ module Aletheia
     # Room reserved per register inside libc's spare data, so two base sums in
     # one gadget can't land on top of each other (see {#spare_slot}).
     SPARE_STRIDE    = 0x80
-    WORD            = 8        # conservative pointer width for a "reads zero" check
+    WORD            = 8 # conservative pointer width for a "reads zero" check
     MASK64          = (1 << 64) - 1
     IMM             = /-?(?:0x[0-9a-fA-F]+|\d+)/
     # A literal zero, in whichever form one_gadget renders it for that context:
@@ -176,9 +176,9 @@ module Aletheia
     # @return [String, nil] the chosen disjunct, or nil if none worked.
     def satisfy_constraint(plan, constraint)
       ordered = constraint.split(' || ').map(&:strip)
-                          .map { |b| [evaluate(b), b] }.select { |c, _| c }
-                          .sort_by { |c, _| c }
-      ordered.each do |_, branch|
+                          .filter_map { |b| (cost = evaluate(b)) && [cost, b] }
+                          .sort_by(&:first).map(&:last)
+      ordered.each do |branch|
         return branch if satisfied?(plan, branch)
 
         regs_snapshot = plan.regs.dup
@@ -505,10 +505,10 @@ module Aletheia
     # assignment (e.g. a +writable: reg+imm+) also satisfy a +[reg+imm] == NULL+ on
     # the same slot, instead of the two conflicting.
     def deref_reads_zero?(plan, op)
-      return reg_value(plan, op.reg) == 0 if op.deref.zero? && op.reg
+      return pinned_to_zero?(reg_value(plan, op.reg)) if op.deref.zero? && op.reg
       return mem_value(plan, op)&.zero? || false if op.deref >= 2
       return false unless op.inner_imm.zero?
-      return plan.base_mem[op.imm] == 0 if op.deref == 1 && base_reg?(op) # zeroed libc global
+      return pinned_to_zero?(plan.base_mem[op.imm]) if op.deref == 1 && base_reg?(op) # zeroed libc global
       return false unless op.deref == 1 && op.reg && scratch?(plan, op.reg)
 
       zeroed_scratch?(reg_value(plan, op.reg)['scratch_off'] + op.imm)
@@ -536,8 +536,9 @@ module Aletheia
       m = branch.match(/\A(?:\([su]\d+\))?\w+ (==|!=|<=|>=|<|>) (#{IMM})\z/)
       return false unless m
 
-      op, imm = m[1], Integer(m[2])
-      op == '!=' || ((op == '>' || op == '>=') && imm <= 0x1000)
+      op = m[1]
+      imm = Integer(m[2])
+      op == '!=' || (['>', '>='].include?(op) && imm <= 0x1000)
     end
 
     # Mutate +plan+ to satisfy +disjunct+; false on an irreconcilable conflict.
@@ -572,9 +573,9 @@ module Aletheia
         return set_reg(plan, sum.first, { 'neg_base_off' => sum.last })
       end
 
-      op = address_operand(text)
-      if op.nil? then false
-      elsif op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
+      op = address_operand(text) or return false
+
+      if op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
       elsif op.deref == 1 && base_reg?(op) then set_base_mem(plan, op.imm, 0) # zero the libc global
       elsif op.deref == 1 && stack_reg?(op.reg) then true # sp-relative slot is already zeroed scratch
       elsif op.deref == 1 && op.reg then set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm })
@@ -883,7 +884,7 @@ module Aletheia
       if op.deref == 1
         addr = mem_addr_off(plan, op)
         return nil if addr.nil?
-        return :terminator if plan.mem[addr] == 0
+        return :terminator if pinned_to_zero?(plan.mem[addr])
 
         [:mem, addr]
       elsif op.deref.zero? && !stack_reg?(op.reg)
@@ -891,7 +892,7 @@ module Aletheia
         # real "sh"/"-c" string the gadget passes -- so it is already valid;
         # re-pointing that register would only conflict with the GOT constraint.
         return nil if base_relative?(reg_value(plan, op.reg))
-        return :terminator if op.imm.zero? && reg_value(plan, op.reg) == 0
+        return :terminator if op.imm.zero? && pinned_to_zero?(reg_value(plan, op.reg))
 
         [:reg, op.reg]
       end
@@ -940,7 +941,10 @@ module Aletheia
     # @return [(String, Integer), (nil, nil)]
     def parse_relation(disjunct)
       if (m = disjunct.match(/\A\((\w+) & (#{IMM})\) (==|!=) (#{IMM})\z/))
-        reg, mask, op, rhs = m[1], Integer(m[2]), m[3], Integer(m[4])
+        reg = m[1]
+        mask = Integer(m[2])
+        op = m[3]
+        rhs = Integer(m[4])
         return [nil, nil] unless settable?(reg)
 
         witness = masked_witness(mask, op, rhs)
@@ -1032,7 +1036,7 @@ module Aletheia
     #   masked_witness(0xf000, '==', 0x1)    #=> nil   -- 0x1 is outside the mask
     #   masked_witness(0x10, '!=', 0x0)      #=> 0x10
     def masked_witness(mask, op, want)
-      return nil unless (want & ~mask & MASK64).zero?
+      return nil unless want.nobits?(~mask & MASK64)
 
       op == '==' ? want : (want ^ mask) & MASK64
     end
@@ -1214,7 +1218,7 @@ module Aletheia
 
       target = scratch_slot(plan, 0)['scratch_off']
       pointer = { 'scratch_off' => target }
-      if via_base then plan.base_mem[op.imm] = pointer else plan.mem[slot_off] = pointer end
+      via_base ? (plan.base_mem[op.imm] = pointer) : (plan.mem[slot_off] = pointer)
       stored = true
       stored ? target + op.inner_imm : nil
     end
@@ -1332,7 +1336,7 @@ module Aletheia
     end
 
     def parse_operand(str)
-      Operand_.parse(str)
+      OperandParser.parse(str)
     rescue ArgumentError
       nil
     end
@@ -1356,6 +1360,14 @@ module Aletheia
     # arch-specific (+w21+ -> +x21+ on aarch64, +eax+ -> +rax+ on amd64).
     def xreg(reg)
       @arch.normalize_reg(reg)
+    end
+
+    # Whether the plan pins this to the literal zero, as opposed to a pointer, a
+    # value only the driver can compute, or nothing at all.
+    # @param [Integer, Hash, String, nil] value
+    # @return [Boolean]
+    def pinned_to_zero?(value)
+      value.eql?(0)
     end
 
     # What the plan assigns +reg+, under whichever name it was written: a role

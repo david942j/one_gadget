@@ -29,7 +29,9 @@ module Aletheia
     end
   end
 
-  module Operand_
+  # Reads one of those expressions into an {Operand}. Kept apart from the struct
+  # so the value and the syntax that produces it stay separable.
+  module OperandParser
     module_function
 
     NUM = /0x[0-9a-fA-F]+|\d+/

@@ -32,6 +32,8 @@ module Aletheia
       @host_machine ||= `uname -m`.strip
     end
 
+    # What both transports have in common: where the stub and the target live,
+    # and how a plan is rendered for them.
     class Base
       def initialize(arch, target)
         @arch = arch
@@ -59,13 +61,13 @@ module Aletheia
         ver = File.basename(@target)[/(\d+\.\d+)/, 1]
         need = ver && @arch.version_strict? && ver != default_libc_version
         dir = need && File.join(ROOT, 'sysroots', "#{@arch.name}-#{ver}")
-        @sysroot = (dir && (stub_built?(dir) || build_sysroot(dir))) ? dir : nil
+        @sysroot = dir && (stub_built?(dir) || build_sysroot(dir)) ? dir : nil
       end
 
       # Whether this run drives the target through qemu (a foreign arch, or a native
       # one forced under qemu) rather than natively.
       def qemu_transport?
-        !@arch.native_on?(Transport.host_machine) || ENV['ALETHEIA_FORCE_QEMU']
+        !@arch.native_on?(Transport.host_machine) || ENV.fetch('ALETHEIA_FORCE_QEMU', nil)
       end
 
       # QEMU_LD_PREFIX base: the host root for a native arch (forced under qemu),

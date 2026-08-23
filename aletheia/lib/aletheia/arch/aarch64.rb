@@ -44,8 +44,10 @@ module Aletheia
       # non-aarch64 host), or when +ALETHEIA_FORCE_QEMU+ drives it under qemu on an
       # aarch64 host -- there the transport resolves the runtime prefix to the host
       # root instead of this cross sysroot.
-      def qemu = { 'bin' => 'qemu-aarch64', 'ld_prefix' => '/usr/aarch64-linux-gnu',
-                   'gdb_arch' => 'aarch64' }
+      def qemu
+        { 'bin' => 'qemu-aarch64', 'ld_prefix' => '/usr/aarch64-linux-gnu',
+          'gdb_arch' => 'aarch64' }
+      end
 
       # Register/syscall model the gdb driver needs (serialized into the plan).
       def driver_model

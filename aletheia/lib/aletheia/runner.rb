@@ -107,9 +107,7 @@ module Aletheia
         chosen_branches: plan.branches,
         plan_regs: plan.regs.transform_values { |v| v.is_a?(Integer) ? format('%#x', v) : v }
       }
-      if plan.status == 'skip'
-        return record.merge(result: 'SKIP', reason: plan.reason)
-      end
+      return record.merge(result: 'SKIP', reason: plan.reason) if plan.status == 'skip'
 
       res = @oracle.run(plan)
       record = record.merge(

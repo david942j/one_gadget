@@ -36,8 +36,10 @@ module Aletheia
 
       # qemu-user transport: emulator binary, the sysroot providing the stub's own
       # ld.so + libc (QEMU_LD_PREFIX), and the gdb architecture to select.
-      def qemu = { 'bin' => 'qemu-i386', 'ld_prefix' => '/usr/i686-linux-gnu',
-                   'gdb_arch' => 'i386' }
+      def qemu
+        { 'bin' => 'qemu-i386', 'ld_prefix' => '/usr/i686-linux-gnu',
+          'gdb_arch' => 'i386' }
+      end
 
       def driver_model
         { 'gprs' => gprs, 'sp' => sp, 'pc' => pc, 'gdb_arch' => 'i386', 'word_size' => 4,
