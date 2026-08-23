@@ -65,7 +65,9 @@ namespace :builds do
     "OneGadget::Gadget.add(build_id, #{gadget.offset},\n#{args.join(",\n")})\n"
   end
 
-  def libc_info(filename)
+  # @param [String] filename Path of the libc to read.
+  # @param [String] source Where that libc came from, recorded as the build file's first line.
+  def libc_info(filename, source = filename)
     file = File.open(filename) # rubocop:disable Style/FileOpen
     libc = ELFTools::ELFFile.new(file)
     build_id = libc.build_id
@@ -81,7 +83,7 @@ namespace :builds do
     len = str[st..].index("\x00")
     return nil if len.nil?
 
-    fname = filename.sub('../libcdb', 'https://gitlab.com/david942j/libcdb/blob/master')
+    fname = source.sub('../libcdb', 'https://gitlab.com/david942j/libcdb/blob/master')
     {
       build_id:,
       info: "#{fname}\n\n#{arch}\n\n#{str[st, len]}"
