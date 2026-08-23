@@ -322,10 +322,16 @@ module OneGadget
       # Expr: <Expr> || <Expr>
       def calculate_score(expr)
         return expr.split(' || ').map(&method(:calculate_score)).max if expr.include?(' || ')
+
         return 0.95 if stack_alignment?(expr)
-        # A requirement on some of a value's bits leaves every other bit free, so
-        # it is a branch relation whatever its right side reads -- including zero.
-        return calculate_relation_score(expr) if MASKED_COMPARISON.match?(expr)
+        # Zero is the easy value to arrange and every other one is hard, so a mask
+        # tells them apart rather than making them easier: asking for zero in some
+        # of a value's bits is a little easier than zeroing all of it, while asking
+        # a mask for any other value is as hard as asking for that value anywhere.
+        return 0.92 if MASKED_ZERO.match?(expr)
+        # Any other mask asks for a particular value, which the mask does nothing
+        # to make easier, so it is the relation it looks like.
+        return calculate_relation_score(expr) if MASKED.match?(expr)
 
         case expr
         when /GOT address/ then 0.9
@@ -343,18 +349,24 @@ module OneGadget
         end
       end
 
-      # A requirement on some of a value's bits: +(eax & 0xf000) == 0x2000+, or the
-      # unparenthesised +rsp & 0xf == 0x0+ an alignment renders as. A mask *inside*
-      # what is compared (+[(rsi & 0xf0)] == NULL+) is not one of these: there the
-      # whole value still has to be zero.
-      MASKED_COMPARISON = /\A(?:\(.+ & .+\)|[\w$]+ & \S+) (?:==|!=|<=|>=|<|>) /
-      private_constant :MASKED_COMPARISON
+      # Some of a value's bits required to be zero: +(eax & 0xf000) == 0x0+, or the
+      # unparenthesised +eax & 0xf == 0x0+ an alignment renders as. A mask against
+      # any other value is not one of these -- that is as hard as asking for that
+      # value anywhere. Nor is a mask by a register (+(x0 & x1) == 0x0+), which
+      # pins no bit anyone knows, nor one inside what is compared
+      # (+[(rsi & 0xf0)] == NULL+), where the whole word still has to be zero.
+      MASKED_ZERO = /\A\(?[^()]+? & ~?(?:0x[0-9a-f]+|\d+)\)? == (?:NULL|0x0+)\z/
+      private_constant :MASKED_ZERO
+
+      # A comparison whose left side is masked, whatever it is compared with.
+      MASKED = /\A\(?[^()]+? & [^()]+?\)? (?:==|!=|<=|>=|<|>) /
+      private_constant :MASKED
 
       # Whether +expr+ is the alignment an aligned store imposes (see
       # {OneGadget::Emulators::X86#inst_movaps}): the stack pointer's low bits
       # must hold a fixed value, which is free -- the caller picks where the
       # stack sits. Matched exactly, so a masked value the caller has to arrange
-      # stays the branch relation it is.
+      # stays what it is.
       # @example matches +rsp & 0xf == 0x0+; not +(eax & 0xf000) == 0x2000+
       def stack_alignment?(expr)
         reg = expr[/\A(\S+) & 0xf == 0x[0-9a-f]+\z/, 1]
