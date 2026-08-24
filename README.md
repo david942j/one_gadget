@@ -89,11 +89,6 @@ $ one_gadget
 
 ```bash
 $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so
-# 0xe3b2e execve("/bin/sh", r15, r12)
-# constraints:
-#   [r15] == NULL || r15 == NULL || r15 is a valid argv
-#   [r12] == NULL || r12 == NULL || r12 is a valid envp
-#
 # 0xe3b31 execve("/bin/sh", r15, rdx)
 # constraints:
 #   [r15] == NULL || r15 == NULL || r15 is a valid argv
@@ -103,27 +98,47 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so
 # constraints:
 #   [rsi] == NULL || rsi == NULL || rsi is a valid argv
 #   [rdx] == NULL || rdx == NULL || rdx is a valid envp
+#
+# 0xe3c20 execve("/bin/sh", r15, r12)
+# constraints:
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0x107cea posix_spawn(rsp+0x64, "/bin/sh", [rsp+0x38], 0, rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
+#   [rsp+0x38] == NULL || (s32)[[rsp+0x38]+0x4] <= 0x0
 
 ```
 ![x86_64](https://github.com/david942j/one_gadget/blob/master/examples/x86_64.png?raw=true)
 
 #### Given BuildID
 ```bash
-$ one_gadget -b aad7dbe330f23ea00ca63daf793b766b51aceb5d
-# 0x4557a execve("/bin/sh", rsp+0x30, environ)
-# constraints:
-#   [rsp+0x30] == NULL || {[rsp+0x30], [rsp+0x38], [rsp+0x40], [rsp+0x48], ...} is a valid argv
-#
-# 0xf1651 execve("/bin/sh", rsp+0x40, environ)
+$ one_gadget -b b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0
+# 0x4f322 execve("/bin/sh", rsp+0x40, environ)
 # constraints:
 #   [rsp+0x40] == NULL || {[rsp+0x40], [rsp+0x48], [rsp+0x50], [rsp+0x58], ...} is a valid argv
 #
-# 0xf24cb execve("/bin/sh", rsp+0x60, environ)
+# 0xe56d8 execve("/bin/sh", r14, r12)
 # constraints:
-#   [rsp+0x60] == NULL || {[rsp+0x60], [rsp+0x68], [rsp+0x70], [rsp+0x78], ...} is a valid argv
+#   [r14] == NULL || r14 == NULL || r14 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe5863 execve("/bin/sh", r10, rdx)
+# constraints:
+#   [r10] == NULL || r10 == NULL || r10 is a valid argv
+#   [rdx] == NULL || rdx == NULL || rdx is a valid envp
+#
+# 0x10a38c execve("/bin/sh", rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
 
 ```
 ![build id](https://github.com/david942j/one_gadget/blob/master/examples/from_build_id.png?raw=true)
+
+The gem carries the gadgets of the libcs most likely to be asked for -- the glibc of
+every Ubuntu LTS still in standard support, and every libc the tests cover. Any other
+BuildID is fetched from this repository, which keeps them all.
 
 #### Gadgets Near Functions
 
@@ -144,11 +159,6 @@ Reorder gadgets according to the distance of given functions.
 ```bash
 $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --near exit,mkdir
 # [OneGadget] Gadgets near exit(0x46a70):
-# 0xe3b2e execve("/bin/sh", r15, r12)
-# constraints:
-#   [r15] == NULL || r15 == NULL || r15 is a valid argv
-#   [r12] == NULL || r12 == NULL || r12 is a valid envp
-#
 # 0xe3b31 execve("/bin/sh", r15, rdx)
 # constraints:
 #   [r15] == NULL || r15 == NULL || r15 is a valid argv
@@ -158,8 +168,28 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --n
 # constraints:
 #   [rsi] == NULL || rsi == NULL || rsi is a valid argv
 #   [rdx] == NULL || rdx == NULL || rdx is a valid envp
+#
+# 0xe3c20 execve("/bin/sh", r15, r12)
+# constraints:
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0x107cea posix_spawn(rsp+0x64, "/bin/sh", [rsp+0x38], 0, rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
+#   [rsp+0x38] == NULL || (s32)[[rsp+0x38]+0x4] <= 0x0
 #
 # [OneGadget] Gadgets near mkdir(0x10dc80):
+# 0x107cea posix_spawn(rsp+0x64, "/bin/sh", [rsp+0x38], 0, rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
+#   [rsp+0x38] == NULL || (s32)[[rsp+0x38]+0x4] <= 0x0
+#
+# 0xe3c20 execve("/bin/sh", r15, r12)
+# constraints:
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
 # 0xe3b34 execve("/bin/sh", rsi, rdx)
 # constraints:
 #   [rsi] == NULL || rsi == NULL || rsi is a valid argv
@@ -169,11 +199,6 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --n
 # constraints:
 #   [r15] == NULL || r15 == NULL || r15 is a valid argv
 #   [rdx] == NULL || rdx == NULL || rdx is a valid envp
-#
-# 0xe3b2e execve("/bin/sh", r15, r12)
-# constraints:
-#   [r15] == NULL || r15 == NULL || r15 is a valid argv
-#   [r12] == NULL || r12 == NULL || r12 is a valid envp
 #
 
 ```
@@ -183,10 +208,10 @@ Regular expression is acceptable.
 ```bash
 $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --near 'write.*' --raw
 # [OneGadget] Gadgets near writev(0x1144a0):
-# 932660 932657 932654
+# 1080554 932896 932660 932657
 #
 # [OneGadget] Gadgets near write(0x10e090):
-# 932660 932657 932654
+# 1080554 932896 932660 932657
 #
 
 ```
@@ -195,22 +220,22 @@ Pass an ELF file as the argument, OneGadget will take all GOT functions for proc
 ```bash
 $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --near spec/data/test_near_file.elf --raw
 # [OneGadget] Gadgets near exit(0x46a70):
-# 932654 932657 932660
+# 932657 932660 932896 1080554
 #
 # [OneGadget] Gadgets near puts(0x84450):
-# 932654 932657 932660
+# 932657 932660 932896 1080554
 #
 # [OneGadget] Gadgets near printf(0x61cc0):
-# 932654 932657 932660
+# 932657 932660 932896 1080554
 #
 # [OneGadget] Gadgets near strlen(0x9f660):
-# 932654 932657 932660
+# 932657 932660 932896 1080554
 #
 # [OneGadget] Gadgets near __cxa_finalize(0x46f40):
-# 932654 932657 932660
+# 932657 932660 932896 1080554
 #
 # [OneGadget] Gadgets near __libc_start_main(0x23fc0):
-# 932654 932657 932660
+# 932657 932660 932896 1080554
 #
 
 ```
@@ -228,39 +253,43 @@ than a handful of others do. `--level` chooses how much of what was found to sho
 
 Level 1 drops a gadget when an easier one already asks for everything it does; level 0
 then scores what is left by how hard its constraints look and keeps only the best few;
-level 2 drops nothing. On the glibc 2.31 below that is 3, 35 and 97 entries -- the last
+level 2 drops nothing. On the glibc 2.31 below that is 4, 32 and 97 entries -- the last
 over 96 addresses, since one of them is reachable two ways with different requirements.
 
-Level 2 also reads the libc you point at directly, where the levels below it answer
-from the pre-built gadget database when it knows the file's BuildID; the database only
-stores the trimmed set. Pass `-f` to search the file at every level.
+Level 2 reads the libc you point at directly, where the levels below it answer from the
+pre-built gadget database when it knows the file's BuildID -- the same gadgets either
+way. Pass `-f` to search the file at every level.
 
 ```bash
 $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --level 1
+# 0x51df8 posix_spawn(rsp+0xc, "/bin/sh", 0, rsp+0x210, rsp+0x50, environ)
+# constraints:
+#   readable: r12
+#   readable: r13
+#   rsp & 0xf == 0x0
+#   {"sh", "-c", rbx, NULL} is a valid argv
+#   rsp+0x210 == NULL || (u16)[rsp+0x210] == 0x0
+#
 # 0x51e2b posix_spawn(rsp+0xc, "/bin/sh", 0, rbp, rsp+0x50, environ)
 # constraints:
-#   address rsp+0x60 is writable
 #   rsp & 0xf == 0x0
 #   {"sh", "-c", rbx, NULL} is a valid argv
 #   rbp == NULL || (u16)[rbp] == 0x0
 #
 # 0x51e32 posix_spawn(rsp+0xc, "/bin/sh", 0, rbp, rsp+0x50, environ)
 # constraints:
-#   address rsp+0x60 is writable
 #   rsp & 0xf == 0x0
 #   rax == NULL || {"sh", rax, rbx, NULL} is a valid argv
 #   rbp == NULL || (u16)[rbp] == 0x0
 #
 # 0x51e39 posix_spawn(rsp+0xc, "/bin/sh", 0, rbp, rsp+0x50, environ)
 # constraints:
-#   address rsp+0x60 is writable
 #   rsp & 0xf == 0x0
 #   rcx == NULL || {rcx, rax, rbx, NULL} is a valid argv
 #   rbp == NULL || (u16)[rbp] == 0x0
 #
 # 0x51e40 posix_spawn(rsp+0xc, "/bin/sh", rdx, rbp, rsp+0x50, environ)
 # constraints:
-#   address rsp+0x60 is writable
 #   rsp & 0xf == 0x0
 #   rcx == NULL || {rcx, (u64)xmm1, rbx, NULL} is a valid argv
 #   rdx == NULL || (s32)[rdx+0x4] <= 0x0
@@ -268,7 +297,6 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x51e45 posix_spawn(rsp+0xc, "/bin/sh", rdx, rbp, rsp+0x50, environ)
 # constraints:
-#   address rsp+0x60 is writable
 #   rsp & 0xf == 0x0
 #   (u64)xmm0 == NULL || {(u64)xmm0, (u64)xmm1, rbx, NULL} is a valid argv
 #   rdx == NULL || (s32)[rdx+0x4] <= 0x0
@@ -276,7 +304,7 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x51e55 posix_spawn(rdi, "/bin/sh", rdx, rbp, rsp+0x50, [rax])
 # constraints:
-#   address rsp+0x60 is writable
+#   readable: rax
 #   rsp & 0xf == 0x0
 #   (u64)xmm0 == NULL || {(u64)xmm0, (u64)(xmm0 >> 64), rbx, NULL} is a valid argv
 #   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
@@ -286,7 +314,7 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x51e5a posix_spawn(rdi, "/bin/sh", rdx, rbp, r8, [rax])
 # constraints:
-#   address rsp+0x60 is writable
+#   readable: rax
 #   rsp & 0xf == 0x0
 #   [r8] == NULL || r8 is a valid argv
 #   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
@@ -294,29 +322,8 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #   rdx == NULL || (s32)[rdx+0x4] <= 0x0
 #   rbp == NULL || (u16)[rbp] == 0x0
 #
-# 0x51e5d posix_spawn(rdi, "/bin/sh", rdx, rcx, r8, [rax])
-# constraints:
-#   address rsp+0x60 is writable
-#   rsp & 0xf == 0x0
-#   [r8] == NULL || r8 is a valid argv
-#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
-#   rdi == NULL || writable: rdi
-#   rdx == NULL || (s32)[rdx+0x4] <= 0x0
-#   rcx == NULL || (u16)[rcx] == 0x0
-#
-# 0x51e62 posix_spawn(rdi, "/bin/sh", rdx, rcx, r8, [rax])
-# constraints:
-#   address rsp+0x68 is writable
-#   rsp & 0xf == 0x0
-#   [r8] == NULL || r8 is a valid argv
-#   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
-#   rdi == NULL || writable: rdi
-#   rdx == NULL || (s32)[rdx+0x4] <= 0x0
-#   rcx == NULL || (u16)[rcx] == 0x0
-#
 # 0x84165 posix_spawn(rbx+0xe0, "/bin/sh", r12, 0, rsp+0x60, environ)
 # constraints:
-#   address rsp+0x70 is writable
 #   rsp & 0xf == 0x0
 #   {"sh", "-c", rbp, NULL} is a valid argv
 #   rbx+0xe0 == NULL || writable: rbx+0xe0
@@ -324,7 +331,6 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x8416c posix_spawn(rbx+0xe0, "/bin/sh", r12, 0, rsp+0x60, environ)
 # constraints:
-#   address rsp+0x70 is writable
 #   rsp & 0xf == 0x0
 #   rax == NULL || {"sh", rax, rbp, NULL} is a valid argv
 #   rbx+0xe0 == NULL || writable: rbx+0xe0
@@ -332,7 +338,6 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x84173 posix_spawn(rbx+0xe0, "/bin/sh", r12, 0, rsp+0x60, environ)
 # constraints:
-#   address rsp+0x70 is writable
 #   rsp & 0xf == 0x0
 #   rcx == NULL || {rcx, rax, rbp, NULL} is a valid argv
 #   rbx+0xe0 == NULL || writable: rbx+0xe0
@@ -340,7 +345,6 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x84176 posix_spawn(rbx+0xe0, "/bin/sh", rdx, 0, rsp+0x60, environ)
 # constraints:
-#   address rsp+0x70 is writable
 #   rsp & 0xf == 0x0
 #   rcx == NULL || {rcx, rax, rbp, NULL} is a valid argv
 #   rbx+0xe0 == NULL || writable: rbx+0xe0
@@ -348,7 +352,6 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x8417b posix_spawn(rbx+0xe0, "/bin/sh", rdx, 0, rsp+0x60, environ)
 # constraints:
-#   address rsp+0x78 is writable
 #   rsp & 0xf == 0x0
 #   rcx == NULL || {rcx, rax, [rsp+0x70], NULL} is a valid argv
 #   rbx+0xe0 == NULL || writable: rbx+0xe0
@@ -356,7 +359,6 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x84180 posix_spawn(rbx+0xe0, "/bin/sh", rdx, 0, rsp+0x60, environ)
 # constraints:
-#   address rsp+0x78 is writable
 #   rsp & 0xf == 0x0
 #   rcx == NULL || {rcx, (u64)xmm1, [rsp+0x70], NULL} is a valid argv
 #   rbx+0xe0 == NULL || writable: rbx+0xe0
@@ -364,7 +366,7 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x8418c posix_spawn(rbx+0xe0, "/bin/sh", rdx, 0, rsp+0x60, [rax])
 # constraints:
-#   address rsp+0x78 is writable
+#   readable: rax
 #   rsp & 0xf == 0x0
 #   (u64)xmm0 == NULL || {(u64)xmm0, (u64)xmm1, [rsp+0x70], NULL} is a valid argv
 #   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
@@ -373,7 +375,7 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x84192 posix_spawn(rbx+0xe0, "/bin/sh", rdx, rcx, rsp+0x60, [rax])
 # constraints:
-#   address rsp+0x78 is writable
+#   readable: rax
 #   rsp & 0xf == 0x0
 #   (u64)xmm0 == NULL || {(u64)xmm0, (u64)(xmm0 >> 64), [rsp+0x70], NULL} is a valid argv
 #   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
@@ -383,7 +385,7 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x84199 posix_spawn(rdi, "/bin/sh", rdx, rcx, rsp+0x60, [rax])
 # constraints:
-#   address rsp+0x78 is writable
+#   readable: rax
 #   rsp & 0xf == 0x0
 #   (u64)xmm0 == NULL || {(u64)xmm0, (u64)(xmm0 >> 64), [rsp+0x70], NULL} is a valid argv
 #   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
@@ -393,18 +395,13 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0x841a0 posix_spawn(rdi, "/bin/sh", rdx, rcx, r8, [rax])
 # constraints:
-#   address rsp+0x78 is writable
+#   readable: rax
 #   rsp & 0xf == 0x0
 #   [r8] == NULL || r8 is a valid argv
 #   [[rax]] == NULL || [rax] == NULL || [rax] is a valid envp
 #   rdi == NULL || writable: rdi
 #   rdx == NULL || (s32)[rdx+0x4] <= 0x0
 #   rcx == NULL || (u16)[rcx] == 0x0
-#
-# 0xe3b2e execve("/bin/sh", r15, r12)
-# constraints:
-#   [r15] == NULL || r15 == NULL || r15 is a valid argv
-#   [r12] == NULL || r12 == NULL || r12 is a valid envp
 #
 # 0xe3b31 execve("/bin/sh", r15, rdx)
 # constraints:
@@ -416,10 +413,9 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #   [rsi] == NULL || rsi == NULL || rsi is a valid argv
 #   [rdx] == NULL || rdx == NULL || rdx is a valid envp
 #
-# 0xe3d23 execve("/bin/sh", r10, r12)
+# 0xe3c20 execve("/bin/sh", r15, r12)
 # constraints:
-#   address rbp-0x78 is writable
-#   [r10] == NULL || r10 == NULL || r10 is a valid argv
+#   [r15] == NULL || r15 == NULL || r15 is a valid argv
 #   [r12] == NULL || r12 == NULL || r12 is a valid envp
 #
 # 0xe3d26 execve("/bin/sh", r10, rdx)
@@ -428,15 +424,27 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #   [r10] == NULL || r10 == NULL || r10 is a valid argv
 #   [rdx] == NULL || rdx == NULL || rdx is a valid envp
 #
+# 0xe3d88 execve("/bin/sh", [rbp-0x78], r12)
+# constraints:
+#   address rbp-0x78 is writable
+#   [[rbp-0x78]] == NULL || [rbp-0x78] == NULL || [rbp-0x78] is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
+# 0xe3d90 execve("/bin/sh", r10, r12)
+# constraints:
+#   address rbp-0x78 is writable
+#   [r10] == NULL || r10 == NULL || r10 is a valid argv
+#   [r12] == NULL || r12 == NULL || r12 is a valid envp
+#
 # 0xe3d92 execve("/bin/sh", rbp-0x50, r12)
 # constraints:
-#   address rbp-0x48 is writable
+#   address rbp-0x50 is writable
 #   r13 == NULL || {"/bin/sh", r13, NULL} is a valid argv
 #   [r12] == NULL || r12 == NULL || r12 is a valid envp
 #
 # 0xe3d99 execve("/bin/sh", rbp-0x50, r12)
 # constraints:
-#   address rbp-0x48 is writable
+#   address rbp-0x50 is writable
 #   rax == NULL || {rax, r13, NULL} is a valid argv
 #   [r12] == NULL || r12 == NULL || r12 is a valid envp
 #
@@ -448,39 +456,15 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #
 # 0xe3dd7 execve("/bin/sh", rbp-0x50, r12)
 # constraints:
-#   address rbp-0x50 is writable
+#   address rbp-0x78 is writable
 #   [rbp-0x68] == NULL || {"/bin/sh", [rbp-0x68], NULL} is a valid argv
 #   [r12] == NULL || r12 == NULL || r12 is a valid envp
 #
 # 0xe3de1 execve("/bin/sh", rbp-0x50, r12)
 # constraints:
-#   address rbp-0x50 is writable
+#   address rbp-0x78 is writable
 #   rax == NULL || {rax, [rbp-0x68], NULL} is a valid argv
 #   [r12] == NULL || r12 == NULL || r12 is a valid envp
-#
-# 0xe3de5 execve("/bin/sh", r10, r12)
-# constraints:
-#   addresses r10+0x10, rbp-0x50 are writable
-#   [r10] == NULL || r10 == NULL || r10 is a valid argv
-#   [r12] == NULL || r12 == NULL || r12 is a valid envp
-#
-# 0xe3ded execve("/bin/sh", r10, r12)
-# constraints:
-#   addresses r10+0x10, rbp-0x48 are writable
-#   [r10] == NULL || r10 == NULL || r10 is a valid argv
-#   [r12] == NULL || r12 == NULL || r12 is a valid envp
-#
-# 0x1075da posix_spawn(rsp+0x64, "/bin/sh", [rsp+0x38], 0, rsp+0x70, [rsp+0xf0])
-# constraints:
-#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
-#   [[rsp+0xf0]] == NULL || [rsp+0xf0] == NULL || [rsp+0xf0] is a valid envp
-#   [rsp+0x38] == NULL || (s32)[[rsp+0x38]+0x4] <= 0x0
-#
-# 0x1075e2 posix_spawn(rsp+0x64, "/bin/sh", [rsp+0x38], 0, rsp+0x70, r9)
-# constraints:
-#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
-#   [r9] == NULL || r9 == NULL || r9 is a valid envp
-#   [rsp+0x38] == NULL || (s32)[[rsp+0x38]+0x4] <= 0x0
 #
 # 0x1075e7 posix_spawn(rsp+0x64, "/bin/sh", rdx, 0, rsp+0x70, r9)
 # constraints:
@@ -494,6 +478,11 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 #   [r9] == NULL || r9 == NULL || r9 is a valid envp
 #   rdi == NULL || writable: rdi
 #   rdx == NULL || (s32)[rdx+0x4] <= 0x0
+#
+# 0x107cea posix_spawn(rsp+0x64, "/bin/sh", [rsp+0x38], 0, rsp+0x70, environ)
+# constraints:
+#   [rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv
+#   [rsp+0x38] == NULL || (s32)[[rsp+0x38]+0x4] <= 0x0
 
 ```
 
@@ -502,21 +491,6 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --l
 ##### i386
 ```bash
 $ one_gadget spec/data/libc-2.27-63b3d43ad45e1b0f601848c65b067f9e9b40528b.so
-# 0x3cbea execve("/bin/sh", esp+0x34, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x34] == NULL || {[esp+0x34], [esp+0x38], [esp+0x3c], [esp+0x40], ...} is a valid argv
-#
-# 0x3cbec execve("/bin/sh", esp+0x38, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x38] == NULL || {[esp+0x38], [esp+0x3c], [esp+0x40], [esp+0x44], ...} is a valid argv
-#
-# 0x3cbf0 execve("/bin/sh", esp+0x3c, environ)
-# constraints:
-#   esi is the GOT address of libc
-#   [esp+0x3c] == NULL || {[esp+0x3c], [esp+0x40], [esp+0x44], [esp+0x48], ...} is a valid argv
-#
 # 0x3cbf7 execve("/bin/sh", esp+0x40, environ)
 # constraints:
 #   esi is the GOT address of libc
@@ -551,21 +525,24 @@ $ one_gadget spec/data/aarch64-libc-2.27.so
 # 0x3f160 execve("/bin/sh", sp+0x70, environ)
 # constraints:
 #   address x20+0x338 is writable
-#   x3 == NULL
-#
-# 0x3f184 execve("/bin/sh", sp+0x70, environ)
-# constraints:
-#   addresses x19+0x4, x20+0x338 are writable
-#   [sp+0x70] == NULL
-#
-# 0x3f1a8 execve("/bin/sh", x21, environ)
-# constraints:
-#   addresses x19+0x4, x20+0x338 are writable
-#   [x21] == NULL || x21 == NULL
+#   x22 == NULL
+#   x3 == NULL || {x3, "-c", x23, NULL} is a valid argv
 #
 # 0x63e90 execl("/bin/sh", x1)
 # constraints:
 #   x1 == NULL
+#
+# 0xa321c execve("/bin/sh", sp+0x40, x2)
+# constraints:
+#   [x1] == 0x0
+#   x0 == NULL || {"/bin/sh", x0, NULL} is a valid argv
+#   [x2] == NULL || x2 == NULL || x2 is a valid envp
+#
+# 0xa32e8 execve("/bin/sh", x29+0x40, x23)
+# constraints:
+#   address x29+0x40 is writable
+#   x0 == NULL || {"/bin/sh", x0, NULL} is a valid argv
+#   [x23] == NULL || x23 == NULL || x23 is a valid envp
 
 ```
 ![aarch64](https://github.com/david942j/one_gadget/blob/master/examples/aarch64.png?raw=true)
@@ -582,12 +559,12 @@ $ one_gadget spec/data/arm-libc-2.39.so
 #   r2 == NULL || (s32)[r2+0x4] <= 0x0
 #   r8 == NULL || (u16)[r8] == 0x0
 #
-# 0x88a48 execve("/bin/sh", r4, r5)
+# 0x88a7c execve("/bin/sh", r4, r5)
 # constraints:
 #   [r4] == NULL || r4 == NULL || r4 is a valid argv
 #   [r5] == NULL || r5 == NULL || r5 is a valid envp
 #
-# 0x9ef1a posix_spawn([sp+0x34], "/bin/sh", [sp+0x2c], 0, [sp+0x3c], r3)
+# 0x9f2be posix_spawn([sp+0x34], "/bin/sh", [sp+0x2c], 0, [sp+0x3c], r3)
 # constraints:
 #   [[sp+0x3c]] == NULL || [sp+0x3c] is a valid argv
 #   [r3] == NULL || r3 == NULL || r3 is a valid envp
@@ -610,15 +587,15 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so -s 
 ```ruby
 require 'one_gadget'
 OneGadget.gadgets(file: 'spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
-#=> [932654, 932657, 932660]
+#=> [932657, 932660, 932896, 1080554]
 
 # or in shorter way
 one_gadget('spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so', level: 1)
-#=> [335403, 335410, 335417, 335424, 335429, 335445, 335450, 335453, 335458, 541029, 541036, 541043, 541046, 541051, 541056, 541068, 541074, 541081, 541088, 932654, 932657, 932660, 933155, 933158, 933266, 933273, 933280, 933335, 933345, 933349, 933357, 1078746, 1078754, 1078759, 1078769]
+#=> [335352, 335403, 335410, 335417, 335424, 335429, 335445, 335450, 541029, 541036, 541043, 541046, 541051, 541056, 541068, 541074, 541081, 541088, 932657, 932660, 932896, 933158, 933256, 933264, 933266, 933273, 933280, 933335, 933345, 1078759, 1078769, 1080554]
 
 # from build id
 one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0')
-#=> [324286, 324293, 324386, 1090444]
+#=> [324386, 939736, 940131, 1090444]
 
 ```
 
@@ -629,7 +606,7 @@ def one_gadget(filename):
   return [int(i) for i in subprocess.check_output(['one_gadget', '--raw', filename]).decode().split(' ')]
 
 one_gadget('spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
-#=> [932654, 932657, 932660]
+#=> [932657, 932660, 932896, 1080554]
 
 ```
 

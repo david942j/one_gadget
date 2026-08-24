@@ -8,6 +8,7 @@ require 'yard'
 import 'tasks/aletheia.rake'
 import 'tasks/builds/generate.rake'
 import 'tasks/builds/list.rake'
+import 'tasks/builds/refresh.rake'
 import 'tasks/readme.rake'
 
 task default: %i[readme rubocop spec builds:list]

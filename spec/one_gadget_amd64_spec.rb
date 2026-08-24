@@ -94,7 +94,10 @@ describe 'one_gadget_amd64' do
                                                  0x84192, 0x84199, 0x841a0, 0xe3b31, 0xe3b34, 0xe3c20, 0xe3d26,
                                                  0xe3d88, 0xe3d90, 0xe3d92, 0xe3d99, 0xe3da0, 0xe3dd7, 0xe3de1,
                                                  0x1075e7, 0x1075f1, 0x107cea]
-      expect(OneGadget.gadgets(file: path)).to eq [0xe3b2e, 0xe3b31, 0xe3b34]
+      # No force_file, so this is the build-id database answering -- it holds the
+      # gadgets of this very libc, and says what emulating it says.
+      expect(OneGadget.gadgets(file: path)).to eq [0xe3b31, 0xe3b34, 0xe3c20, 0x107cea]
+      expect(OneGadget.gadgets(file: path)).to eq OneGadget.gadgets(file: path, force_file: true)
     end
 
     # rip-relative libc globals are concretized to $base+<off>, so the do_system
