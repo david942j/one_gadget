@@ -95,8 +95,11 @@ module OneGadget
         res = super
         return res if res.nil? || @got_base_regs.empty?
 
-        @got_base_regs.each do |reg|
-          res[:constraints].unshift("#{reg} is the GOT address of libc")
+        gots = @got_base_regs.to_h { |reg| [reg, got_base_constraint(processor, reg)] }
+        return nil unless gots.values.all?
+
+        gots.each do |reg, got|
+          res[:constraints].unshift(got)
           res[:constraints].delete_if { |c| c.start_with?("writable: #{reg}") }
         end
         res

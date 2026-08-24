@@ -31,6 +31,7 @@ module OneGadget
         return nil unless str_bin_sh?(arg0.to_s)
 
         @base_reg = arg0.deref.obj.to_s # this should be esi or ebx..
+        got = got_base_constraint(processor, @base_reg) or return
         # now we can let parent invoke "global_var?"
         res = super
         return if res.nil?
@@ -41,7 +42,7 @@ module OneGadget
         # is dropped. Unlike arm, i386 doesn't seed this register to +$base+ before
         # emulating, so the emulator can't recognise it as mapped -- it is pruned
         # here once +@base_reg+ is known.
-        res[:constraints].unshift("#{@base_reg} is the GOT address of libc")
+        res[:constraints].unshift(got)
         res[:constraints].reject! { |c| c.match?(/\A(?:writable|readable): \[*#{Regexp.escape(@base_reg)}\b/) }
         res
       end
