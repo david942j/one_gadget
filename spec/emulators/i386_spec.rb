@@ -7,6 +7,39 @@ describe OneGadget::Emulators::I386 do
     @processor = described_class.new
   end
 
+  # A compiler pads with `xchg ax,ax` and swaps registers with the real thing;
+  # both used to stop a candidate outright.
+  describe 'xchg' do
+    it 'swaps what the two registers hold' do
+      ebx = @processor.registers['ebx']
+      edi = @processor.registers['edi']
+      expect(@processor.process("  3fa77:\txchg   ebx,edi\n")).to be true
+      expect(@processor.registers['ebx'].to_s).to eq edi.to_s
+      expect(@processor.registers['edi'].to_s).to eq ebx.to_s
+    end
+
+    it 'does nothing when it names one register twice' do
+      before = @processor.registers['eax'].to_s
+      expect(@processor.process("  ed21e:\txchg   ax,ax\n")).to be true
+      expect(@processor.registers['eax'].to_s).to eq before
+    end
+
+    # An exchange with memory is a different instruction from a register swap --
+    # and an atomic one -- so it stops the candidate rather than being guessed at.
+    it 'refuses an exchange with memory' do
+      expect(@processor.process("  7fdcd:\txchg   DWORD PTR [esi+0x1a00],edx\n")).to be false
+    end
+  end
+
+  # The marker says a branch may land here; it touches nothing.
+  describe 'endbr' do
+    it 'runs on without changing anything' do
+      before = @processor.registers.transform_values(&:to_s)
+      expect(@processor.process("  ed2e0:\tendbr32\n")).to be true
+      expect(@processor.registers.transform_values(&:to_s)).to eq before
+    end
+  end
+
   describe 'process' do
     it 'libc-2.23' do
       gadget = <<-EOS
