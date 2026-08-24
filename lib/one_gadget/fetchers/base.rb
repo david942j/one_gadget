@@ -500,6 +500,24 @@ module OneGadget
         str.match?(/\A\[*#{Regexp.escape(base)}(?:[+-]0x[0-9a-f]+)?\]*\z/)
       end
 
+      # The requirement that a value be libc's GOT base, when a register holds it.
+      # That is a precondition a caller can arrange and a reader can check: set
+      # the register before jumping. A candidate whose window loads the base out
+      # of memory instead names a location nobody sets up -- there is no register
+      # to point anywhere -- so it is refused rather than stated as a constraint
+      # nothing can meet.
+      # @param [OneGadget::Emulators::Processor] processor
+      # @param [String] holder Where the candidate found the GOT base.
+      # @return [String?] The constraint, or +nil+ if the candidate must be refused.
+      # @example
+      #   got_base_constraint(processor, 'ecx')        #=> "ecx is the GOT address of libc"
+      #   got_base_constraint(processor, '[ebp-0x2c]') #=> nil
+      def got_base_constraint(processor, holder)
+        return nil unless processor.registers.key?(holder)
+
+        "#{holder} is the GOT address of libc"
+      end
+
       def str_bin_sh?(_str); raise NotImplementedError
       end
 

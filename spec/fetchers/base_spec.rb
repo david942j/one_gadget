@@ -2,13 +2,34 @@
 
 require 'one_gadget/emulators/amd64'
 require 'one_gadget/emulators/lambda'
+require 'one_gadget/emulators/i386'
 require 'one_gadget/fetchers/amd64'
+require 'one_gadget/fetchers/i386'
 
 describe OneGadget::Fetchers::Base do
   # Allocate without #initialize so no libc file / objdump is needed; these
   # tests only exercise the arch-independent private helpers of Base.
   let(:fetcher) { OneGadget::Fetchers::Amd64.allocate }
   let(:processor) { OneGadget::Emulators::Amd64.new }
+
+  # i386 PIC reaches its globals through whatever register holds the GOT base,
+  # so the gadget states which one -- and that is only a precondition a caller
+  # can arrange when it names a register.
+  describe '#got_base_constraint' do
+    let(:i386) { OneGadget::Fetchers::I386.allocate }
+    let(:i386_processor) { OneGadget::Emulators::I386.new }
+
+    it 'states the requirement for a register holding the base' do
+      expect(i386.send(:got_base_constraint, i386_processor, 'ecx'))
+        .to eq 'ecx is the GOT address of libc'
+    end
+
+    # A window that loads the base out of a stack slot names a place the caller
+    # never sets up, so there is nothing to ask of them and the candidate goes.
+    it 'refuses a base the candidate reads out of memory' do
+      expect(i386.send(:got_base_constraint, i386_processor, '[ebp-0x2c]')).to be_nil
+    end
+  end
 
   describe '#check_stack_argv' do
     # The argv pointer lives on the stack and every argv[i] happens to be a
