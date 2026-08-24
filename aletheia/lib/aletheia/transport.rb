@@ -61,7 +61,7 @@ module Aletheia
         ver = libc_version(@target)
         need = ver && @arch.version_strict? && ver != default_libc_version
         dir = need && File.join(ROOT, 'sysroots', "#{@arch.name}-#{ver}")
-        @sysroot = dir && (stub_built?(dir) || build_sysroot(dir)) ? dir : nil
+        @sysroot = dir && (reusable?(dir) || build_sysroot(dir)) ? dir : nil
       end
 
       # Whether this run drives the target through qemu (a foreign arch, or a native
@@ -103,6 +103,43 @@ module Aletheia
       # before a SCRATCH_SIZE bump still only mmaps the old (smaller) size, so a
       # plan computed against the new size writes past its actual mapping and
       # faults. Rebuild whenever the source is newer than the cached binary.
+      # A cached sysroot answers for a whole glibc release, but it was built from one
+      # package of it, and the older package cannot always run the newer libc: an
+      # +arm-2.39+ built from +2.39-0ubuntu8.7+ reaches no execve at all for a
+      # +8.8+ target, while the 8.7 target runs fine under an 8.8 sysroot. So keep
+      # one only for a libc no newer than the one it came from -- otherwise every
+      # gadget of the newer libc fails, and it reads as the gadgets being wrong.
+      def reusable?(dir)
+        stub_built?(dir) && !older_than_target?(dir)
+      end
+
+      # @return [Boolean] Whether +dir+ was built from an older package than the target.
+      def older_than_target?(dir)
+        built_from = sysroot_package_version(dir)
+        wanted = package_version(@target)
+        return false if built_from.nil? || wanted.nil?
+
+        # Debian version ordering is its own thing (epochs, tildes, +ubuntu
+        # suffixes), so let dpkg be the judge rather than guessing at it.
+        system('dpkg', '--compare-versions', wanted, 'gt', built_from)
+      end
+
+      # The package a sysroot was built from, read off the libc it carries -- the
+      # sysroot states this itself, so nothing has to be recorded alongside it.
+      # @return [String?]
+      def sysroot_package_version(dir)
+        libc = Dir[File.join(dir, '**', '{libc.so.6,libc-2.*.so}')].find { |f| File.file?(f) }
+        libc && package_version(libc)
+      end
+
+      # The exact Ubuntu package a libc was built as, where it says so.
+      # @param [String] file
+      # @return [String?]
+      def package_version(file)
+        File.binread(file)[/Ubuntu E?GLIBC (\d[^)]*)/, 1] ||
+          NON_UBUNTU_FIXTURE_VERSIONS[File.basename(file, '.so')]
+      end
+
       def stub_built?(dir)
         src_mtime = File.mtime(File.join(ROOT, 'park_stub.c'))
         %w[park_stub park_stub_native].all? do |name|
@@ -124,11 +161,17 @@ module Aletheia
       # Build the per-version sysroot from the fixture's own Ubuntu package version
       # (Ubuntu-sourced fixtures only). Returns whether its park_stub now exists.
       def build_sysroot(dir)
-        uver = File.binread(@target)[/Ubuntu E?GLIBC (\d[^)]*)/, 1] ||
-               NON_UBUNTU_FIXTURE_VERSIONS[File.basename(@target, '.so')] or return false
+        uver = package_version(@target) or return false
         warn "aletheia: building #{File.basename(dir)} sysroot (libc #{uver})..."
         system(File.join(ROOT, 'build_sysroot.sh'), @arch.name, uver, %i[out err] => File::NULL)
-        stub_built?(dir)
+        built = stub_built?(dir)
+        # Without the sysroot it needs, a version-strict libc runs against the
+        # default one, reaches no execve at all, and every one of its gadgets comes
+        # back FAIL -- indistinguishable from gadgets that genuinely do not work.
+        # A build that fell over (a fetch that timed out, a missing cross compiler)
+        # has to say so, or it reads as a finding.
+        warn "aletheia: #{File.basename(dir)} did not build; this libc's verdicts are not trustworthy" unless built
+        built
       end
 
       # The park_stub to run: an explicit override, else the per-version sysroot's
