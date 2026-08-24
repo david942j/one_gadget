@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+# What the helpers below need; +one_gadget+ itself is asked for by the task that
+# emulates, so merely checking the archive does not pay for loading it.
+require 'fileutils'
+require 'shellwords'
+require 'zlib'
+
 # The libcs the gem carries gadgets for: the glibc of every Ubuntu LTS still in
 # standard support, plus every libc the specs run against -- those are the ones
 # Aletheia verifies gadget by gadget, so they are the best-evidenced entries we
@@ -20,10 +26,6 @@ namespace :builds do
   # bundle exec rake builds:refresh
   # bundle exec rake "builds:refresh[spec]"
   task :refresh, :scope do |_t, args|
-    require 'fileutils'
-    require 'shellwords'
-    require 'zlib'
-
     require 'elftools'
     require 'one_gadget'
 
@@ -83,8 +85,11 @@ def latest_libc6(release, arch)
 end
 
 def libc6_stanza(mirror, suite, arch)
+  # Always re-read the index: it is the thing that says what is current, and a
+  # kept copy would answer with whatever was published when it was fetched. The
+  # packages it points at are immutable and stay cached.
   index = download("#{mirror}/dists/#{suite}/main/binary-#{arch}/Packages.gz",
-                   File.join(download_cache, "Packages-#{suite}-#{arch}.gz"))
+                   File.join(download_cache, "Packages-#{suite}-#{arch}.gz"), refetch: true)
   return nil if index.nil?
 
   stanza = Zlib::GzipReader.open(index, &:read).split("\n\n").find do |st|
@@ -122,9 +127,10 @@ end
 
 # @param [String] url
 # @param [String] dest
+# @param [Boolean] refetch Ask again even when +dest+ already holds an answer.
 # @return [String?] +dest+, or +nil+ when the archive does not serve the URL.
-def download(url, dest)
-  return dest if File.file?(dest) && File.size(dest).positive?
+def download(url, dest, refetch: false)
+  return dest if !refetch && File.file?(dest) && File.size(dest).positive?
 
   ok = system("curl -fsSL -o #{dest.shellescape} #{url.shellescape}")
   return dest if ok
