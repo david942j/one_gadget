@@ -26,12 +26,13 @@ Gem::Specification.new do |s|
   shipped = File.readlines(File.expand_path('shipped_builds', __dir__), chomp: true)
   s.files         = Dir['lib/**/*.rb'].grep_v(%r{\Alib/one_gadget/builds/}) +
                     shipped.map { |name| "lib/one_gadget/builds/#{name}.rb" } +
-                    Dir['bin/*'] + %w[README.md]
+                    Dir['bin/*'] + %w[README.md CHANGELOG.md]
   s.homepage      = 'https://github.com/david942j/one_gadget'
   s.executables   = ['one_gadget']
 
   s.metadata = {
     'bug_tracker_uri' => 'https://github.com/david942j/one_gadget/issues',
+    'changelog_uri' => 'https://github.com/david942j/one_gadget/blob/master/CHANGELOG.md',
     'documentation_uri' => 'https://www.rubydoc.info/github/david942j/one_gadget/master',
     'homepage_uri' => 'https://github.com/david942j/one_gadget',
     'source_code_uri' => 'https://github.com/david942j/one_gadget',
