@@ -55,7 +55,7 @@ test corpus reports has been run under a debugger and seen to spawn a shell.
   (#325), and a candidate whose path cannot hold is rejected (#359, #360).
 - Searching a libc got roughly five times faster: the test corpus at level 0
   went from 42.5s to 8.6s (#388, #389, #390, #393, #394, #395, #396).
-- Requires Ruby >= 3.3 (#293).
+- Requires Ruby >= 3.3 (#293) and elftools >= 2.0.0.
 
 ### Fixed
 
@@ -74,6 +74,10 @@ test corpus reports has been run under a debugger and seen to spawn a shell.
   call, and could invent gadgets by falling through a window boundary (#391,
   #392).
 - The "not glibc" check did not fire for aarch64 files (#311).
+- An architecture is recognised by the machine type its ELF header states, not
+  by the name the reader library prints for it -- the latter is that library's
+  wording and changed in elftools 2.0.0, which left every aarch64 and amd64 file
+  reading as an unknown architecture.
 
 ## v1.10.0 - 2024-10-04
 

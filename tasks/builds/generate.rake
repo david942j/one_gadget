@@ -68,13 +68,17 @@ namespace :builds do
   # @param [String] filename Path of the libc to read.
   # @param [String] source Where that libc came from, recorded as the build file's first line.
   def libc_info(filename, source = filename)
+    # The architectures a gadget can be searched for; the ELF reader knows plenty
+    # this tool cannot emulate.
+    machine = OneGadget::Helper.architecture(filename)
+    return nil unless %i[aarch64 amd64 arm i386].include?(machine)
+
     file = File.open(filename) # rubocop:disable Style/FileOpen
     libc = ELFTools::ELFFile.new(file)
     build_id = libc.build_id
     arch = libc.machine
-    return nil unless ['Advanced Micro Devices X86-64', 'Intel 80386', 'AArch64', 'ARM'].include?(arch)
     # let's skip amd64 with 32bit, i.e. x32
-    return nil if arch.start_with?('Advanced') && libc.elf_class == 32
+    return nil if machine == :amd64 && libc.elf_class == 32
 
     str = file.read
     st = str.index('GNU C Library')
