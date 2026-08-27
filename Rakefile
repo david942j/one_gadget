@@ -6,13 +6,14 @@ require 'rubocop/rake_task'
 require 'yard'
 
 import 'tasks/aletheia.rake'
+import 'tasks/builds/audit.rake'
 import 'tasks/builds/check.rake'
 import 'tasks/builds/generate.rake'
 import 'tasks/builds/list.rake'
 import 'tasks/builds/refresh.rake'
 import 'tasks/readme.rake'
 
-task default: %i[readme rubocop spec builds:list builds:check]
+task default: %i[readme rubocop spec builds:list builds:audit builds:check]
 
 RuboCop::RakeTask.new(:rubocop) do |task|
   task.patterns = ['lib/**/*.rb', 'spec/**/*.rb', 'bin/*', 'tasks/**/*.rake', 'aletheia/**/*.rb', 'aletheia/bin/*']
