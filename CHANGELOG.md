@@ -74,6 +74,10 @@ test corpus reports has been run under a debugger and seen to spawn a shell.
   call, and could invent gadgets by falling through a window boundary (#391,
   #392).
 - The "not glibc" check did not fire for aarch64 files (#311).
+- Shipped entries reported fewer gadgets than reading the same libc as a file,
+  having been generated before the emulator learned to run `xchg`. They are
+  regenerated, and `rake builds:audit` now fails when an entry stops matching
+  its libc.
 - An architecture is recognised by the machine type its ELF header states, not
   by the name the reader library prints for it -- the latter is that library's
   wording and changed in elftools 2.0.0, which left every aarch64 and amd64 file
