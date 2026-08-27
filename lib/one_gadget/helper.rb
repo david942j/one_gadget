@@ -192,11 +192,22 @@ module OneGadget
     end
 
     # Fetch the ELF architecture of +file+.
+    # What this tool calls each architecture it can search. Keyed by the
+    # header's own value, which is fixed by the ELF ABI, rather than by the name a
+    # reader library prints for it -- that is the library's wording and does
+    # change, as elftools 2.0.0 renamed "AArch64" to "ARM 64-bit architecture".
+    MACHINES = {
+      ELFTools::Constants::EM::EM_386 => :i386,
+      ELFTools::Constants::EM::EM_ARM => :arm,
+      ELFTools::Constants::EM::EM_X86_64 => :amd64,
+      ELFTools::Constants::EM::EM_AARCH64 => :aarch64
+    }.freeze
+
     # @param [String] file The target ELF filename.
     # @return [Symbol]
-    #   One of +:amd64+, +:i386+, +:arm+, +:aarch64+, or +:mips+ for a recognized
-    #   architecture, +:unknown+ for a valid ELF with an unsupported machine type,
-    #   or +:invalid+ when +file+ does not exist or is not a valid ELF.
+    #   One of +:amd64+, +:i386+, +:arm+ or +:aarch64+, +:unknown+ for a valid ELF
+    #   this tool cannot search, or +:invalid+ when +file+ does not exist or is
+    #   not a valid ELF.
     # @example
     #   Helper.architecture('/bin/cat')
     #   #=> :amd64
@@ -204,14 +215,7 @@ module OneGadget
       return :invalid unless File.exist?(file)
 
       f = File.open(file) # rubocop:disable Style/FileOpen
-      str = ELFTools::ELFFile.new(f).machine
-      {
-        'Advanced Micro Devices X86-64' => :amd64,
-        'Intel 80386' => :i386,
-        'ARM' => :arm,
-        'AArch64' => :aarch64,
-        'MIPS R3000' => :mips
-      }[str] || :unknown
+      MACHINES[ELFTools::ELFFile.new(f).header.e_machine.to_i] || :unknown
     rescue ELFTools::ELFError # not a valid ELF
       :invalid
     ensure
