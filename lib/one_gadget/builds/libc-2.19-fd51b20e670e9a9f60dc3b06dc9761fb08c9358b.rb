@@ -20,6 +20,9 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/eglibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
+OneGadget::Gadget.add(build_id, 260727,
+                      constraints: ["edi is the GOT address of libc", "[esp+0x18] == NULL", "eax == 0x0", "{\"sh\", \"-c\", [esp+0x1c], NULL} is a valid argv"],
+                      effect: "execve(\"/bin/sh\", esp+0x34, environ)")
 OneGadget::Gadget.add(build_id, 260729,
                       constraints: ["ebx is the GOT address of libc", "[esp+0x18] == NULL", "eax == 0x0", "{\"sh\", \"-c\", [esp+0x1c], NULL} is a valid argv"],
                       effect: "execve(\"/bin/sh\", esp+0x34, environ)")

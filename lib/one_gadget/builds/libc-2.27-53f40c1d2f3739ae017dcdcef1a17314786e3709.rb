@@ -1,7 +1,7 @@
 require 'one_gadget/gadget'
 # spec/data/aarch64-libc-2.27.so
 # 
-# AArch64
+# ARM 64-bit architecture
 # 
 # GNU C Library (Ubuntu GLIBC 2.27-3ubuntu1) stable release version 2.27.
 # Copyright (C) 2018 Free Software Foundation, Inc.

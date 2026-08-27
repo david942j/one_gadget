@@ -1,7 +1,7 @@
 require 'one_gadget/gadget'
 # http://ports.ubuntu.com/ubuntu-ports/pool/main/g/glibc/libc6_2.39-0ubuntu8.8_arm64.deb
 # 
-# AArch64
+# ARM 64-bit architecture
 # 
 # GNU C Library (Ubuntu GLIBC 2.39-0ubuntu8.8) stable release version 2.39.
 # Copyright (C) 2024 Free Software Foundation, Inc.

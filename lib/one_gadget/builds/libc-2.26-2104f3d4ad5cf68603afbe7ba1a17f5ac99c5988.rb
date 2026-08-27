@@ -1,7 +1,7 @@
 require 'one_gadget/gadget'
 # spec/data/libc-2.26-2104f3d4ad5cf68603afbe7ba1a17f5ac99c5988.so
 # 
-# Advanced Micro Devices X86-64
+# Advanced Micro Devices X86-64 processor
 # 
 # GNU C Library (GNU libc) stable release version 2.26, by Roland McGrath et al.
 # Copyright (C) 2017 Free Software Foundation, Inc.

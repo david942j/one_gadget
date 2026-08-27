@@ -1,7 +1,7 @@
 require 'one_gadget/gadget'
 # spec/data/aarch64-libc-2.24.so
 # 
-# AArch64
+# ARM 64-bit architecture
 # 
 # GNU C Library (GNU libc) stable release version 2.24, by Roland McGrath et al.
 # Copyright (C) 2016 Free Software Foundation, Inc.
