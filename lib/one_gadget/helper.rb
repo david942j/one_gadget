@@ -199,7 +199,8 @@ module OneGadget
       ELFTools::Constants::EM::EM_386 => :i386,
       ELFTools::Constants::EM::EM_ARM => :arm,
       ELFTools::Constants::EM::EM_X86_64 => :amd64,
-      ELFTools::Constants::EM::EM_AARCH64 => :aarch64
+      ELFTools::Constants::EM::EM_AARCH64 => :aarch64,
+      ELFTools::Constants::EM::EM_RISCV => :riscv64
     }.freeze
 
     # @param [String] file The target ELF filename.
@@ -317,6 +318,7 @@ module OneGadget
     def objdump_arch(arch)
       case arch
       when :amd64 then 'i386:x86-64'
+      when :riscv64 then 'riscv:rv64'
       else arch.to_s
       end
     end
@@ -331,7 +333,8 @@ module OneGadget
         aarch64: 'aarch64-linux-gnu-objdump',
         amd64: 'x86_64-linux-gnu-objdump',
         arm: 'arm-linux-gnueabihf-objdump',
-        i386: 'i686-linux-gnu-objdump'
+        i386: 'i686-linux-gnu-objdump',
+        riscv64: 'riscv64-linux-gnu-objdump'
       }[arch]
     end
 
