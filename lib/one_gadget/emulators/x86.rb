@@ -303,9 +303,6 @@ module OneGadget
         registers[dst] -= src
       end
 
-      # yap, nop
-      def inst_nop(*); end
-
       # A marker for the branch predictor: it says a jump may land here and leaves
       # every value alone.
       def inst_endbr64(*); end
