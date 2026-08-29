@@ -31,9 +31,11 @@ flowchart LR
 
   subgraph FE["Fetcher side: find candidate sequences"]
     direction TB
-    FB["Fetchers::Base<br/>(engine)"]:::engine
+    FB["Fetchers::Base<br/>(engine + every arch hook)"]:::engine
+    FM["modules mixed into Base:<br/>CandidateWalk, Disassembly,<br/>ArgumentResolution"]:::mixin
     FA["Fetchers::&lt;Arch&gt;<br/>(you implement)"]:::arch
     FB -->|inherits| FA
+    FM -.->|mixed into| FB
   end
   subgraph EM["Emulator side: execute one candidate"]
     direction TB
@@ -52,7 +54,10 @@ Legend: 🟦 engine (shared base) · 🟨 family base class · 🟩 what you imp
 
 What each box is for:
 
-- **`Fetchers::Base`** — the engine: walks the CFG for candidate sequences, then solves and trims gadgets.
+- **`Fetchers::Base`** — the engine, and where every hook below is declared whichever module implements the code that calls it.
+- **`module CandidateWalk`** — the backward CFG walk that yields the sequences reaching a terminal call.
+- **`module Disassembly`** — finding the terminal calls and disassembling around them (whole-file, or windows when `scan_calls` finds the sites).
+- **`module ArgumentResolution`** — reading a reached call's arguments and stating what they require of the caller.
 - **`Fetchers::<Arch>`** — the arch's disassembly, its string/branch recognition, and how to build its emulator.
 - **`Emulators::Processor`** — the engine: the emulation lifecycle (parse, dispatch) and the calls a candidate may cross.
 - **`module Conditional`** — shared compare/branch machinery; a crossed branch becomes a gadget constraint.
@@ -105,6 +110,10 @@ Reading the flow:
 | `global_var?(operand)` | does it reference a libc global (i.e. is it `$base`-relative)? |
 | `branch_kind(line)` | classify an instruction: `:conditional`, `:unconditional`, `:terminator`, or `nil` (not a branch) |
 | `branch_lead_chars` | the leading character(s) of this arch's branch mnemonics, e.g. `'bct'` or `'j'` (a cheap filter) |
+
+Every one of these is declared in `base.rb`, even where the engine calling it lives
+in one of the mixed-in modules — the class is the page that says what an
+architecture owes the engine, so override them against that list.
 
 `branch_kind` is the one method that drives the control-flow walk:
 
