@@ -38,6 +38,41 @@ describe OneGadget::Emulators::Riscv64 do
     expect(@processor.registers['a3'].to_s).to eq '(a1+0x8 + a1+0x8)'
   end
 
+  describe 'conditional branches' do
+    # Feed the branch, then a follow-up line whose address decides taken
+    # (== target) vs not-taken (!= target).
+    def branch_constraint(branch, target, follow_addr)
+      @processor.process("1000: #{branch} #{format('%x', target)} <x>")
+      @processor.process("#{format('%x', follow_addr)}: nop")
+      @processor.constraints
+    end
+
+    it 'compares and branches in the one instruction' do
+      expect(branch_constraint('bne a2,a4,', 0x2000, 0x1004)).to eq ['a2 == a4'] # not taken
+      @processor = described_class.new
+      expect(branch_constraint('beq a2,a4,', 0x2000, 0x2000)).to eq ['a2 == a4'] # taken
+    end
+
+    it 'reads a comparison against zero off the register that names it' do
+      expect(branch_constraint('beqz a3,', 0x2000, 0x2000)).to eq ['a3 == 0x0'] # taken
+      @processor = described_class.new
+      expect(branch_constraint('bnez a3,', 0x2000, 0x2000)).to eq ['a3 != 0x0'] # taken
+    end
+
+    it 'states a reversed spelling as the relation it reads' do
+      expect(branch_constraint('bgt a0,a1,', 0x2000, 0x2000)).to eq ['(s64)a0 > a1'] # taken
+      @processor = described_class.new
+      expect(branch_constraint('bleu a0,a1,', 0x2000, 0x1004)).to eq ['(u64)a0 > a1'] # not taken
+      @processor = described_class.new
+      expect(branch_constraint('blez a0,', 0x2000, 0x2000)).to eq ['(s64)a0 <= 0x0'] # taken
+    end
+
+    it 'takes an unconditional jump without constraining anything' do
+      expect(@processor.process('1000: j 2000 <x>')).to be true
+      expect(@processor.constraints).to eq []
+    end
+  end
+
   it 'holds zero in the hardwired register' do
     expect(@processor.registers['zero']).to be 0
   end
