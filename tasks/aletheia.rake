@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-ARCHES = %w[aarch64 amd64 arm i386].freeze
+ARCHES = %w[aarch64 amd64 arm i386 riscv64].freeze
 FIXTURES = 'spec/data/*.so'
 
 namespace :aletheia do

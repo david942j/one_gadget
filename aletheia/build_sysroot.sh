@@ -22,6 +22,7 @@ case "$arch" in
   arm)     deb_arch=armhf; triplet=arm-linux-gnueabihf; cc=arm-linux-gnueabihf-gcc; ldso=ld-linux-armhf.so.3 ;;
   aarch64) deb_arch=arm64; triplet=aarch64-linux-gnu;   cc=aarch64-linux-gnu-gcc;   ldso=ld-linux-aarch64.so.1 ;;
   amd64)   deb_arch=amd64; triplet=x86_64-linux-gnu;    cc=x86_64-linux-gnu-gcc;    ldso=ld-linux-x86-64.so.2 ;;
+  riscv64) deb_arch=riscv64; triplet=riscv64-linux-gnu; cc=riscv64-linux-gnu-gcc; ldso=ld-linux-riscv64-lp64d.so.1 ;;
   *) echo "unsupported arch $arch" >&2; exit 2 ;;
 esac
 dl=-l:libdl.so.2
