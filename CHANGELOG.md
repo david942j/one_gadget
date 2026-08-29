@@ -7,7 +7,7 @@ Notable changes to one_gadget, newest first. The format follows
 A change worth a user's attention lands with its entry under *Unreleased*;
 releases are cut by giving that section a version and a date.
 
-## Unreleased
+## v2.0.0 - 2026-08-29
 
 Reported gadgets are not offset-for-offset comparable with 1.x: constraints are
 more precise, an output level means one thing everywhere, and every gadget the

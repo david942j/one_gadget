@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    one_gadget (1.10.0)
+    one_gadget (2.0.0)
       elftools (>= 2.0.0, < 3.0.0)
       logger
 
