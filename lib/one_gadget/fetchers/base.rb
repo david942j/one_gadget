@@ -143,7 +143,14 @@ module OneGadget
 
       private
 
-      def global_var?(_str); raise NotImplementedError
+      # Whether +str+ references a libc global, i.e. an address the caller does not
+      # choose. The default reads the +$base+-relative form an arch produces once it
+      # concretizes a pc-relative operand; one that reaches its globals through a
+      # register (i386's GOT) overrides this against that register instead.
+      # @param [String] str A rendered value.
+      # @return [Boolean]
+      def global_var?(str)
+        base_relative?(str, '$base')
       end
 
       # Whether +str+ names a value at a fixed offset from +base+, i.e. an address
@@ -179,10 +186,38 @@ module OneGadget
         "#{holder} is the GOT address of libc"
       end
 
-      def str_bin_sh?(_str); raise NotImplementedError
+      # Whether +str+ references the +"/bin/sh"+ string. The default recognises the
+      # +$base+-relative form (see {#global_var?}); an arch that renders the address
+      # differently overrides it.
+      # @param [String] str A rendered value.
+      # @return [Boolean]
+      def str_bin_sh?(str)
+        str.include?('$base') && str.include?(bin_sh_offset.to_s(16))
       end
 
-      def str_sh?(_str); raise NotImplementedError
+      # Whether +str+ references the standalone +"sh"+ string glibc passes as
+      # argv[0] in +execl("/bin/sh", "sh", ...)+. False for a libc that has none.
+      # @param [String] str A rendered value.
+      # @return [Boolean]
+      def str_sh?(str)
+        !sh_offset.nil? && str.include?('$base') && str.include?(sh_offset.to_s(16))
+      end
+
+      # File offset of the +"/bin/sh"+ string.
+      # @return [Integer]
+      def bin_sh_offset
+        @bin_sh_offset ||= str_offset('/bin/sh')
+      end
+
+      # File offset of the standalone +"sh"+ string (\0-preceded and
+      # \0-terminated). Its distance from +"/bin/sh"+ is build-specific, so locate
+      # it directly instead of guessing.
+      # @return [Integer?] +nil+ when the libc has no such string.
+      def sh_offset
+        return @sh_offset if defined?(@sh_offset)
+
+        idx = file_bytes.index("\x00sh\x00")
+        @sh_offset = idx && idx + 1
       end
 
       def call_str; raise NotImplementedError

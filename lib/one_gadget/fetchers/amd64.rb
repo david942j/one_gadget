@@ -18,23 +18,11 @@ module OneGadget
       def candidates
         super do |candidate|
           next true if candidate.include?('posix_spawn@')
-          next false unless candidate.include?(bin_sh_hex) # works in x86-64
+          next false unless candidate.include?(bin_sh_offset.to_s(16)) # works in x86-64
           next false unless candidate.lines.last.include?('execve') # only care execve
 
           true
         end
-      end
-
-      def bin_sh_hex
-        @bin_sh_hex ||= str_offset('/bin/sh').to_s(16)
-      end
-
-      def str_bin_sh?(str)
-        str.include?('$base') && str.include?(bin_sh_hex)
-      end
-
-      def global_var?(str)
-        base_relative?(str, '$base')
       end
     end
   end
