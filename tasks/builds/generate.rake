@@ -68,10 +68,8 @@ namespace :builds do
   # @param [String] filename Path of the libc to read.
   # @param [String] source Where that libc came from, recorded as the build file's first line.
   def libc_info(filename, source = filename)
-    # The architectures a gadget can be searched for; the ELF reader knows plenty
-    # this tool cannot emulate.
     machine = OneGadget::Helper.architecture(filename)
-    return nil unless %i[aarch64 amd64 arm i386].include?(machine)
+    return nil unless OneGadget::Fetchers.supported_architecture?(machine)
 
     file = File.open(filename) # rubocop:disable Style/FileOpen
     libc = ELFTools::ELFFile.new(file)
@@ -95,7 +93,7 @@ namespace :builds do
   rescue ELFTools::ELFError, EOFError # corrupted elf file
     nil
   ensure
-    file.close
+    file&.close # nil when an unsupported architecture returned before it was opened
   end
 
   def failed(msg)
