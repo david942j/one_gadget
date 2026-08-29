@@ -165,7 +165,14 @@ def execd_shell(pid):
 # ever fire in the (non-execing) parent -- useless there, and qemu-aarch64's
 # gdbstub SIGSEGVs some straight-line execl() paths when it's armed regardless
 # (reproduced: works cleanly without it, corrupts execl with it).
-gdb.execute("catch syscall execve execveat")
+# Not every architecture has a syscall catchpoint in gdb (RISC-V is one). Where it
+# is missing, nothing stops at the syscall entry and L0 goes unanswered -- the run
+# still reaches the shell, and L2 (a real shell running `ls /`) is what decides the
+# verdict anyway.
+try:
+    gdb.execute("catch syscall execve execveat")
+except gdb.error:
+    pass
 if connect == "run":
     try:
         gdb.execute("catch exec")
@@ -185,6 +192,11 @@ if not l0 and connect == "run":
     l0 = execd_shell(gdb.selected_inferior().pid)
 gdb.write("ALETHEIA_L0=%s\n" % ("pass" if l0 else "fail"))
 
-# Let the shell run for the L2 (`ls /`) check on the tty.
+# Let the shell run for the L2 (`ls /`) check on the tty. With no catchpoint armed
+# the continue above already ran to the shell, so there may be nothing left to
+# resume.
 gdb.execute("delete")
-gdb.execute("continue")
+try:
+    gdb.execute("continue")
+except gdb.error:
+    pass

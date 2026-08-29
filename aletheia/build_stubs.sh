@@ -22,6 +22,7 @@ build() {
 case "$(uname -m)" in
   aarch64) build cc park_stub_aarch64 ;;
   x86_64)  build cc park_stub_x86_64 ;;
+  riscv64) build cc park_stub_riscv64 ;;
   *) echo "unknown host arch $(uname -m); build a stub manually" >&2 ;;
 esac
 
@@ -30,4 +31,5 @@ esac
 [ "$(uname -m)" = x86_64 ]  && build aarch64-linux-gnu-gcc park_stub_aarch64
 build i686-linux-gnu-gcc park_stub_i386 # i386 (32-bit) is always cross-built
 build arm-linux-gnueabihf-gcc park_stub_arm # armhf (32-bit) is always cross-built
+build riscv64-linux-gnu-gcc park_stub_riscv64 # cross-built unless the host is riscv64 itself
 exit 0
