@@ -568,7 +568,7 @@ module Aletheia
     # the same slot, instead of the two conflicting.
     def deref_reads_zero?(plan, op)
       return pinned_to_zero?(reg_value(plan, op.reg)) if op.deref.zero? && op.reg
-      return mem_value(plan, op)&.zero? || false if op.deref >= 2
+      return pinned_to_zero?(mem_value(plan, op)) if op.deref >= 2
       return false unless op.inner_imm.zero?
       return pinned_to_zero?(plan.base_mem[op.imm]) if op.deref == 1 && base_reg?(op) # zeroed libc global
       return false unless op.deref == 1 && op.reg && scratch?(plan, op.reg)
@@ -640,11 +640,24 @@ module Aletheia
 
       if op.deref.zero? then set_reg(plan, op.reg, (-op.imm) & MASK64)
       elsif op.deref == 1 && base_reg?(op) then set_base_mem(plan, op.imm, 0) # zero the libc global
-      elsif op.deref == 1 && stack_reg?(op.reg) then true # sp-relative slot is already zeroed scratch
+      elsif op.deref == 1 && stack_reg?(op.reg) then stack_slot_still_zero?(plan, op)
       elsif op.deref == 1 && op.reg then set_reg(plan, op.reg, { 'scratch_off' => STRING_POOL - op.imm })
       elsif op.deref >= 2 then apply_deep_null(plan, op)
       else false
       end
+    end
+
+    # Whether an +sp+-relative slot still reads zero. It does by default -- the
+    # stack lands in the zero-filled scratch, so nothing has to be written to make
+    # it NULL -- but only while nothing else has put something there. Another
+    # constraint may have pointed that very slot at scratch, and answering "already
+    # zero" then would hand back a plan whose two constraints contradict each
+    # other, with the write landing at a fixed low address.
+    # @param [Aletheia::Operand] op The slot, at one dereference.
+    # @return [Boolean]
+    def stack_slot_still_zero?(plan, op)
+      existing = plan.mem[mem_addr_off(plan, op)]
+      existing.nil? || pinned_to_zero?(existing)
     end
 
     # A +(reg + $base+imm)+ that has to come out zero. Nothing the register can be
@@ -809,14 +822,7 @@ module Aletheia
       orders.any? do |index, shift, base|
         regs_snapshot = plan.regs.dup
         mem_snapshot = plan.mem.dup
-        if empty_index?(plan, index, shift) && writable_base?(plan, base)
-          # What the address is now offset from must stay pointed there: a later
-          # constraint choosing NULL for it would put the write at a fixed low
-          # address, on an unmapped page (cf. the compound writable this shares
-          # the hazard with).
-          @null_unsafe_bases&.push(base)
-          next true
-        end
+        next true if empty_index?(plan, index, shift) && writable_base?(plan, base)
 
         plan.regs = regs_snapshot
         plan.mem = mem_snapshot
