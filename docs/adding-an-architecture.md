@@ -143,7 +143,7 @@ Optional hooks (sensible defaults in `Base`):
 | `operands(cmd)` | split an instruction into its operand strings |
 | `branch_mnem?(mnem)` | is `mnem` a branch this emulator handles? |
 | `handle_branch(mnem, cmd)` | turn a branch into a pending decision (via the `branch_on_*` helpers below) |
-| `inst_<name>(...)` | one handler per supported instruction |
+| `inst_<name>(...)` | one handler per supported instruction; a mnemonic spelled with a dot takes its name from `Instruction.handler_name` (`sext.w` -> `inst_sext_w`) |
 
 **Inherited from `Processor` — don't reimplement.** The frame-pointer/stack model
 (`get_corresponding_stack`, `setup_frame_pointer`, `eval_dict`, `reg_based_stack`)

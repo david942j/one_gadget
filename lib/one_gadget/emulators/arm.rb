@@ -45,7 +45,7 @@ module OneGadget
         return __send__(:"inst_#{mnem}", rest) != :fail if %w[push pop].include?(mnem)
 
         inst, args = parse(body)
-        __send__(:"inst_#{inst.inst}", *args) != :fail
+        __send__(inst.handler, *args) != :fail
       end
 
       # The flag-setting spelling of an instruction we model, which differs from

@@ -9,12 +9,23 @@ describe OneGadget::Emulators::Instruction do
     @add = OneGadget::Emulators::Instruction.new('add', 2)
     @lea = OneGadget::Emulators::Instruction.new('lea', 2)
     @call = OneGadget::Emulators::Instruction.new('call', 1)
+    @sext = OneGadget::Emulators::Instruction.new('sext.w', 2)
   end
 
   it 'match?' do
     expect(@add.match?('add rax, rax')).to be true
     expect(@add.match?('41f11:       addr32 call c4590 <execve>')).to be false
     expect(@call.match?('41f11:       addr32 call c4590 <execve>')).to be true
+    # the dot is this mnemonic's own character, not "any character"
+    expect(@sext.match?('a3f04:       0007879b        sext.w  a5,a5')).to be true
+    expect(@sext.match?('a3f04:       0007879b        sextxw  a5,a5')).to be false
+  end
+
+  it 'handler' do
+    expect(@mov.handler).to be :inst_mov
+    expect(@sext.handler).to be :inst_sext_w
+    # the same naming an emulator uses when it defines a family of handlers at once
+    expect(described_class.handler_name('zext.b')).to be :inst_zext_b
   end
 
   it 'fetch_args' do
