@@ -21,9 +21,27 @@ module OneGadget
         resolve_pending_branch(cmd)
         @cur_addr = cmd[/\A\s*([0-9a-f]+):/, 1]&.to_i(16)
 
+        mnem = mnemonic(cmd)
+        return handle_branch(mnem, cmd) != :fail if branch_mnem?(mnem)
+
         inst, args = parse(cmd)
         __send__(inst.handler, *args) != :fail
       end
+
+      # A conditional branch of this arch compares its operands itself -- there is
+      # no flag register and no compare instruction -- so each mnemonic names the
+      # relation the operands must stand in for the branch to be taken. The
+      # assembler's spellings against zero (+beqz+, +blez+, ...) name one register
+      # and the reversed ones (+bgt+, +ble+, ...) read a relation the other way
+      # round; each is listed as the relation it states, so a constraint reads as
+      # the comparison was written.
+      COND = {
+        'beq' => :eq, 'bne' => :ne,
+        'blt' => :slt, 'bge' => :sge, 'bltu' => :ult, 'bgeu' => :uge,
+        'bgt' => :sgt, 'ble' => :sle, 'bgtu' => :ugt, 'bleu' => :ule,
+        'beqz' => :eq, 'bnez' => :ne,
+        'bltz' => :slt, 'bgez' => :sge, 'blez' => :sle, 'bgtz' => :sgt
+      }.freeze
 
       # The loads, mapped to how many bytes each reads.
       LOADS = { 'ld' => 8, 'lw' => 4, 'lwu' => 4, 'lh' => 2, 'lhu' => 2, 'lb' => 1, 'lbu' => 1 }.freeze
@@ -57,6 +75,27 @@ module OneGadget
       end
 
       private
+
+      def branch_mnem?(mnem)
+        mnem == 'j' || COND.key?(mnem)
+      end
+
+      # Operands of +cmd+ (mnemonic dropped), each stripped of a trailing +<symbol>+.
+      def operands(cmd)
+        cmd.sub(/\A[0-9a-f]+:\s*\S+\s*/, '').split(',').map { |o| o.strip.sub(/\s*<.*>\z/, '') }
+      end
+
+      # Record the comparison and decide the branch together, since one
+      # instruction is both (see {COND}). The zero spellings leave their second
+      # operand out; +zero+ names it, and reads as the +0x0+ it holds.
+      def handle_branch(mnem, cmd)
+        return true if mnem == 'j' # unconditional: control handled by the stitched path
+
+        ops = operands(cmd)
+        lhs, rhs = mnem.end_with?('z') ? [ops[0], 'zero'] : ops[0..1]
+        record_compare(:sub, operand_str(lhs), operand_str(rhs))
+        branch_on_compare(COND[mnem], ops.last.to_i(16))
+      end
 
       # A direct call: record the terminal +exec*+ target, accept a known-safe
       # syscall wrapper, or +:fail+ to abort the candidate. The two-operand form
