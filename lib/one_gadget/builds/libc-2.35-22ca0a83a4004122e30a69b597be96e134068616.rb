@@ -1,7 +1,7 @@
 require 'one_gadget/gadget'
 # http://archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc6_2.35-0ubuntu3.14_amd64.deb
 # 
-# Advanced Micro Devices X86-64
+# Advanced Micro Devices X86-64 processor
 # 
 # GNU C Library (Ubuntu GLIBC 2.35-0ubuntu3.14) stable release version 2.35.
 # Copyright (C) 2022 Free Software Foundation, Inc.

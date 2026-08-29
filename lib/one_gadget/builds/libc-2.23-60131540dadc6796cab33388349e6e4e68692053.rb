@@ -1,7 +1,7 @@
 require 'one_gadget/gadget'
 # spec/data/libc-2.23-60131540dadc6796cab33388349e6e4e68692053.so
 # 
-# Advanced Micro Devices X86-64
+# Advanced Micro Devices X86-64 processor
 # 
 # GNU C Library (Ubuntu GLIBC 2.23-0ubuntu5) stable release version 2.23, by Roland McGrath et al.
 # Copyright (C) 2016 Free Software Foundation, Inc.
@@ -258,6 +258,9 @@ OneGadget::Gadget.add(build_id, 984519,
                       constraints: ["[rsp+0x2c] != 0x0", "[rsp+0x70] == NULL || {[rsp+0x70], [rsp+0x78], [rsp+0x80], [rsp+0x88], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", rsp+0x70, environ)",
                       closed_fds: ["[rsp+0x60]"])
+OneGadget::Gadget.add(build_id, 1006350,
+                      constraints: ["readable: rbp-0xf8", "[rcx] == NULL || rcx == NULL || rcx is a valid argv", "[[rbp-0xf8]] == NULL || [rbp-0xf8] == NULL || [rbp-0xf8] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", rcx, [rbp-0xf8])")
 OneGadget::Gadget.add(build_id, 1006352,
                       constraints: ["readable: rbp-0xf8", "[rcx] == NULL || rcx == NULL || rcx is a valid argv", "[[rbp-0xf8]] == NULL || [rbp-0xf8] == NULL || [rbp-0xf8] is a valid envp"],
                       effect: "execve(\"/bin/sh\", rcx, [rbp-0xf8])")

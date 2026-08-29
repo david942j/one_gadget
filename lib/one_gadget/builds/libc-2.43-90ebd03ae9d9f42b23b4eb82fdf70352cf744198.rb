@@ -1,7 +1,7 @@
 require 'one_gadget/gadget'
 # spec/data/libc-2.43-90ebd03ae9d9f42b23b4eb82fdf70352cf744198.so
 # 
-# Advanced Micro Devices X86-64
+# Advanced Micro Devices X86-64 processor
 # 
 # GNU C Library (Ubuntu GLIBC 2.43-2ubuntu2) stable release version 2.43.
 # Copyright (C) 2026 Free Software Foundation, Inc.

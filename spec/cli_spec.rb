@@ -22,7 +22,7 @@ describe OneGadget::CLI do
 [OneGadget] Information of b417c:
             spec/data/libc-2.27-b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0.so
 
-            Advanced Micro Devices X86-64
+            Advanced Micro Devices X86-64 processor
 
             GNU C Library (Ubuntu GLIBC 2.27-3ubuntu1) stable release version 2.27.
             Copyright (C) 2018 Free Software Foundation, Inc.

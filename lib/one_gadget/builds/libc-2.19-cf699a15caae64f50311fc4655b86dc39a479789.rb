@@ -1,7 +1,7 @@
 require 'one_gadget/gadget'
 # spec/data/libc-2.19-cf699a15caae64f50311fc4655b86dc39a479789.so
 # 
-# Advanced Micro Devices X86-64
+# Advanced Micro Devices X86-64 processor
 # 
 # GNU C Library (Ubuntu EGLIBC 2.19-0ubuntu6.9) stable release version 2.19, by Roland McGrath et al.
 # Copyright (C) 2014 Free Software Foundation, Inc.
