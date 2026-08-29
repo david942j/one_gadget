@@ -86,6 +86,10 @@ module Aletheia
     # or named as a +writable:+/+readable:+ target (see {#steer_base_sums}).
     BASE_SUM_ADDRESS = /(?:\[|writable: |readable: )\((\w+) \+ \$base([+-](?:0x[0-9a-fA-F]+|\d+))\)/
 
+    # A term of an indexed address that carries the element scale, e.g. the
+    # +(a5 << 0x3)+ of +((a5 << 0x3) + [sp+0xd0])+.
+    SCALED_TERM = /\A\((.+) << (#{IMM})\)\z/
+
     # +writable: [base]+imm+ (a compound base -- offset from a *dereferenced*
     # value, not a bare register, e.g. a store through a pointer read off the
     # stack). +base+'s own content is only pinned by a *later* argv/envp
@@ -197,6 +201,52 @@ module Aletheia
       plan
     end
 
+    # An address built by indexing an array -- a (scaled) index added to a base,
+    # both supplied by the caller, as an element's address is in a copy loop.
+    # Emptying the index leaves the address wherever the base points, which is an
+    # ordinary writable target, so the pair is what this returns.
+    # @param [String] text The address, as the constraint writes it.
+    # @return [Array<(String, Integer, String)>, nil] the (index, scale shift,
+    #   base) orders worth trying; nil when +text+ is not that shape. A scaled term
+    #   can only be the index -- zeroing the other one leaves the scale multiplying
+    #   whatever the caller did not choose.
+    # @example
+    #   index_sum('((a5 << 0x3) + [sp+0xd0])')  #=> [['a5', 3, '[sp+0xd0]']]
+    #   index_sum('(a5 + a4)')                  #=> [['a5', 0, 'a4'], ['a4', 0, 'a5']]
+    #   index_sum('sp+0x50')                    #=> nil
+    def index_sum(text)
+      terms = sum_terms(text) or return nil
+      # A sum naming a libc address is steered whole (see {#steer_base_sums}),
+      # which places it in a region that is writable by construction -- nothing
+      # here has to be emptied to arrange that.
+      return nil if terms.any? { |t| t.include?('$base') }
+
+      parsed = terms.map { |t| (m = t.match(SCALED_TERM)) ? [m[1], Integer(m[2])] : [t, 0] }
+      return nil unless parsed.all? { |t, _| safe_parse(t) }
+
+      (first, first_shift), (second, second_shift) = parsed
+      orders = []
+      orders << [first, first_shift, second] if second_shift.zero?
+      orders << [second, second_shift, first] if first_shift.zero?
+      orders.empty? ? nil : orders
+    end
+
+    # Split a parenthesised +(a + b)+ into its two terms, respecting the brackets
+    # and parentheses either may itself contain. nil when +text+ is not one.
+    # @return [Array<String>, nil]
+    def sum_terms(text)
+      return nil unless text.start_with?('(') && text.end_with?(')')
+
+      depth = 0
+      inner = text[1..-2]
+      inner.each_char.with_index do |c, i|
+        depth += 1 if '(['.include?(c)
+        depth -= 1 if ')]'.include?(c)
+        return [inner[0...i].strip, inner[(i + 3)..].strip] if depth.zero? && inner[i, 3] == ' + '
+      end
+      nil
+    end
+
     # +(reg + $base+imm)+ where the sum is used as an ADDRESS -- the target of a
     # +writable:+/+readable:+, or a dereference. Where it lands is the register's
     # to decide, so each such register is pinned once, up front, to put its sums
@@ -270,7 +320,11 @@ module Aletheia
       case disjunct
       when WRITABLE_COMPOUND then 0.9 # deferred; see #order_compound_writable_last
       when /\Awritable: (.+)\z/
-        (op = writable_target(Regexp.last_match(1))) && writable_cost(op)
+        target = Regexp.last_match(1)
+        # Two assignments rather than one, so ranked just above a plain target.
+        if index_sum(target) then 0.3
+        else (op = writable_target(target)) && writable_cost(op)
+        end
       when /\Areadable: (.+)\z/
         (op = address_operand(Regexp.last_match(1))) && op.reg && 0.4 # point it at scratch
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
@@ -340,7 +394,10 @@ module Aletheia
       # storing one keeps the location usable as a pointer by another constraint
       # (+[$base+off] != 0+ alongside +[[$base+off]+0xe8] == 0+), which pinning
       # the bare literal 1 would block.
-      witness && [op, witness & MASK64, relop == '!=' && imm.zero?]
+      # The excluded value travels with the witness: an inequality is satisfied by
+      # anything but that one value, which is not the same as holding the witness
+      # picked for it (see {#literal_satisfied?}).
+      witness && [op, witness & MASK64, relop == '!=' && imm.zero?, (imm if relop == '!=')]
     end
 
     # +<reg> is the GOT address of libc+: settable when we know the PLTGOT offset
@@ -456,7 +513,7 @@ module Aletheia
         if (op = deref_zero(branch))
           deref_reads_zero?(plan, op)
         elsif (parsed = deref_relation(branch))
-          literal_satisfied?(plan, parsed[0], parsed[1], any_nonzero: parsed[2])
+          literal_satisfied?(plan, parsed[0], parsed[1], any_nonzero: parsed[2], exclude: parsed[3])
         elsif (pair = reg_relation(branch))
           reg_relation_satisfied?(plan, *pair)
         elsif (trio = reg_mem_relation(branch))
@@ -475,9 +532,14 @@ module Aletheia
 
     # Whether a memory-relation operand's tracked memory already holds +literal+
     # (see {#deref_relation}).
-    def literal_satisfied?(plan, op, literal, any_nonzero: false)
+    def literal_satisfied?(plan, op, literal, any_nonzero: false, exclude: nil)
       value = mem_value(plan, op)
       return pointer_value?(value) || (value.is_a?(Integer) && !value.zero?) if any_nonzero
+      # An inequality is answered by whatever is already there, the excluded value
+      # aside. Checking against the witness instead would rewrite a location that
+      # was already fine -- and that write is what collides with the next
+      # constraint reading the same location.
+      return (value & MASK64) != (exclude & MASK64) if exclude && value.is_a?(Integer)
 
       value == literal
     end
@@ -547,7 +609,8 @@ module Aletheia
       when WRITABLE_COMPOUND
         compound_writable_satisfied?(plan, Regexp.last_match(1))
       when /\Awritable: (.+)\z/
-        (op = writable_target(Regexp.last_match(1))) ? apply_writable(plan, op) : false
+        target = Regexp.last_match(1)
+        (orders = index_sum(target)) ? apply_index_sum(plan, orders) : apply_plain_writable(plan, target)
       when /\Areadable: (.+)\z/
         (op = address_operand(Regexp.last_match(1))) ? apply_pointer(plan, op) : false
       when /\A(.+?) == NULL\z/, /\A(.+?) <= #{ZERO}\z/
@@ -655,6 +718,9 @@ module Aletheia
     # @example +[[r5+8]] == NULL+ (deref 2, register): r5 is pointed at a fresh
     #   slot, and that slot -> STRING_POOL
     # @example deref 3: X -> slot_1 -> STRING_POOL (two writes, one extra slot)
+    # @example +[[[$base+0x171fc0]]] == NULL+ (deref 3, libc global): the global
+    #   itself holds the first pointer, which the driver writes once the load base
+    #   is known, and the chain continues in scratch from there
     def apply_deep_null(plan, op)
       # A field read off a pointer ([[base+imm]+inner]): point that pointer at a
       # fresh scratch area so the field lands in the zero fill.
@@ -663,8 +729,18 @@ module Aletheia
         return target ? set_mem(plan, target, 0) : false
       end
 
+      # A chain rooted in a libc global starts one level in: the global holds the
+      # first pointer (written by the driver, which alone knows the load base),
+      # and the rest of it is walked through scratch like any other.
+      levels = op.deref - 1
       addr_off =
-        if stack_reg?(op.reg)
+        if base_reg?(op)
+          slot = scratch_slot(plan, 0)
+          return false unless set_base_mem(plan, op.imm, slot)
+
+          levels -= 1
+          slot['scratch_off']
+        elsif stack_reg?(op.reg)
           SP_OFFSET + op.imm
         elsif op.reg && settable?(op.reg)
           slot = scratch_slot(plan, op.imm)
@@ -674,8 +750,8 @@ module Aletheia
         end
       return false unless addr_off
 
-      (op.deref - 1).times do |i|
-        target_off = i == op.deref - 2 ? STRING_POOL : scratch_slot(plan, 0)['scratch_off']
+      levels.times do |i|
+        target_off = i == levels - 1 ? STRING_POOL : scratch_slot(plan, 0)['scratch_off']
         return false unless set_mem(plan, addr_off, { 'scratch_off' => target_off })
 
         addr_off = target_off
@@ -720,6 +796,62 @@ module Aletheia
     # +writable: [X]+imm+ form is {WRITABLE_COMPOUND}) requires the pointer *stored*
     # at X to reference writable memory, so point that slot at scratch, exactly as
     # a pointer-form argv/envp constraint does.
+    def apply_plain_writable(plan, target)
+      (op = writable_target(target)) ? apply_writable(plan, op) : false
+    end
+
+    # Make an indexed address writable by emptying the index and pointing the base
+    # somewhere writable, which is what the two terms of it are for. Each order is
+    # tried whole, and a failed one leaves nothing behind.
+    # @param [Array<(String, String)>] orders (index, base) pairs, as {#index_sum} yields them.
+    # @return [Boolean]
+    def apply_index_sum(plan, orders)
+      orders.any? do |index, shift, base|
+        regs_snapshot = plan.regs.dup
+        mem_snapshot = plan.mem.dup
+        if empty_index?(plan, index, shift) && writable_base?(plan, base)
+          # What the address is now offset from must stay pointed there: a later
+          # constraint choosing NULL for it would put the write at a fixed low
+          # address, on an unmapped page (cf. the compound writable this shares
+          # the hazard with).
+          @null_unsafe_bases&.push(base)
+          next true
+        end
+
+        plan.regs = regs_snapshot
+        plan.mem = mem_snapshot
+        false
+      end
+    end
+
+    # Make the index contribute nothing -- or accept one already pinned, provided
+    # its element still lands inside the area the base is pointed at. A gadget
+    # writing both +base[i]+ and +base[i+1]+ states two such addresses, and the
+    # second cannot empty an index the first already settled.
+    # @param [String] index The index term, as the constraint writes it.
+    # @param [Integer] shift The element scale, as a shift.
+    # @return [Boolean]
+    def empty_index?(plan, index, shift)
+      return true if apply_null(plan, index)
+
+      op = safe_parse(index)
+      return false unless op&.deref&.zero? && op.reg
+
+      value = reg_value(plan, op.reg)
+      return false unless value.is_a?(Integer)
+
+      ((value + op.imm) & MASK64) << shift < WRITABLE_STRIDE
+    end
+
+    # Whether +base+ points somewhere writable, arranging it if it does not
+    # already. Asking first matters: a base some other constraint has already
+    # pointed at scratch is writable, and applying again would refuse to replace
+    # that pointer with a second slot.
+    # @return [Boolean]
+    def writable_base?(plan, base)
+      satisfied?(plan, "writable: #{base}") || apply_plain_writable(plan, base)
+    end
+
     def apply_writable(plan, op)
       return true if op.deref.zero? && base_reg?(op) # steered into libc's spare data
 
@@ -1245,9 +1377,14 @@ module Aletheia
       return false if current.is_a?(Hash)
 
       # The comparison is on `reg + imm`, so the register itself carries the
-      # displacement: it holds the matched value less `imm`.
+      # displacement: it holds the matched value less `imm`. Only a register still
+      # free can be pinned from what memory holds -- one another constraint has
+      # already settled would have to be repinned to a different value, which is a
+      # conflict, so the memory side is the one to arrange instead.
       known = mem_value(plan, mem)
-      return set_reg(plan, xreg(reg.reg), (counterpart(known, op) - reg.imm) & MASK64) if known && !known.is_a?(Hash)
+      if current.nil? && known && !known.is_a?(Hash)
+        return set_reg(plan, xreg(reg.reg), (counterpart(known, op) - reg.imm) & MASK64)
+      end
 
       value = current || 0
       lhs = (value + reg.imm) & MASK64
@@ -1273,7 +1410,11 @@ module Aletheia
     def relation_witness(op, imm)
       case op
       when '==', '>=' then imm
-      when '!=' then imm.zero? ? 1 : 0
+      # Any value but +imm+ will do. Zero is the one to avoid: it is what every
+      # unpinned register and every untouched scratch word already reads as, so a
+      # witness of zero is the one certain to collide with another constraint
+      # comparing this same value against something else.
+      when '!=' then imm == 1 ? 2 : 1
       when '>'  then imm + 1
       when '<=' then imm.negative? ? imm : 0
       when '<'  then imm.positive? ? 0 : imm - 1
