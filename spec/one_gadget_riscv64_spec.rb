@@ -11,8 +11,20 @@ describe 'one_gadget_riscv64' do
     it 'libc-2.39' do
       path = data_path('riscv64-libc-2.39.so')
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x9f738, 0x9f73a, 0x9f73c]
-      expect(OneGadget.gadgets(file: path, force_file: true, level: 2))
-        .to eq [0x9f738, 0x9f73a, 0x9f73c, 0xb5762, 0xb5764, 0xb5766]
+      expect(OneGadget.gadgets(file: path, force_file: true, level: 1))
+        .to eq [0x46df2, 0x46e12, 0x46e20, 0x46e24, 0x46e26, 0x46e2a, 0x46e2e, 0x46e30, 0x46e32,
+                0x46e3c, 0x625dc, 0x625e8, 0x625ec, 0x625ee, 0x625f2, 0x625f6, 0x625fa, 0x625fe,
+                0x6260a, 0x9f738, 0x9f73a, 0x9f73c, 0xb575a, 0xb5760, 0xb5762, 0xb5764]
+    end
+
+    it 'stages an argv on the stack and requires it writable' do
+      path = data_path('riscv64-libc-2.39.so')
+      gadget = OneGadget.gadgets(file: path, force_file: true, details: true, level: 1)
+                        .find { |g| g.offset == 0x625e8 }
+      # posix_spawn's file_actions/attr are staged through s0 and s1, neither of
+      # which is invariantly writable the way sp is, so both stay preconditions.
+      expect(gadget.constraints).to include('writable: s0-0xf0')
+      expect(gadget.constraints).to include('s1+0xe0 == NULL || writable: s1+0xe0')
     end
 
     it 'resolves the auipc/addi pair that names "/bin/sh"' do

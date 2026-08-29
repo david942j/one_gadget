@@ -25,6 +25,14 @@ module OneGadget
         __send__(inst.handler, *args) != :fail
       end
 
+      # The loads, mapped to how many bytes each reads.
+      LOADS = { 'ld' => 8, 'lw' => 4, 'lwu' => 4, 'lh' => 2, 'lhu' => 2, 'lb' => 1, 'lbu' => 1 }.freeze
+      private_constant :LOADS
+
+      # The stores, mapped to how many bytes each writes.
+      STORES = { 'sd' => 8, 'sw' => 4, 'sh' => 2, 'sb' => 1 }.freeze
+      private_constant :STORES
+
       # Supported instruction set. Anything not listed aborts the candidate.
       # @return [Array<Instruction>] The supported instructions.
       def instructions
@@ -38,7 +46,7 @@ module OneGadget
           Instruction.new('mv', 2),
           Instruction.new('nop', 0),
           Instruction.new('sub', 3)
-        ]
+        ] + (LOADS.keys + STORES.keys).map { |mnem| Instruction.new(mnem, 2) }
       end
 
       # Return the argument value of calling a function.
@@ -104,6 +112,63 @@ module OneGadget
         check_register!(dst)
 
         registers[dst] = arg_to_lambda(src)
+      end
+
+      # Each load and store handled the one way, since within a family they differ
+      # only in the width they touch (see {#load_value} and {#store_value}).
+      LOADS.each do |mnem, size|
+        define_method(Instruction.handler_name(mnem)) { |dst, mem| load_value(dst, mem, size) }
+      end
+      STORES.each do |mnem, size|
+        define_method(Instruction.handler_name(mnem)) { |src, mem| store_value(src, mem, size) }
+      end
+
+      # A load. The address is read like any other, so what the caller has to
+      # arrange about it is recorded the same way. A load narrower than a register
+      # only takes part of the word this emulator tracks, which is not a value it
+      # can name, so the register then holds what a call would have left: a path
+      # that goes on to depend on it is abandoned rather than described wrongly.
+      # @param [String] dst The destination register.
+      # @param [String] mem The memory operand, as written.
+      # @param [Integer] size How many bytes the load reads.
+      # @return [void]
+      def load_value(dst, mem, size)
+        check_register!(dst)
+
+        value = read_value(arg_to_lambda(mem_operand(mem)))
+        registers[dst] = size == size_t ? value : clobbered_value
+      end
+
+      # A store, tracked so a later load of the same slot reads it back, and
+      # requiring its target writable ({Processor#track_write}). A store narrower
+      # than a register leaves the rest of the slot holding whatever was there, so
+      # what the slot then holds is named as unknown rather than as the value
+      # stored -- the requirement that it be writable is what the candidate really
+      # establishes, and that is kept.
+      # @param [String] src The register holding the value stored.
+      # @param [String] mem The memory operand, as written.
+      # @param [Integer] size How many bytes the store writes.
+      # @return [void]
+      def store_value(src, mem, size)
+        check_register!(src)
+
+        dst_l = arg_to_lambda(mem_operand(mem)).ref!
+        track_write(dst_l, size == size_t ? registers[src] : clobbered_value)
+      end
+
+      # This arch writes a memory operand as an offset applied to one register,
+      # which the {Lambda} parser reads in its bracketed form. The offset is
+      # decimal, as objdump prints every operand but an upper immediate.
+      # @param [String] mem The operand, as written.
+      # @return [String]
+      # @example
+      #   mem_operand('-1230(a5)') #=> '[a5-1230]'
+      #   mem_operand('0(s1)')     #=> '[s1+0]'
+      def mem_operand(mem)
+        m = mem.match(/\A(-?\d+)\((\w+)\)\z/)
+        raise_unsupported('memory operand', mem) if m.nil?
+
+        "[#{m[2]}#{format('%+d', Integer(m[1]))}]"
       end
 
       # The value +pc+ holds while the instruction at {@cur_addr} runs: this arch
