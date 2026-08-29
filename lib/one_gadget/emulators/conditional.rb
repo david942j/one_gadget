@@ -56,9 +56,9 @@ module OneGadget
       # A value comparison's zero literal, always hex. Pointer operands render
       # +NULL+ (chosen by the arg resolvers); every value-context zero here is
       # +0x0+, so a bare +0+ (and objdump's arch-specific +#0+ vs +0x0+) never leaks
-      # into a constraint.
+      # into a constraint. Recorded here and read back by {Constraints}, whose drop
+      # rules recognise a compare against zero by it.
       ZERO = '0x0'
-      private_constant :ZERO
 
       # Record a compare so a following conditional branch can be rendered.
       # Normally reached through {#handle_compare}; call it directly only when an

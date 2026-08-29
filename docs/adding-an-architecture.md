@@ -38,7 +38,7 @@ flowchart LR
   subgraph EM["Emulator side: execute one candidate"]
     direction TB
     EP["Emulators::Processor<br/>(engine)"]:::engine
-    CO["module Conditional"]:::mixin
+    CO["modules mixed into Processor:<br/>Conditional, Constraints,<br/>TrackedMemory, DataProcessing"]:::mixin
     FAM["X86 / ArmFamily<br/>(family base class)"]:::family
     EA["Emulators::&lt;Arch&gt;<br/>(you implement)"]:::arch
     EP -->|inherits| FAM
@@ -54,8 +54,11 @@ What each box is for:
 
 - **`Fetchers::Base`** — the engine: walks the CFG for candidate sequences, then solves and trims gadgets.
 - **`Fetchers::<Arch>`** — the arch's disassembly, its string/branch recognition, and how to build its emulator.
-- **`Emulators::Processor`** — the engine: parse an instruction, track register/stack state, collect constraints.
+- **`Emulators::Processor`** — the engine: the emulation lifecycle (parse, dispatch) and the calls a candidate may cross.
 - **`module Conditional`** — shared compare/branch machinery; a crossed branch becomes a gadget constraint.
+- **`module Constraints`** — what a gadget requires of its caller, and which of those requirements another already implies.
+- **`module TrackedMemory`** — the memory a candidate reads and writes, filed under the base each address is an offset from.
+- **`module DataProcessing`** — what an instruction leaves in a register (`arith`, `data_op`, and the helpers they are built from).
 - **`X86` / `ArmFamily`** — a family base class between `Processor` and the concrete arch, holding that family's shared instruction set, mnemonic tables, and condition codes.
 - **`Emulators::<Arch>`** — emulate each instruction, plus the calling convention and register model.
 
@@ -134,15 +137,16 @@ Optional hooks (sensible defaults in `Base`):
 | `inst_<name>(...)` | one handler per supported instruction |
 
 **Inherited from `Processor` — don't reimplement.** The frame-pointer/stack model
-(`get_corresponding_stack`, `setup_frame_pointer`, `eval_dict`, `reg_based_stack`),
-the writable-constraint logic (`add_writable`/`needs_writable?`, which skip `sp`,
-`pc`, and `libc_base` for free), the value-computing helpers an `inst_*` handler is
+(`get_corresponding_stack`, `setup_frame_pointer`, `eval_dict`, `reg_based_stack`)
+and the store tracker (`track_write`, which writes each word into the stack the
+address resolves to and requires anything but a pure `sp` store writable) come from
+`TrackedMemory`; the writable-constraint logic (`add_writable`/`needs_writable?`,
+which skip `sp`, `pc`, and `libc_base` for free) and the rest of the requirement
+collection from `Constraints`; the value-computing helpers an `inst_*` handler is
 built from (`arith` for add/sub — including the refusal to let `sp` go symbolic —
 `data_op` for a bitwise or shift operator, `complement`, `shorthand`, `value_of`,
-`width_mask`), the store tracker (`track_write`, which writes each word into the
-stack the address resolves to and requires anything but a pure `sp` store
-writable), the libc-base marker (`libc_base`,
-`mapped_pointer?`), and the table of non-terminal libc calls the emulator accepts
+`width_mask`) from `DataProcessing`. The libc-base marker (`libc_base`,
+`mapped_pointer?`) and the table of non-terminal libc calls the emulator accepts
 without executing (`SafeCalls::COMMON`, applied by `dispatch_safe_call` — the
 `posix_spawn` setup helpers, `sigprocmask`, `__sigaction`, …) are all
 architecture-independent and live in `Processor`/`SafeCalls`. A new arch inherits
