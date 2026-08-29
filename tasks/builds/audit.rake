@@ -8,6 +8,11 @@ namespace :builds do
   # entries whose libc is in the repository can be asked; the rest are checked by
   # regenerating them (see builds:refresh).
   task :audit do
+    # Skipped on CI for the same reason as builds:check (whose +ci?+ this shares):
+    # answering it means regenerating and committing the entries, which happens in
+    # a checkout rather than in a build.
+    next puts 'builds:audit: skipped on CI' if ci?
+
     require 'one_gadget'
 
     checked = 0
