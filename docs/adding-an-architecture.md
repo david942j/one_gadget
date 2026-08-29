@@ -111,7 +111,7 @@ Reading the flow:
 
 The last three have defaults in `Base` that read the `$base`-relative form an arch
 produces once it concretizes a pc-relative operand, so an arch that renders
-addresses that way (aarch64, arm, amd64) implements none of them. Override
+addresses that way (aarch64, arm, amd64, riscv64) implements none of them. Override
 them only where the address reads differently — i386 reaches a global through its
 GOT register, so all three are its own.
 | `branch_kind(line)` | classify an instruction: `:conditional`, `:unconditional`, `:terminator`, or `nil` (not a branch) |

@@ -7,6 +7,15 @@ Notable changes to one_gadget, newest first. The format follows
 A change worth a user's attention lands with its entry under *Unreleased*;
 releases are cut by giving that section a version and a date.
 
+## Unreleased
+
+### Added
+
+- RISC-V (RV64) support, alongside i386, amd64, aarch64 and arm (#420, #421,
+  #422, #423, #425). Every gadget the riscv64 fixture reports has been run under
+  a debugger and seen to spawn a real shell, the same bar the other
+  architectures are held to (#424).
+
 ## v2.0.0 - 2026-08-29
 
 Reported gadgets are not offset-for-offset comparable with 1.x: constraints are

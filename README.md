@@ -33,6 +33,7 @@ Note: requires ruby version >= 2.1.0, you can use `ruby --version` to check.
 - [x] amd64 (x86-64)
 - [x] aarch64 (ARMv8)
 - [x] arm (ARMv7, A32/Thumb-2)
+- [x] riscv64 (RV64GC)
 
 ## Implementation
 
@@ -570,6 +571,32 @@ $ one_gadget spec/data/arm-libc-2.39.so
 #   [r3] == NULL || r3 == NULL || r3 is a valid envp
 #   [sp+0x34] == NULL || writable: [sp+0x34]
 #   [sp+0x2c] == NULL || (s32)[[sp+0x2c]+0x4] <= 0x0
+
+```
+
+##### RISC-V (RV64)
+
+```bash
+$ one_gadget spec/data/riscv64-libc-2.39.so
+# 0x9f73a execve("/bin/sh", s1, a2)
+# constraints:
+#   [s1] == NULL || s1 == NULL || s1 is a valid argv
+#   [a2] == NULL || a2 == NULL || a2 is a valid envp
+#
+# 0x9f73c execve("/bin/sh", a1, a2)
+# constraints:
+#   [a1] == NULL || a1 == NULL || a1 is a valid argv
+#   [a2] == NULL || a2 == NULL || a2 is a valid envp
+#
+# 0x9f778 execve("/bin/sh", s1, s2)
+# constraints:
+#   [s1] == NULL || s1 == NULL || s1 is a valid argv
+#   [s2] == NULL || s2 == NULL || s2 is a valid envp
+#
+# 0xb5adc posix_spawn(sp+0x44, "/bin/sh", [sp+0x30], 0, sp+0x50, environ)
+# constraints:
+#   [sp+0x50] == NULL || {[sp+0x50], [sp+0x58], [sp+0x60], [sp+0x68], ...} is a valid argv
+#   [sp+0x30] == NULL || (s32)[[sp+0x30]+0x4] <= 0x0
 
 ```
 
