@@ -73,6 +73,25 @@ describe OneGadget::Emulators::Riscv64 do
     end
   end
 
+  it 'folds the bitwise operations and the shifts' do
+    @processor.process('1000: li a5,0x30')
+    @processor.process('1004: andi a4,a5,-16')
+    expect(@processor.registers['a4']).to be 0x30
+    @processor.process('1008: slli a4,a4,0x3')
+    expect(@processor.registers['a4']).to be 0x180
+    @processor.process('100c: xor a3,a2,a2') # how every arch spells "zero this"
+    expect(@processor.registers['a3']).to be 0
+    @processor.process('1010: ori a2,a1,7')
+    expect(@processor.registers['a2'].to_s).to eq '(a1 | 0x7)'
+  end
+
+  it 'complements only a value it can name' do
+    @processor.process('1000: lui a6,0x80000')
+    @processor.process('1004: not a6,a6')
+    expect(@processor.registers['a6']).to eq 0xffffffff7fffffff
+    expect(@processor.process('1008: not a5,a4')).to be false # a4 is whatever the caller left
+  end
+
   it 'holds zero in the hardwired register' do
     expect(@processor.registers['zero']).to be 0
   end
