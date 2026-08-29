@@ -14,6 +14,11 @@ module OneGadget
     # Registers of AArch64.
     AARCH64 = %w[xzr wzr sp] + 0.upto(30).map { |i| ["x#{i}", "w#{i}"] }.flatten
 
+    # Registers of RISC-V (RV64), by the ABI names objdump prints: it emits neither
+    # the numbered +x0+-+x15+ names nor +fp+ for +s0+, so neither is listed.
+    RISCV64 = %w[zero ra sp gp tp] + 0.upto(6).map { |i| "t#{i}" } +
+              0.upto(11).map { |i| "s#{i}" } + 0.upto(7).map { |i| "a#{i}" }
+
     # Registers of ARM (32-bit).
     # objdump never prints the numbered name of a register that has a role name:
     # +r10+-+r15+ always appear as +sl+/+fp+/+ip+/+sp+/+lr+/+pc+, so those are
@@ -31,7 +36,10 @@ module OneGadget
               8.upto(15).map { |i| ["r#{i}d", "r#{i}"] }).to_h,
       i386: {},
       aarch64: 0.upto(30).to_h { |i| ["w#{i}", "x#{i}"] }.merge('wzr' => 'xzr'),
-      arm: {}
+      arm: {},
+      # RISC-V names no part of a register: its 32-bit operations are instructions
+      # of their own (+addiw+, +sext.w+), each writing the whole register.
+      riscv64: {}
     }.freeze
 
     # Registers a call may destroy, per each ABI's calling convention: the return
@@ -49,11 +57,14 @@ module OneGadget
       aarch64: (0.upto(7).to_a + 9.upto(18).to_a).map { |i| "x#{i}" },
       # AAPCS: r0-r3 arguments and return, ip (r12) the intra-procedure scratch,
       # and lr, which the call itself overwrites with the return address.
-      arm: %w[r0 r1 r2 r3 ip lr]
+      arm: %w[r0 r1 r2 r3 ip lr],
+      # RISC-V LP64: a0-a7 arguments (a0/a1 also the return), t0-t6 temporaries,
+      # and ra, which the call itself overwrites with the return address.
+      riscv64: %w[ra] + 0.upto(7).map { |i| "a#{i}" } + 0.upto(6).map { |i| "t#{i}" }
     }.freeze
 
     # The register each ABI leaves an integer return value in.
-    RETURN_REGISTER = { amd64: 'rax', i386: 'eax', aarch64: 'x0', arm: 'r0' }.freeze
+    RETURN_REGISTER = { amd64: 'rax', i386: 'eax', aarch64: 'x0', arm: 'r0', riscv64: 'a0' }.freeze
 
     module_function
 
@@ -81,10 +92,16 @@ module OneGadget
       ARM
     end
 
+    # Registers' name of RISC-V (RV64).
+    # @return [Array<String>] List of registers.
+    def riscv64
+      RISCV64
+    end
+
     # Returns all names of registers.
     # @return [Array<String>] List of registers.
     def all
-      amd64 + aarch64 + arm
+      amd64 + aarch64 + arm + riscv64
     end
 
     # Checks if the register is a stack-related pointer.
@@ -92,7 +109,7 @@ module OneGadget
     #   Register's name.
     # @return [Boolean] +true+ if +reg+ is a stack or frame pointer (e.g. +rsp+, +rbp+, +sp+).
     def stack_register?(reg)
-      %w[esp ebp rsp rbp sp x29].include?(reg)
+      %w[esp ebp rsp rbp sp x29 s0].include?(reg)
     end
   end
 end
