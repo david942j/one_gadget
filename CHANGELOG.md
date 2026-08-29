@@ -74,6 +74,10 @@ test corpus reports has been run under a debugger and seen to spawn a shell.
   call, and could invent gadgets by falling through a window boundary (#391,
   #392).
 - The "not glibc" check did not fire for aarch64 files (#311).
+- **Certificates are verified again when fetching a gadget database entry.**
+  Verification had been switched off, and what comes back from that request is
+  written to a file and required as Ruby, so anyone able to answer it could run
+  code as the user.
 - Shipped entries reported fewer gadgets than reading the same libc as a file,
   having been generated before the emulator learned to run `xchg`. They are
   regenerated, and `rake builds:audit` now fails when an entry stops matching
