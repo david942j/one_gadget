@@ -33,6 +33,7 @@ Note: requires ruby version >= 2.1.0, you can use `ruby --version` to check.
 - [x] amd64 (x86-64)
 - [x] aarch64 (ARMv8)
 - [x] arm (ARMv7, A32/Thumb-2)
+- [x] riscv64 (RV64GC)
 
 ## Implementation
 
@@ -157,6 +158,12 @@ SHELL_OUTPUT_OF(one_gadget spec/data/aarch64-libc-2.27.so)
 
 ```bash
 SHELL_OUTPUT_OF(one_gadget spec/data/arm-libc-2.39.so)
+```
+
+##### RISC-V (RV64)
+
+```bash
+SHELL_OUTPUT_OF(one_gadget spec/data/riscv64-libc-2.39.so)
 ```
 
 #### Combine with Script
