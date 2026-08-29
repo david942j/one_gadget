@@ -56,14 +56,12 @@ module OneGadget
       #   get_corresponding_stack(Lambda.parse('(rsi & 0xfffffffffffffff0)'))
       # @param [String, Lambda] base A base, as {#resolve_address} yields it --
       #   not an offset expression, whose offset belongs in the key it indexes.
-      # Stores whose address is an operation rather than a base and a displacement
-      # -- a scaled index added to a pointer, say. Such a write lands somewhere in
-      # whatever that pointer addresses, at an offset only a value the caller
-      # supplies decides, so it is tracked under a base of its own that nothing
-      # reads back (see {#writes_through}).
-      # @return [Array<(Lambda, Array)>] The address operation, and what went there.
-      def derived_writes
-        @derived_writes ||= []
+      # @return [Hash{Integer => Lambda}, nil] nil when +base+ names nothing this
+      #   emulator tracks memory for.
+      def get_corresponding_stack(base)
+        return nil unless base.is_a?(OneGadget::Emulators::Lambda) || registers.key?(base.to_s)
+
+        tracked_memory[base.to_s]
       end
 
       # The values this candidate wrote through an address built from +text+, which
@@ -84,25 +82,6 @@ module OneGadget
           # and the NULL such a loop writes to terminate the array is one.
           values.grep_v(Integer).map(&:to_s)
         end.flatten.uniq
-      end
-
-      # The values an operation is built from, flattened out of its tree, so an
-      # operand is recognised as itself rather than as text inside a rendering
-      # (where +x3+ would be found in +x30+).
-      # @param [Lambda, Object] lmda
-      # @return [Array] Its leaf operands, or +lmda+ itself when it is one.
-      def operands_of(lmda)
-        return [lmda] unless lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.operation?
-
-        operands_of(lmda.obj) + operands_of(lmda.rhs)
-      end
-
-      # @return [Hash{Integer => Lambda}, nil] nil when +base+ names nothing this
-      #   emulator tracks memory for.
-      def get_corresponding_stack(base)
-        return nil unless base.is_a?(OneGadget::Emulators::Lambda) || registers.key?(base.to_s)
-
-        tracked_memory[base.to_s]
       end
 
       private
@@ -183,6 +162,27 @@ module OneGadget
         obj = lmda.obj
         obj = obj.obj while obj.is_a?(OneGadget::Emulators::Lambda)
         obj
+      end
+
+      # Stores whose address is an operation rather than a base and a displacement
+      # -- a scaled index added to a pointer, say. Such a write lands somewhere in
+      # whatever that pointer addresses, at an offset only a value the caller
+      # supplies decides, so it is tracked under a base of its own that nothing
+      # reads back (see {#writes_through}).
+      # @return [Array<(Lambda, Array)>] Each address operation, and what went there.
+      def derived_writes
+        @derived_writes ||= []
+      end
+
+      # The values an operation is built from, flattened out of its tree, so an
+      # operand is recognised as itself rather than as text inside a rendering
+      # (where +x3+ would be found in +x30+).
+      # @param [Lambda, Object] lmda An address, or one part of one.
+      # @return [Array] Its leaf operands, or +lmda+ itself when it is not an operation.
+      def operands_of(lmda)
+        return [lmda] unless lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.operation?
+
+        operands_of(lmda.obj) + operands_of(lmda.rhs)
       end
 
       # Track a store: write +values+ (one per word from +dst_l+) into the stack
