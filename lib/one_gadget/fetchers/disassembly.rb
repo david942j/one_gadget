@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'elftools'
+
 module OneGadget
   module Fetchers
     # Reading the target file: where its terminal calls are, and the disassembly
@@ -8,13 +10,14 @@ module OneGadget
     # instead (see {Base#scan_calls}), and everything derived from one objdump
     # command is cached. Mixed into {Base}.
     module Disassembly
-      # What a terminal function's name starts with, and enough bytes of a name to
-      # tell: a symbol table's string table is read as one blob, so a name is a
-      # slice of it.
+      # What a terminal function's name starts with. Read by {DynamicSymbols} too,
+      # which finds the same functions by another route.
       TERMINAL_PREFIXES = %w[exec posix_spawn].freeze
 
+      # Enough bytes of a name to tell: a symbol table's string table is read as
+      # one blob, so a name is a slice of it.
       TERMINAL_PREFIX_BYTES = 12
-      private_constant :TERMINAL_PREFIXES, :TERMINAL_PREFIX_BYTES
+      private_constant :TERMINAL_PREFIX_BYTES
 
       # How much to disassemble around each terminal call when an architecture can
       # locate the calls cheaply (see {#terminal_call_sites} / {#windowed_disasm}).
@@ -57,6 +60,7 @@ module OneGadget
       # for the lifetime of the fetcher.
       # @return [Hash{Symbol => Array<String>, Hash}]
       def disassembly
+        prepare_raw_disassembly if sectionless?
         @disassembly ||= Base.cached(:disasm, @objdump.command) do
           sites = terminal_call_sites
           sites.nil? || sites.empty? ? full_disasm : windowed_disasm(sites)
@@ -101,12 +105,40 @@ module OneGadget
       DISASSEMBLED = /\A[0-9a-f]+:/
       private_constant :DISASSEMBLED
 
+      # Whether this file ships without section headers, which is what makes the
+      # ordinary route to its code and symbols unavailable (see {DynamicSymbols}).
+      # @return [Boolean]
+      def sectionless?
+        return @sectionless unless @sectionless.nil?
+
+        @sectionless = File.open(file) { |fd| ELFTools::ELFFile.new(fd).sections.empty? }
+      end
+
+      # Point objdump at the bytes rather than the ELF, once, when there is no
+      # other way to read the file.
+      # @return [void]
+      def prepare_raw_disassembly
+        File.open(file) do |fd|
+          elf = ELFTools::ELFFile.new(fd)
+          seg = executable_segment(elf)
+          next if seg.nil?
+
+          @raw_symbols = dynamic_symbols(elf)
+          @objdump.read_raw(machine: OneGadget::Helper.objdump_arch(OneGadget::Helper.architecture(file)),
+                            endian: elf.endian,
+                            vma: seg.header.p_vaddr.to_i - seg.header.p_offset.to_i)
+        end
+      end
+
       def objdump_lines(start: nil, stop: nil)
         # One pass, one string per line: a whole libc is hundreds of thousands of
         # them, and only the instructions are wanted.
+        symbols = @raw_symbols
         `#{@objdump.command(start:, stop:)}`.each_line.filter_map do |line|
           line = line.strip
-          line if DISASSEMBLED.match?(line)
+          next unless DISASSEMBLED.match?(line)
+
+          symbols ? symbolize(line, symbols) : line
         end
       end
 
@@ -124,13 +156,35 @@ module OneGadget
           targets = terminal_symbol_addresses(elf)
           return [] if targets.empty?
 
-          text = elf.section_by_name('.text')
-          return nil if text.nil?
+          base, data = executable_bytes(elf)
+          return nil if data.nil?
 
-          scan_calls(text.header.sh_addr.to_i, text.data, targets)
+          scan_calls(base, data, targets)
         end
       rescue ELFTools::ELFError
         nil # not something we can scan; disassemble everything
+      end
+
+      # The bytes a call scan runs over, and where they are loaded. Normally that is
+      # +.text+; a file whose section headers are gone has the executable segment
+      # instead, which holds the same code and a little else besides.
+      # @param [ELFTools::ELFFile] elf
+      # @return [(Integer, String), nil] +nil+ when neither can be found.
+      def executable_bytes(elf)
+        text = elf.section_by_name('.text')
+        return [text.header.sh_addr.to_i, text.data] if text
+
+        seg = executable_segment(elf)
+        seg && [seg.header.p_vaddr.to_i, seg.data]
+      end
+
+      # The loadable segment holding the code (+PT_LOAD+, executable).
+      # @param [ELFTools::ELFFile] elf
+      # @return [ELFTools::Segments::Segment, nil]
+      def executable_segment(elf)
+        elf.segments.find do |seg|
+          seg.header.p_type == ELFTools::Constants::PT::PT_LOAD && seg.header.p_flags.to_i.anybits?(1)
+        end
       end
 
       # Where the +exec*+/+posix_spawn*+ symbols live, keyed for lookup. Read
@@ -139,6 +193,8 @@ module OneGadget
       # @param [ELFTools::ELFFile] elf
       # @return [Hash{Integer => true}]
       def terminal_symbol_addresses(elf)
+        return sectionless_terminal_addresses(elf) if elf.sections.empty?
+
         addrs = {}
         %w[.dynsym .symtab].each do |name|
           sec = elf.section_by_name(name)
