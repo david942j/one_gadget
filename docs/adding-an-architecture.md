@@ -108,6 +108,12 @@ Reading the flow:
 | `str_bin_sh?(operand)` | does this operand reference the `"/bin/sh"` string? |
 | `str_sh?(operand)` | does it reference the standalone `"sh"` string? |
 | `global_var?(operand)` | does it reference a libc global (i.e. is it `$base`-relative)? |
+
+The last three have defaults in `Base` that read the `$base`-relative form an arch
+produces once it concretizes a pc-relative operand, so an arch that renders
+addresses that way (aarch64, arm, amd64) implements none of them. Override
+them only where the address reads differently — i386 reaches a global through its
+GOT register, so all three are its own.
 | `branch_kind(line)` | classify an instruction: `:conditional`, `:unconditional`, `:terminator`, or `nil` (not a branch) |
 | `branch_lead_chars` | the leading character(s) of this arch's branch mnemonics, e.g. `'bct'` or `'j'` (a cheap filter) |
 
