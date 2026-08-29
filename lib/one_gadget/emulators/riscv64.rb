@@ -43,6 +43,22 @@ module OneGadget
         'bltz' => :slt, 'bgez' => :sge, 'blez' => :sle, 'bgtz' => :sgt
       }.freeze
 
+      # The data-processing instructions, mapped to the Ruby operator that folds
+      # them and renders them alike. An immediate form differs from its register
+      # one only in how the right operand is written, which the operand reader
+      # already handles, so both name the same operator. Arithmetic shift right is
+      # absent: a value is held masked to its width, where +>>+ is the logical
+      # shift, and naming the arithmetic one as that would state a different
+      # instruction.
+      DATA_OPS = {
+        'and' => :&, 'andi' => :&,
+        'or' => :|, 'ori' => :|,
+        'xor' => :^, 'xori' => :^,
+        'sll' => :<<, 'slli' => :<<,
+        'srl' => :>>, 'srli' => :>>
+      }.freeze
+      private_constant :DATA_OPS
+
       # The loads, mapped to how many bytes each reads.
       LOADS = { 'ld' => 8, 'lw' => 4, 'lwu' => 4, 'lh' => 2, 'lhu' => 2, 'lb' => 1, 'lbu' => 1 }.freeze
       private_constant :LOADS
@@ -63,8 +79,10 @@ module OneGadget
           Instruction.new('lui', 2),
           Instruction.new('mv', 2),
           Instruction.new('nop', 0),
-          Instruction.new('sub', 3)
-        ] + (LOADS.keys + STORES.keys).map { |mnem| Instruction.new(mnem, 2) }
+          Instruction.new('sub', 3),
+          Instruction.new('not', 2)
+        ] + (LOADS.keys + STORES.keys).map { |mnem| Instruction.new(mnem, 2) } +
+          DATA_OPS.keys.map { |mnem| Instruction.new(mnem, 3) }
       end
 
       # Return the argument value of calling a function.
@@ -151,6 +169,23 @@ module OneGadget
         check_register!(dst)
 
         registers[dst] = arg_to_lambda(src)
+      end
+
+      # Each data-processing mnemonic handled the one way, since they differ only
+      # in the operator applied (see {Processor#data_op} for the operands).
+      DATA_OPS.each do |mnem, op|
+        define_method(Instruction.handler_name(mnem)) do |dst, src, op2|
+          data_op(op, dst, src, op2, name: mnem)
+        end
+      end
+
+      # +not dst, src+ is every bit of +src+ flipped. Only a concrete value has a
+      # complement this emulator can name ({Processor#complement}); a symbolic one
+      # aborts rather than being recorded as a mask it isn't.
+      def inst_not(dst, src)
+        check_register!(dst)
+
+        registers[dst] = complement('not', src, dst, src)
       end
 
       # Each load and store handled the one way, since within a family they differ
