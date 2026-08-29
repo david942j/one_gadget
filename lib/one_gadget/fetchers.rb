@@ -16,6 +16,16 @@ module OneGadget
     # down to the easiest-to-reach set (see {ClassMethods#from_file}).
     RAW_LEVEL = 2
 
+    # The fetcher each architecture is searched with, and so the set of
+    # architectures this tool supports (see {ClassMethods#supported_architecture?}).
+    FETCHERS = {
+      aarch64: OneGadget::Fetchers::AArch64,
+      amd64: OneGadget::Fetchers::Amd64,
+      arm: OneGadget::Fetchers::Arm,
+      i386: OneGadget::Fetchers::I386,
+      riscv64: OneGadget::Fetchers::Riscv64
+    }.freeze
+
     # Define class methods here.
     module ClassMethods
       # Fetch one-gadget offsets of this build id.
@@ -43,16 +53,18 @@ module OneGadget
       #   Array of all found gadgets is returned.
       def from_file(file, level: 0)
         arch = OneGadget::Helper.architecture(file)
-        klass = {
-          aarch64: OneGadget::Fetchers::AArch64,
-          amd64: OneGadget::Fetchers::Amd64,
-          arm: OneGadget::Fetchers::Arm,
-          i386: OneGadget::Fetchers::I386,
-          riscv64: OneGadget::Fetchers::Riscv64
-        }[arch]
+        klass = FETCHERS[arch]
         raise Error::UnsupportedArchitectureError, arch if klass.nil?
 
         for_level(klass.new(file).find, level)
+      end
+
+      # Whether gadgets can be searched for in +arch+. The ELF reader recognises
+      # plenty this tool cannot emulate.
+      # @param [Symbol] arch As {OneGadget::Helper.architecture} names it.
+      # @return [Boolean]
+      def supported_architecture?(arch)
+        FETCHERS.key?(arch)
       end
 
       private

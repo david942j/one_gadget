@@ -15,7 +15,8 @@ UBUNTU_MIRRORS = {
   'amd64' => 'http://archive.ubuntu.com/ubuntu',
   'i386' => 'http://archive.ubuntu.com/ubuntu',
   'arm64' => 'http://ports.ubuntu.com/ubuntu-ports',
-  'armhf' => 'http://ports.ubuntu.com/ubuntu-ports'
+  'armhf' => 'http://ports.ubuntu.com/ubuntu-ports',
+  'riscv64' => 'http://ports.ubuntu.com/ubuntu-ports'
 }.freeze
 # A glibc security fix is published to one pocket or the other, so ask both and
 # keep whichever answer is newer.

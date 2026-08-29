@@ -8,6 +8,16 @@ describe OneGadget::Fetchers do
     OneGadget::Gadget::Gadget.new(offset, constraints: constraints, effect: 'execve("/bin/sh", 0, 0)')
   end
 
+  describe '.supported_architecture?' do
+    it 'answers for what a fetcher exists for' do
+      # the build database generator asks this rather than keeping a list of its
+      # own, which is how riscv64 was left out of it
+      expect(described_class.supported_architecture?(:riscv64)).to be true
+      expect(described_class.supported_architecture?(:amd64)).to be true
+      expect(described_class.supported_architecture?(:ppc64)).to be false
+    end
+  end
+
   describe '.trim_gadgets' do
     # Gadgets asking for the very same constraints are interchangeable, so the
     # last one represents them all -- and it has to be the same one however the
