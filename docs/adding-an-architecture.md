@@ -136,7 +136,12 @@ Optional hooks (sensible defaults in `Base`):
 **Inherited from `Processor` — don't reimplement.** The frame-pointer/stack model
 (`get_corresponding_stack`, `setup_frame_pointer`, `eval_dict`, `reg_based_stack`),
 the writable-constraint logic (`add_writable`/`needs_writable?`, which skip `sp`,
-`pc`, and `libc_base` for free), the libc-base marker (`libc_base`,
+`pc`, and `libc_base` for free), the value-computing helpers an `inst_*` handler is
+built from (`arith` for add/sub — including the refusal to let `sp` go symbolic —
+`data_op` for a bitwise or shift operator, `complement`, `shorthand`, `value_of`,
+`width_mask`), the store tracker (`track_write`, which writes each word into the
+stack the address resolves to and requires anything but a pure `sp` store
+writable), the libc-base marker (`libc_base`,
 `mapped_pointer?`), and the table of non-terminal libc calls the emulator accepts
 without executing (`SafeCalls::COMMON`, applied by `dispatch_safe_call` — the
 `posix_spawn` setup helpers, `sigprocmask`, `__sigaction`, …) are all
