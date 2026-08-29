@@ -809,7 +809,14 @@ module Aletheia
       orders.any? do |index, shift, base|
         regs_snapshot = plan.regs.dup
         mem_snapshot = plan.mem.dup
-        next true if empty_index?(plan, index, shift) && writable_base?(plan, base)
+        if empty_index?(plan, index, shift) && writable_base?(plan, base)
+          # What the address is now offset from must stay pointed there: a later
+          # constraint choosing NULL for it would put the write at a fixed low
+          # address, on an unmapped page (cf. the compound writable this shares
+          # the hazard with).
+          @null_unsafe_bases&.push(base)
+          next true
+        end
 
         plan.regs = regs_snapshot
         plan.mem = mem_snapshot
