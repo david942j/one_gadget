@@ -56,6 +56,47 @@ module OneGadget
       #   get_corresponding_stack(Lambda.parse('(rsi & 0xfffffffffffffff0)'))
       # @param [String, Lambda] base A base, as {#resolve_address} yields it --
       #   not an offset expression, whose offset belongs in the key it indexes.
+      # Stores whose address is an operation rather than a base and a displacement
+      # -- a scaled index added to a pointer, say. Such a write lands somewhere in
+      # whatever that pointer addresses, at an offset only a value the caller
+      # supplies decides, so it is tracked under a base of its own that nothing
+      # reads back (see {#writes_through}).
+      # @return [Array<(Lambda, Array)>] The address operation, and what went there.
+      def derived_writes
+        @derived_writes ||= []
+      end
+
+      # The values this candidate wrote through an address built from +text+, which
+      # the array reported at +text+ therefore holds -- wherever in it they landed.
+      # A reader told about that array has to be told about these too, or it is
+      # described as though the gadget had not written to it.
+      # @param [String] text How the address is named.
+      # @return [Array<String>] Each value written, rendered, without duplicates.
+      # @example (riscv64) a store of +s8+ through +((a5 << 0x3) + [sp+0xd0])+
+      #   writes_through('[sp+0xd0]') #=> ['s8']
+      def writes_through(text)
+        return [] if text.empty?
+
+        derived_writes.filter_map do |base, values|
+          next unless operands_of(base).any? { |operand| operand.to_s == text }
+
+          # A literal is not the caller's to arrange -- it is already what it is,
+          # and the NULL such a loop writes to terminate the array is one.
+          values.grep_v(Integer).map(&:to_s)
+        end.flatten.uniq
+      end
+
+      # The values an operation is built from, flattened out of its tree, so an
+      # operand is recognised as itself rather than as text inside a rendering
+      # (where +x3+ would be found in +x30+).
+      # @param [Lambda, Object] lmda
+      # @return [Array] Its leaf operands, or +lmda+ itself when it is one.
+      def operands_of(lmda)
+        return [lmda] unless lmda.is_a?(OneGadget::Emulators::Lambda) && lmda.operation?
+
+        operands_of(lmda.obj) + operands_of(lmda.rhs)
+      end
+
       # @return [Hash{Integer => Lambda}, nil] nil when +base+ names nothing this
       #   emulator tracks memory for.
       def get_corresponding_stack(base)
@@ -154,6 +195,8 @@ module OneGadget
       # @return [void]
       def track_write(dst_l, *values)
         stack, offset = resolve_address(dst_l)
+        base, = address_base(dst_l)
+        derived_writes << [base, values] if base.is_a?(OneGadget::Emulators::Lambda) && base.operation?
         values.each_with_index { |v, i| stack[offset + size_t * i] = v } if stack
         add_writable(dst_l) unless stack.equal?(sp_based_stack)
       end

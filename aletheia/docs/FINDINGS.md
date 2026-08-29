@@ -378,6 +378,52 @@ EXEC* (not silently trusted), this is lower urgency than Findings 1-5 were -- wo
 completeness, but with real design/review needed before implementation given the
 cross-cutting change and the new invalidation-correctness requirement.
 
+## Finding 11 -- missing constraint: a scaled-index write into the array the gadget passes
+
+**Gadgets:** `0xb5718`, `0xb571c`, `0xb571e` (riscv64 libc-2.39,
+`posix_spawn(sp+0x44, "/bin/sh", [sp+0x30], 0, sp+0x50, [sp+0xd0])`), level 2 only.
+**Status: fixed.** Found 2026-08-29, the first finding riscv64 produced -- and only once
+the satisfier could plan these gadgets at all: they had been SKIPped, so nothing had ever
+run them.
+
+**Signature:** PASS benign, FAIL strict -- the constraint list is incomplete.
+
+**Root cause (verified):** glibc copies `environ` into a fresh array in the `posix_spawn`
+path, and the window writes an entry into it through a scaled index:
+
+```
+b571e: ld   a4,208(sp)     ; a4 = the envp base, [sp+0xd0]
+b5720: slli a5,a5,0x3      ; index * 8
+b5722: add  a5,a5,a4
+b5724: sd   s8,0(a5)       ; envp[index] = s8
+...
+b5770: jal  posix_spawn    ; envp = [sp+0xd0]
+```
+
+one_gadget required the *address* to be writable but said nothing about the *value*, and
+still described the array as `[[sp+0xd0]] == NULL || ... is a valid envp` -- a claim its own
+store invalidates. Under poison `s8` is an unmapped pointer, `execve` fails EFAULT and no
+shell runs. **Pinning `s8 = 0` by hand turns the strict run into a PASS**, which is the
+proof.
+
+The emulator was not losing the value: `resolve_address` keys such a write under a base
+named `((a5 << 0x3) + [sp+0xd0])`, which nothing ever reads back. The fix records a store
+whose address is an *operation* and lets the argv/envp resolver ask what was written
+through a base built from the array pointer, stating each as
+`s8 == NULL || readable: s8`. Operands are compared structurally rather than as text --
+matching by substring finds `x3` inside `x30` and constrains unrelated aarch64 gadgets.
+
+**Not the cause, though it is the loudest thing in the log:** the parent aborts with
+`free(): invalid pointer` at `b577a`, because the plan points `[sp+0xd0]` at scratch rather
+than the heap the code frees. That is survivable -- `posix_spawn` has vfork semantics, so
+the child has already exec'd -- and with `s8` pinned the same abort still yields a PASS.
+
+**Neighbours are correct:** `0xb5720`/`0xb5722`/`0xb5724` take the destination from a caller
+register, so their store lands wherever the caller points it, not necessarily in the array.
+
+**After the fix:** riscv64 level 2 is **171 PASS, 0 FAIL, 0 SKIP**, and no other
+architecture's output changes at any level.
+
 ## Reproduce
 
 ```

@@ -253,10 +253,14 @@ module OneGadget
         if stack
           # I haven't see this case after some tests, but just in case :)
           envp = (0..3).map { |i| stack[envp_ptr.immi + processor.class.bits / 8 * i].to_s }
-          # TODO: Handle the case when libc will write something into envp
           cons = global_var?(envp[0]) ? nil : "#{envp_ptr} == NULL || {#{envp.join(', ')}, ...} is a valid envp"
         else
           cons = "[#{envp_ptr}] == NULL || #{envp_ptr} == NULL || #{envp_ptr} is a valid envp"
+        end
+        # What the gadget itself put in the array is the caller's to arrange too,
+        # whichever element it landed in (see {#written_into}).
+        processor.writes_through(envp_ptr.to_s).each do |value|
+          yield "#{value} == NULL || readable: #{value}"
         end
         return nil if cons.nil?
 
