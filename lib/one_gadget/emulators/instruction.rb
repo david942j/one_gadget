@@ -46,7 +46,28 @@ module OneGadget
       # @param [String] cmd One line of objdump output.
       # @return [Boolean] +true+ if +cmd+ contains this instruction's mnemonic.
       def match?(cmd)
-        (cmd =~ /#{inst}\s/) != nil
+        cmd.match?(/#{Regexp.escape(inst)}\s/)
+      end
+
+      class << self
+        # The emulator method that runs +mnemonic+. A mnemonic is not always a
+        # method name -- one can carry a suffix spelled with a dot -- so the dots
+        # become underscores. Named here, rather than at each dispatch, so an
+        # emulator defining a family of handlers at once agrees with the dispatcher
+        # about what to call them.
+        # @param [String] mnemonic
+        # @return [Symbol]
+        # @example
+        #   Instruction.handler_name('mov')     #=> :inst_mov
+        #   Instruction.handler_name('sext.w')  #=> :inst_sext_w
+        def handler_name(mnemonic) = :"inst_#{mnemonic.tr('.', '_')}"
+      end
+
+      # The emulator method that runs this instruction.
+      # @return [Symbol]
+      # @see .handler_name
+      def handler
+        @handler ||= self.class.handler_name(inst)
       end
 
       private

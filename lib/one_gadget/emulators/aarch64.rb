@@ -27,8 +27,7 @@ module OneGadget
         return handle_branch(mnem, cmd) != :fail if branch_mnem?(mnem)
 
         inst, args = parse(cmd)
-        sym = :"inst_#{inst.inst}"
-        __send__(sym, *args) != :fail
+        __send__(inst.handler, *args) != :fail
       end
 
       # Supported instruction set.
