@@ -15,6 +15,13 @@ releases are cut by giving that section a version and a date.
   #422, #423, #425). Every gadget the riscv64 fixture reports has been run under
   a debugger and seen to spawn a real shell, the same bar the other
   architectures are held to (#424).
+- Reading a libc that ships without section headers, as an embedded one commonly
+  does -- OpenWrt strips them from musl to save flash (#432). Nothing is missing
+  from such a file, so the symbols are read through `PT_DYNAMIC` and the code is
+  disassembled as raw bytes; it reports the same gadgets as the same libc with
+  its sections intact.
+- A terminal `posix_spawn` whose symbol carries no version marker, as musl's does
+  not, is no longer passed over (#432).
 
 ## v2.0.0 - 2026-08-29
 
