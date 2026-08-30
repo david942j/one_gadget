@@ -12,7 +12,7 @@ module OneGadget
     # implies and names what is left. Mixed into {Processor}.
     module Constraints
       # Marks a register holding whatever a call returned or left behind; see
-      # {#clobber_caller_saved}.
+      # {Processor#clobber_caller_saved}.
       CLOBBERED = '$clobbered'
 
       # Constraint types whose payload is an address {Lambda} asserting the target

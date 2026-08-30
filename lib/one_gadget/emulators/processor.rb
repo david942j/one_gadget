@@ -71,7 +71,7 @@ module OneGadget
 
       # Record a reached terminal +exec*+ call as the gadget's effect and stop
       # emulating: it is the gadget's goal, and any following instruction would
-      # clobber the argument registers that {#resolve} reads to describe it.
+      # clobber the argument registers that {OneGadget::Fetchers::ArgumentResolution#resolve} reads to describe it.
       # @param [String] addr The call target.
       # @return [Symbol] +:fail+, the sentinel {#process!} maps to "stop".
       def reach_terminal_call(addr)

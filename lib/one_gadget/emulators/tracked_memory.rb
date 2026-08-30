@@ -13,7 +13,7 @@ module OneGadget
       # @return [Hash{Integer => OneGadget::Emulators::Lambda}] Memory written through +sp+.
       def sp_based_stack = get_corresponding_stack(sp)
 
-      # @return [Hash{Integer => Lambda}, nil] Memory written through {#bp}, or nil when the arch has none.
+      # @return [Hash{Integer => Lambda}, nil] Memory written through {Processor#bp}, or nil when the arch has none.
       def bp_based_stack = bp && get_corresponding_stack(bp)
 
       # Enable frame-pointer stack tracking with +bp+ as the frame register, so a
@@ -111,7 +111,7 @@ module OneGadget
       end
 
       # An always-on tracked stack keyed by offset: a Hash that lazily materialises
-      # +[reg+off]+ as a one-deref {Lambda}. Used for the +sp+- and {#bp}-based stacks.
+      # +[reg+off]+ as a one-deref {Lambda}. Used for the +sp+- and {Processor#bp}-based stacks.
       def tracked_stack(reg)
         Hash.new do |h, k|
           h[k] = OneGadget::Emulators::Lambda.new(reg).tap do |lmda|
@@ -201,7 +201,7 @@ module OneGadget
         add_writable(dst_l) unless stack.equal?(sp_based_stack)
       end
 
-      # Resolve +sp+- and (when tracked) {#bp}-relative operands to their offset.
+      # Resolve +sp+- and (when tracked) {Processor#bp}-relative operands to their offset.
       def eval_dict
         bp ? { sp => 0, bp => 0 } : { sp => 0 }
       end
