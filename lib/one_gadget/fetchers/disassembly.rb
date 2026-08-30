@@ -14,6 +14,12 @@ module OneGadget
       # which finds the same functions by another route.
       TERMINAL_PREFIXES = %w[exec posix_spawn].freeze
 
+      # A call to +posix_spawn+ itself, not one of the setup helpers that share its
+      # prefix. The name ends at the version marker, or at the closing bracket when
+      # there is none -- glibc's symbols are versioned, musl's are not, and neither
+      # is one recovered from a file with no symbol table (see {DynamicSymbols}).
+      TERMINAL_SPAWN = /posix_spawn[@>]/
+
       # Enough bytes of a name to tell: a symbol table's string table is read as
       # one blob, so a name is a slice of it.
       TERMINAL_PREFIX_BYTES = 12

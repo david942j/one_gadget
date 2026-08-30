@@ -7,12 +7,6 @@ module OneGadget
   module Fetchers
     # Fetcher for amd64.
     class Amd64 < OneGadget::Fetchers::X86
-      # +posix_spawn+ itself, not one of the setup helpers that share its prefix.
-      # The name ends at the version marker, or at the closing bracket when there
-      # is none -- glibc's symbols are versioned, musl's are not, and neither is
-      # one recovered from a file with no symbol table (see {DynamicSymbols}).
-      TERMINAL_SPAWN = /posix_spawn[@>]/
-
       private
 
       def emulator
