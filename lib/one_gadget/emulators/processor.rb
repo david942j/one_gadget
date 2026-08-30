@@ -174,6 +174,9 @@ module OneGadget
         raise Error::InstructionArgumentError, "#{reg.inspect} is not a valid register" unless register?(reg)
       end
 
+      # Whether the +idx+-th argument meets +expect+, a requirement a catalogued
+      # call states about it that is not about the pointer being mapped (those go
+      # through {#record_pointer}). See {SafeCalls}.
       def check_argument(idx, expect)
         case expect
         when :global_var? then global_var?(argument(idx))
@@ -316,6 +319,9 @@ module OneGadget
         self.class.bits / 8
       end
 
+      # Whether +obj+ is reached through the program counter, which is what a
+      # libc global looks like once resolved -- as opposed to a value the caller
+      # supplies.
       def global_var?(obj)
         obj.to_s.include?(pc)
       end

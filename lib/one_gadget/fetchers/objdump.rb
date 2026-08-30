@@ -34,6 +34,7 @@ module OneGadget
       # @param [Array<String>] options The options.
       # @example
       #   objdump.extra_options = %w[-M intel]
+      # @return [void]
       def extra_options=(options)
         @options = options
       end

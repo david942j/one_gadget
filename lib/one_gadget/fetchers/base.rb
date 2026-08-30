@@ -37,6 +37,10 @@ module OneGadget
       # (its output and everything derived from it), so re-analysing the same
       # file - common in the specs, harmless for the CLI which reads a file once -
       # doesn't redo the disassembly or the whole-binary scans.
+      # @param [Symbol] kind What is being cached, so two kinds may share a command.
+      # @param [String] command The objdump command the value is a function of.
+      # @yieldreturn [Object] The value, computed only on a miss.
+      # @return [Object] The cached value.
       def self.cached(kind, command)
         @cached ||= Hash.new { |h, k| h[k] = {} }
         @cached[kind][command] ||= yield
@@ -101,6 +105,8 @@ module OneGadget
       # also matches the +posix_spawn+ setup helpers, which emulation runs through.
       # The mnemonic must be a call, so a branch whose target symbol merely looks
       # similar (+<execlp@@GLIBC_2.4+0x136>+) doesn't end the window.
+      # @param [String] line One disassembled line.
+      # @return [Boolean]
       def terminal_call_line?(line)
         return false unless line[/\A\s*[0-9a-f]+:\s*(\S+)/, 1]&.match?(/\A#{call_str}x?(?:\.[wn])?\z/)
 
@@ -123,6 +129,8 @@ module OneGadget
       end
 
       # Emulate a candidate suffix and turn it into a gadget, or +nil+ if it isn't one.
+      # @param [Array<String>] lines The suffix, ending at the terminal call.
+      # @return [OneGadget::Gadget::Gadget, nil]
       def resolve_suffix(lines)
         processor = emulate(lines)
         (@refused ||= {})[processor.refused_line] = true if processor.refused_line

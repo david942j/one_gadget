@@ -130,10 +130,14 @@ module OneGadget
         generate_argv_without_sh(argv_ptr, argv, allow_null)
       end
 
+      # Whether the array is usable as it stands: an empty argv, or one whose only
+      # entry is a libc global.
       def argv_already_valid?(argv)
         argv[0] == '0' || (global_var?(argv[0]) && argv[1] == '0')
       end
 
+      # The constraint for an argv whose first entry libc has already filled in
+      # with the shell's own name, leaving the caller to arrange the rest.
       def generate_argv_with_sh(argv)
         # argv[0] is not controlled by the user, argv[0] probably is "/bin/sh" or "sh" (but actually, the content of
         # argv[0] doesn't quite matter, just need to make sure it's readable)

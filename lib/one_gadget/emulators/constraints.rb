@@ -58,6 +58,9 @@ module OneGadget
 
       # Whether +(type, obj)+ is an address constraint on a bare (deref-0) target,
       # i.e. one carrying a base register and offset to normalise.
+      # @param [Symbol] type The constraint's type.
+      # @param [Object] obj Its payload.
+      # @return [Boolean]
       def address_deref0?(type, obj)
         ADDRESS_TYPES.include?(type) && obj.deref_count.zero?
       end
@@ -65,6 +68,9 @@ module OneGadget
       # De-duplication key: an address constraint collapses per (type, base) so
       # constraints of different types on the same register stay distinct; a raw
       # constraint keys on its own text.
+      # @param [Symbol] type The constraint's type.
+      # @param [Object] obj Its payload.
+      # @return [Object] Equal for two constraints that impose the same requirement.
       def constraint_key(type, obj)
         return obj unless ADDRESS_TYPES.include?(type)
 
@@ -72,6 +78,9 @@ module OneGadget
       end
 
       # Render a constraint to its output string.
+      # @param [Symbol] type The constraint's type.
+      # @param [Object] obj Its payload.
+      # @return [String] The constraint as reported.
       def render_constraint(type, obj)
         case type
         when :writable then "writable: #{obj}"

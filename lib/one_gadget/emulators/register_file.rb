@@ -36,15 +36,22 @@ module OneGadget
         @entry_halves = {}
       end
 
+      # @param [String] name Any name the architecture accepts, narrow or full.
+      # @return [OneGadget::Emulators::Lambda, Integer] What that name currently reads as.
       def [](name)
         value = super(full(name))
         narrow?(name) ? narrowed(name, value) : value
       end
 
+      # @param [String] name Any name the architecture accepts, narrow or full.
+      # @param [OneGadget::Emulators::Lambda, Integer] value
+      # @return [void]
       def []=(name, value)
         super(full(name), value)
       end
 
+      # @param [String] name Any name the architecture accepts, narrow or full.
+      # @return [Boolean] Whether its storage holds a value.
       def key?(name)
         super(full(name))
       end

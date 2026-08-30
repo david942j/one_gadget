@@ -16,7 +16,7 @@ require 'one_gadget/version'
 # @param [String?] arg
 #   Can be either +build_id+ or path to libc.
 # @param [Mixed] options
-#   See {OneGadget#gadgets} for ore information.
+#   See {OneGadget#gadgets} for more information.
 # @return [Array<OneGadget::Gadget::Gadget>, Array<Integer>]
 #   The gadgets found.
 # @example

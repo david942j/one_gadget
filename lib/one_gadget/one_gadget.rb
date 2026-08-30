@@ -79,6 +79,12 @@ module OneGadget
       take_until(high, 3)
     end
 
+    # The +count+ best-scoring of +ary+, in the order they were given, plus
+    # anything scoring as well as the last of them -- so a tie is never broken
+    # arbitrarily, and more than +count+ may come back.
+    # @param [Array<OneGadget::Gadget::Gadget>] ary
+    # @param [Integer] count
+    # @return [Array<OneGadget::Gadget::Gadget>]
     def take_until(ary, count)
       return ary if ary.size <= count
 

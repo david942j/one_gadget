@@ -424,6 +424,8 @@ module OneGadget
         0.9**(depth + base)
       end
 
+      # The constraints as a reader wants them: every +writable:+ folded into one
+      # sentence naming all of the addresses, the rest left alone.
       def merge_constraints
         key = 'writable: '
         w_cons, normal = constraints.partition { |c| c.start_with?(key) }

@@ -42,6 +42,8 @@ module OneGadget
         sites.uniq
       end
 
+      # Whether the two halfwords are a Thumb +BL+: the first names the encoding,
+      # and the second's top bits say it is the long form rather than +BLX+.
       def thumb_bl?(high, low)
         high.between?(0xf000, 0xf7ff) && low.allbits?(0xd000)
       end
@@ -52,6 +54,9 @@ module OneGadget
         ((low >> 8) & 0x0f) == 0x0b
       end
 
+      # Where a Thumb +BL+ goes. Its offset is scattered across both halfwords,
+      # with the two middle bits stored inverted against the sign bit, and is
+      # taken from the address two instructions on.
       def thumb_bl_target(addr, high, low)
         s = (high >> 10) & 1
         i1 = (~(((low >> 13) & 1) ^ s)) & 1

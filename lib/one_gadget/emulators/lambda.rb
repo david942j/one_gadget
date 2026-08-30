@@ -186,7 +186,9 @@ module OneGadget
 
         private
 
-        # @return [(String, Integer)]
+        # Split a memory operand into what it is based on and how far from it.
+        # @param [String] arg The operand, with its brackets already removed.
+        # @return [(String, Integer)] The base, and the offset from it.
         def mem_obj(arg)
           # We have three forms:
           # 0. reg

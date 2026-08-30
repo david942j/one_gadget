@@ -9,6 +9,7 @@ module OneGadget
     class Amd64 < X86
       class << self
         # Bits.
+        # @return [Integer]
         def bits
           64
         end
