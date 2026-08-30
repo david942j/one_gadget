@@ -11,14 +11,9 @@ module OneGadget
     class I386 < OneGadget::Fetchers::X86
       private
 
-      def candidates
-        rel_sh_hex = rel_sh.to_s(16)
-        super do |candidate|
-          next false unless candidate.include?(rel_sh_hex)
-
-          true
-        end
-      end
+      # PIC reaches the string through the GOT, so what a window holds is the
+      # distance between them rather than the string's own offset.
+      def bin_sh_reference = rel_sh
 
       def emulator
         OneGadget::Emulators::I386.new

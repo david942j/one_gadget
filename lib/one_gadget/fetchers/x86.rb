@@ -12,6 +12,26 @@ module OneGadget
 
       private
 
+      # Emulate only the candidates that could still become a gadget. x86 writes
+      # the address of a string as a displacement, so a window that reaches
+      # +"/bin/sh"+ names it outright -- except through +posix_spawn+, which takes
+      # the path as an argument a window need not have materialised itself.
+      #
+      # An architecture that builds such an address in pieces (+adrp+ then +add+)
+      # can state no such rule, which is why this one lives here and not in
+      # {Base}: filtering those on the same test drops all but one of the aarch64
+      # gadgets.
+      def candidates
+        reference = bin_sh_reference.to_s(16)
+        super do |candidate|
+          candidate.match?(TERMINAL_SPAWN) || candidate.include?(reference)
+        end
+      end
+
+      # The number a window holds when it points at the +"/bin/sh"+ string.
+      # @return [Integer]
+      def bin_sh_reference = bin_sh_offset
+
       # A direct near call, +E8+ then a 32-bit displacement from the instruction
       # after it.
       CALL_REL32 = "\xe8".b.freeze
