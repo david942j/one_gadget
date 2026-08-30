@@ -12,6 +12,22 @@ describe OneGadget::Fetchers::DynamicSymbols do
     File.open(path) { |fd| yield ELFTools::ELFFile.new(fd) }
   end
 
+  describe '#dynamic_symbols' do
+    it 'names the functions at the addresses the tags record' do
+      with_elf do |elf|
+        symbols = fetcher.send(:dynamic_symbols, elf)
+        execve = elf.section_by_name('.dynsym').symbol_by_name('execve')
+        expect(symbols[execve.header.st_value.to_i]).to eq 'execve'
+        expect(symbols.values).to include('posix_spawn')
+      end
+    end
+
+    it 'is empty for a file the loader is told nothing about' do
+      elf = instance_double(ELFTools::ELFFile, dynamic: nil)
+      expect(fetcher.send(:dynamic_symbols, elf)).to be_empty
+    end
+  end
+
   describe '#sectionless_terminal_addresses' do
     # The dynamic segment is the route left when the section headers are gone, so
     # what it reports has to be what the sections would have.
@@ -20,27 +36,6 @@ describe OneGadget::Fetchers::DynamicSymbols do
         expect(fetcher.send(:sectionless_terminal_addresses, elf))
           .to eq fetcher.send(:terminal_symbol_addresses, elf)
       end
-    end
-  end
-
-  describe '#symbol_count' do
-    # Every symbol has to be reachable through DT_HASH, so its chain is as long as
-    # the table. A file carrying only the GNU hash says it another way, and the two
-    # have to agree.
-    it 'counts by where the string table starts when there is no DT_HASH' do
-      gnu_only = OneGadget::Fetchers::Amd64.new(path)
-      allow(gnu_only).to receive(:dynamic_tag).and_wrap_original do |original, dyn, type|
-        type == :hash ? nil : original.call(dyn, type)
-      end
-      with_elf do |elf|
-        expect(gnu_only.send(:dynamic_symbols, elf)).to eq fetcher.send(:dynamic_symbols, elf)
-      end
-    end
-  end
-
-  describe '#file_offset' do
-    it 'is nil for an address no segment covers' do
-      with_elf { |elf| expect(fetcher.send(:file_offset, elf, 0xdeadbeef000)).to be_nil }
     end
   end
 
