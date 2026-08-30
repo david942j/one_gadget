@@ -54,8 +54,6 @@ namespace :builds do
     TEMPLATE.sub('INFO', info_str).sub('GADGETS', gadgets_str)
   end
 
-  # @param [String] filename Path of the libc to read.
-  # @param [String] source Where that libc came from, recorded as the build file's first line.
   # One +Gadget.add+ call. A gadget names the descriptors it closes only when it
   # closes any, so an entry says no more than it has to.
   def gadget_entry(gadget)
