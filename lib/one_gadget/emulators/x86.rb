@@ -266,10 +266,17 @@ module OneGadget
         registers[dst] = 0
       end
 
+      # A {Lambda} knows how to add a number to itself, not the other way round,
+      # and addition commutes -- adding an unknown value to a known one is the
+      # same unknown value shifted (see {DataProcessing#offset_result}, which
+      # states the same rule for the architectures that go through it).
       def inst_add(dst, src)
         check_register!(dst)
 
-        registers[dst] += read_value(arg_to_lambda(src))
+        lhs = registers[dst]
+        rhs = read_value(arg_to_lambda(src))
+        lhs, rhs = rhs, lhs if lhs.is_a?(Integer)
+        registers[dst] = lhs + rhs
       end
 
       # +and dst, src+ both writes +dst+ and sets the flags a following branch

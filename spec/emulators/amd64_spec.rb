@@ -98,6 +98,22 @@ describe OneGadget::Emulators::Amd64 do
     end
   end
 
+  describe 'add' do
+    # The register holds a number and the operand does not, which is the order a
+    # Lambda cannot add in. Addition commutes, so the result is the operand
+    # shifted by the number -- and reaching this at all used to raise TypeError.
+    it 'adds an unknown value to a known one' do
+      @processor.process('1000: mov rax,0x10')
+      @processor.process('1004: add rax,rbx')
+      expect(@processor.registers['rax'].to_s).to eq 'rbx+0x10'
+    end
+
+    it 'adds a known value to an unknown one' do
+      @processor.process('1000: add rax,0x10')
+      expect(@processor.registers['rax'].to_s).to eq 'rax+0x10'
+    end
+  end
+
   describe 'and' do
     it 'names a mask it cannot fold, and folds one it can' do
       @processor.process('1000: and rax,0xf')
