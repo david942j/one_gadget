@@ -23,6 +23,16 @@ releases are cut by giving that section a version and a date.
 - A terminal `posix_spawn` whose symbol carries no version marker, as musl's does
   not, is no longer passed over (#432).
 
+### Fixed
+
+- amd64 threw away every candidate whose terminal call was not `execve` or
+  `posix_spawn` before emulating it -- 10 to 30 `execl` windows per libc, a call
+  one_gadget knows how to resolve (#434). They are emulated now. No libc in the
+  test corpus reports a new gadget as a result, but one could.
+- A search could abort with `TypeError` where it should have dropped the
+  candidate, when a window added an unknown value to a register already holding
+  a known one (#434).
+
 ## v2.0.0 - 2026-08-29
 
 Reported gadgets are not offset-for-offset comparable with 1.x: constraints are
