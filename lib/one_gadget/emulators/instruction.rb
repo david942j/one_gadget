@@ -72,6 +72,8 @@ module OneGadget
 
       private
 
+      # Split an operand list on the commas that separate operands, which are the
+      # ones outside brackets: a memory operand carries commas of its own.
       def parse_args(str)
         args = []
         cur = +''

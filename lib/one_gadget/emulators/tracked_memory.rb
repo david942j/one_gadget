@@ -20,6 +20,7 @@ module OneGadget
       # gadget staging data at +[bp+imm]+ (e.g. an argv array off the frame
       # pointer) is recovered instead of collapsing to a bare +writable:+. A nil
       # +bp+ leaves the arch +sp+-only. Call from the arch initializer after +super+.
+      # @param [String, nil] bp The frame register's name, or nil for an arch with none.
       # @return [void]
       def setup_frame_pointer(bp)
         @bp = bp

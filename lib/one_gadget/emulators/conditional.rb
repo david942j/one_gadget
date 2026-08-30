@@ -188,6 +188,7 @@ module OneGadget
       #   # fall-through path emits  x0 != 0 ; taken path emits  x0 == 0
       # @example x86 reuses it for +jrcxz+/+jecxz+/+jcxz+ (always branch-if-zero)
       #   branch_on_zero(0x4a200, 'rcx', negate: false)
+      # @return [true] Registering the branch is how the line is handled.
       def branch_on_zero(target, operand, negate:)
         reg = operand_str(operand)
         hit = negate ? '!=' : '==' # taken (not negated) => reg == 0
@@ -205,6 +206,7 @@ module OneGadget
       # @example aarch64 +tbz w0, #4, 4a200+ - branch taken when bit 4 of +w0+ is 0
       #   branch_on_bit(0x4a200, 'w0', 4, negate: false) #=> true
       #   # taken path emits  (w0 & 0x10) == 0 ; fall-through emits  (w0 & 0x10) != 0
+      # @return [true] Registering the branch is how the line is handled.
       def branch_on_bit(target, operand, bit, negate:)
         reg = operand_str(operand)
         mask = OneGadget::Helper.hex(1 << bit)
@@ -227,6 +229,9 @@ module OneGadget
       #   end
       #   # if the previous line did +branch_on_compare(:ne, 0x4a200)+ and this
       #   # +cmd+ sits at 0x4a200, the branch was taken; otherwise it fell through
+      # @return [void]
+      # @raise [OneGadget::Error::InfeasiblePathError]
+      #   When the resolved relation cannot hold with the ones already recorded.
       def resolve_pending_branch(cmd)
         return if @pending.nil?
 
@@ -244,6 +249,8 @@ module OneGadget
       # each register's current value, so two constraints printing the same left
       # side really are about the same tracked value (and a differing signedness
       # cast is part of that text, keeping incomparable ones apart).
+      # @param [String] expr The left side, as rendered.
+      # @return [Array<(String, String, String)>] The comparisons recorded on it.
       def comparisons_on(expr)
         @constraints.filter_map { |type, obj| obj if type == :cmp && obj.first == expr }
       end

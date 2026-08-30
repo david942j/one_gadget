@@ -17,6 +17,8 @@ module OneGadget
       end
 
       # @see OneGadget::Emulators::X86#process!
+      # @param [String] cmd One line from result of objdump.
+      # @return [Boolean] If successfully processed.
       def process!(cmd)
         resolve_pending_branch(cmd)
         @cur_addr = cmd[/\A\s*([0-9a-f]+):/, 1]&.to_i(16)
@@ -253,6 +255,7 @@ module OneGadget
 
       class << self
         # RV64 is 64-bit.
+        # @return [Integer]
         def bits
           64
         end

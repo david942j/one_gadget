@@ -77,6 +77,8 @@ module OneGadget
         end
       end
 
+      # How far +"/bin/sh"+ sits before the GOT, which is how PIC code names it:
+      # a window reaches the string as an offset from the register holding the base.
       def rel_sh
         @rel_sh ||= got_offset - str_offset('/bin/sh')
       end

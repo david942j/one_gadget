@@ -10,6 +10,10 @@ module OneGadget
     # Super class for amd64 and i386 processor.
     class X86 < Processor
       # Constructor for a x86 processor.
+      # @param [Array<String>] registers All the register names this architecture accepts.
+      # @param [String] sp The stack pointer's name.
+      # @param [String] bp The frame pointer's name.
+      # @param [String] pc The program counter's name.
       def initialize(registers, sp, bp, pc)
         super(registers, sp)
         @pc = pc
@@ -124,6 +128,8 @@ module OneGadget
         branch_on_compare(JCC[mnem], jump_target(cmd))
       end
 
+      # The counter register a +jcxz+-family branch tests, at the width its
+      # mnemonic names.
       def cx_reg(mnem)
         { 'jcxz' => 'cx', 'jecxz' => 'ecx', 'jrcxz' => 'rcx' }[mnem]
       end
@@ -337,6 +343,9 @@ module OneGadget
         dispatch_safe_call(addr)
       end
 
+      # A vector register holds one value per lane, so it becomes an array of
+      # them -- each lane named by the shift that reaches it -- where an ordinary
+      # register becomes a single {Lambda}.
       def to_lambda(reg)
         return super unless reg =~ /^xmm\d+$/
 

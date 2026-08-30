@@ -28,11 +28,15 @@ module OneGadget
       end
 
       # Memoized bytes of +file+ (the target libc), shared across emulator instances.
+      # @param [String] file Path to the target libc.
+      # @return [String] Its bytes.
       def self.file_data(file)
         (@file_data ||= {})[file] ||= File.binread(file)
       end
 
       # @see OneGadget::Emulators::AArch64#process!
+      # @param [String] cmd One line from result of objdump.
+      # @return [Boolean] If successfully processed.
       def process!(cmd)
         resolve_pending_branch(cmd)
         line = cmd.strip
@@ -112,6 +116,7 @@ module OneGadget
       # Thumb candidate offers no evidence either and is no better served than
       # before.
       # @param [Array<String>] lines The candidate's objdump lines.
+      # @return [void]
       def note_instruction_set(lines)
         return if @thumb
 
@@ -297,6 +302,7 @@ module OneGadget
 
       class << self
         # ARM (32-bit) is 32-bit.
+        # @return [Integer]
         def bits
           32
         end

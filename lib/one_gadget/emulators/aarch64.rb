@@ -19,6 +19,8 @@ module OneGadget
       end
 
       # @see OneGadget::Emulators::X86#process!
+      # @param [String] cmd One line from result of objdump.
+      # @return [Boolean] If successfully processed.
       def process!(cmd)
         resolve_pending_branch(cmd)
         cmd = cmd.gsub(/#-?(0x)?[0-9a-f]+/) { |v| v[1..] }
@@ -60,6 +62,7 @@ module OneGadget
 
       # A landing pad marks where an indirect branch may arrive; nothing about the
       # state changes at one.
+      # @return [void]
       alias inst_bti inst_nop
 
       # Return the argument value of calling a function.
@@ -157,6 +160,7 @@ module OneGadget
 
       class << self
         # AArch64 is 64-bit.
+        # @return [Integer]
         def bits
           64
         end

@@ -9,6 +9,7 @@ module OneGadget
     class I386 < X86
       class << self
         # Yap, bits.
+        # @return [Integer]
         def bits
           32
         end
