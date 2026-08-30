@@ -8,6 +8,12 @@ libc. Two run modes:
 - **`--strict` (poison)** — those registers are set to an unmapped address, so any
   *unlisted* dependency faults. This is the completeness test for the constraint list.
 
+Findings 7, 9 and 10 are missing from this document on purpose: they were bugs in the
+harness rather than in one_gadget's output -- a gadget allowed to close the shell's own
+stdin, a GOT-base register re-seeded from no evidence, and a libc matched to a sysroot by
+file name -- and what is written up here is what verification found wrong with the
+gadgets themselves.
+
 ## Summary
 
 | fixture | gadgets | benign | strict (poison) |
@@ -307,10 +313,16 @@ instead of `x29`-relative writes.
 
 **Gadgets:** `0xc7a40` (aarch64 libc-2.43, `execve("/bin/sh", x4, x6)`); `0x9b9e4`
 (aarch64 libc-2.23, `execve("/bin/sh", x1, x20)`); `0x9bc5c` (aarch64 libc-2.23,
-`execve("/bin/sh", x0, x20)`). **Status: candidate imprecision, scoped but not yet fixed
-(see fix plan below) -- pending review.** All three are the "3 EXEC*" already counted in
-the Level-1 sweep summary above (found before this investigation named the mechanism);
-this documents *why* they're EXEC* and what a real fix would need.
+`execve("/bin/sh", x0, x20)`). **Status: fixed**, by the work Finding 8 describes
+(#375, consolidated by #378), rather than by the plan sketched at the end of this
+section. All three now name the register that plan was written to expose: `0xc7a40`
+reports `x0 == NULL || {"/bin/sh", x0, NULL} is a valid argv`, where it once said
+nothing about `x0` at all, and the 2.23 pair name `x23`. The section is kept as
+written, because its reasoning is what the fix was measured against -- see Finding 8
+for why the shape it proposed was not the shape that worked. All three are the
+"3 EXEC*" already counted in the Level-1 sweep summary above (found before this
+investigation named the mechanism); this documents *why* they're EXEC* and what a
+real fix would need.
 
 **Severity, and how this differs from Findings 1/3/5:** those were true false positives --
 a *fully satisfied* plan still crashed before ever reaching a shell. Here, the gadget
@@ -378,7 +390,68 @@ EXEC* (not silently trusted), this is lower urgency than Findings 1-5 were -- wo
 completeness, but with real design/review needed before implementation given the
 cross-cutting change and the new invalidation-correctness requirement.
 
+## Finding 8 -- imprecise constraint: argv built through a pointer no register names
+
+**Gadgets:** `0xc18cd`, `0xc1b3d` (amd64 libc-2.19) and `0xcc27d`, `0xcc4c0` (amd64
+libc-2.23), each `execve("/bin/sh", <a derived pointer>, r12)`. **Status: fixed** (#375,
+consolidated by #378). Found 2026-08-11; these were the last four EXEC verdicts in the
+corpus.
+
+**Signature:** EXEC, not FAIL -- the gadget reaches a real shell, but the shell is not
+drivable, the same signature as Finding 6.
+
+**Root cause (verified):** the candidate builds the argv array in place, through a
+pointer it derives rather than one a register names:
+
+```
+c18cd: and    rsi,0xfffffffffffffff0    ; the array's base -- no register holds it
+c18d1: lea    rax,[rip+0xbafeb]         ; rax = "sh"
+c18d8: cmp    r14d,0x1
+c18dc: mov    QWORD PTR [rsi+0x8],r15   ; argv[1] = r15, an incoming register
+c18e0: mov    QWORD PTR [rsi],rax       ; argv[0] = "sh"
+...
+       call execve
+```
+
+The emulator tracked writes under two special-cased bases, `sp` and the named frame
+pointer. A store through `(rsi & ~0xf)` -- or through `[rbp-0x48]`, which is `0xc1b3d`'s
+shape -- matched neither, so it fell to the generic `add_writable` path, which records
+*that* the address must be writable and discards *what* was written. argv then rendered
+as the opaque `[ptr] == NULL || ... is a valid argv`, whose first disjunct is one the
+gadget's own store to `argv[0]` immediately overwrites, while the real requirement --
+`argv[1]` holding an uncontrolled incoming register -- was never stated at all.
+
+**The fix, and why it is not the one Finding 6 proposed:** Finding 6 asked for a write
+history keyed by *register name*, and correctly identified invalidation as the hard part:
+a later `mov x4, x9` must not let stale `x4` entries be read back. Keying by the *value*
+the base renders as dissolves that problem, because a reassigned register simply names a
+different value and nothing goes stale. Three pieces landed in #375, all cross-arch:
+
+- `Lambda.parse` reading back its own operation rendering. Before it,
+  `(rsi & 0xff..f0)` re-parsed as `rsi+0xff..f0`, and `(rsp+0xf & ...)` raised --
+  silently dropping candidates.
+- `Processor#value_based_stack`, the write history keyed by that rendering.
+- `Processor#resolve_address`, one rule for where an address lands in tracked memory,
+  replacing the scattered `get_corresponding_stack(x.obj)` + `x.immi` pairs.
+
+**A trap worth keeping:** the `Lambda` representation is asymmetric. `[[X]]` collapses
+onto `X` with a deref count of 2, while `[[X]+8]` nests. Call sites that guarded on
+`deref_count == 1` therefore dropped the zero-offset store without a word. Route an
+address through `resolve_address` rather than adding another depth guard.
+
+**After the fix:** strict level 2 reached **1163 PASS, 0 EXEC, 0 FAIL, 0 SKIP** over all
+21 fixtures, and six previously-dropped `rsp`-based siblings appeared -- better gadgets,
+since their writable precondition is the stack itself. `0xc18cd` now reports
+`r15 == NULL || {"sh", r15, [(rsi & 0xff..f0)+0x10], ...} is a valid argv`.
+
+#378 then collapsed `sp_based_stack`, `bp_based_stack`, `reg_based_stack` and
+`value_based_stack` into one store keyed by how the base renders, having measured that
+the differences between them did nothing: `get_corresponding_stack` never saw an offset
+expression across 53k calls, and the identity guard only ever discarded a history that
+was still good, fragmenting the writes of a post-increment store loop.
+
 ## Finding 11 -- missing constraint: a scaled-index write into the array the gadget passes
+
 
 **Gadgets:** `0xb5718`, `0xb571c`, `0xb571e` (riscv64 libc-2.39,
 `posix_spawn(sp+0x44, "/bin/sh", [sp+0x30], 0, sp+0x50, [sp+0xd0])`), level 2 only.
