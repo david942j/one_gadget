@@ -117,7 +117,7 @@ module OneGadget
       def sectionless?
         return @sectionless unless @sectionless.nil?
 
-        @sectionless = File.open(file) { |fd| ELFTools::ELFFile.new(fd).sections.empty? }
+        @sectionless = File.open(file) { |fd| ELFTools::ELFFile.new(fd).num_sections.zero? }
       end
 
       # Point objdump at the bytes rather than the ELF, once, when there is no
@@ -186,7 +186,7 @@ module OneGadget
       # @param [ELFTools::ELFFile] elf
       # @return [Hash{Integer => true}]
       def terminal_symbol_addresses(elf)
-        return sectionless_terminal_addresses(elf) if elf.sections.empty?
+        return sectionless_terminal_addresses(elf) if elf.num_sections.zero?
 
         addrs = {}
         %w[.dynsym .symtab].each do |name|
