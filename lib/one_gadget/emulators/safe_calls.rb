@@ -3,9 +3,9 @@
 module OneGadget
   module Emulators
     # Arch-independent catalog of libc calls the emulator accepts without
-    # executing them (see {Processor#dispatch_safe_call} for how an entry's
-    # per-argument requirements are applied and what each requirement symbol
-    # means). These functions -- syscall wrappers and +posix_spawn+'s setup
+    # executing them (see {COMMON} for what each requirement means, and
+    # {Processor#dispatch_safe_call} for how they are applied). These
+    # functions -- syscall wrappers and +posix_spawn+'s setup
     # helpers -- have identical semantics on every architecture, so their
     # requirements live here once instead of being copied into each arch's
     # emulator, keeping the arches from drifting.
@@ -14,6 +14,16 @@ module OneGadget
     # the specific +posix_spawnattr_setsigmask+/+setsigdefault+ keys precede the
     # generic +posix_spawnattr_+ prefix.
     module SafeCalls
+      # What each requirement asks of the caller, the entries below saying why the
+      # function needs it:
+      # * +:global_var?+ -- nothing; it must already hold, or the candidate is aborted.
+      # * +:closed_fd+ -- nothing; the descriptor is recorded (see {Processor#note_closed_fd}).
+      # * +:null+, +:nullable_deref+ -- +<arg> == NULL+, because the callee writes through
+      #   it otherwise, or dereferences it unless it is NULL. Tag the second only after
+      #   confirming the callee both NULL-checks the argument and still reaches the
+      #   terminal call on that path.
+      # * +:deref+ -- +readable: <arg>+, for a pointer NULL cannot make safe.
+      # * +:writable+ -- +writable: <arg>+.
       # @return [Hash{String => Hash{Integer => Symbol}}]
       #   Function name (or name prefix) => argument index => requirement.
       COMMON = {

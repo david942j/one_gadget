@@ -183,37 +183,12 @@ module OneGadget
         end
       end
 
-      # Accept a +call+ to a libc function the emulator treats as non-terminal
-      # (a syscall wrapper). {SafeCalls::COMMON} maps each function name to its
-      # per-argument requirements: an argument index paired with one of
-      # * +:global_var?+ - a precondition that must already hold, else the
-      #   candidate is aborted (+:fail+).
-      # * +:closed_fd+ - the descriptor the callee closes. Nothing is required of
-      #   it; it is recorded, because closing a standard descriptor changes what
-      #   the spawned shell can still do (see {#note_closed_fd}).
-      # * +:null+ - the callee must be given NULL here, so +<arg> == NULL+ is
-      #   recorded for the caller to arrange. A value that can never be NULL --
-      #   a fixed address, or any other non-zero literal -- aborts the candidate.
-      #   @example +__sigaction(sig, act, oldact)+ writes the old action through
-      #     +oldact+ unless it is NULL
-      # * +:nullable_deref+ - the callee dereferences this argument *unless it is
-      #   NULL*, which glibc guards with an explicit NULL check. When the pointer
-      #   isn't already known to be mapped, +<arg> == NULL+ is recorded so the
-      #   callee takes the skip-the-dereference path. Only tag an argument this way
-      #   after confirming the callee both NULL-checks it and still reaches the
-      #   terminal call on the NULL path.
-      # * +:deref+ - the callee dereferences this argument *unconditionally* (no
-      #   NULL guard), so it can't be made safe by forcing it NULL. When the pointer
-      #   isn't already known to be mapped, +readable: <arg>+ is recorded so the
-      #   attacker knows it must reference readable memory.
-      #   @example +posix_spawnattr_setsigmask(attr, set)+ runs +attr->__ss = *set+
-      # * +:writable+ - the callee *writes through* this argument (an out-param), so
-      #   +writable: <arg>+ is recorded (via {#add_writable}, which drops the
-      #   pc/+$base+/sp targets that are writable or fixed for free).
-      #   @example +posix_spawnattr_init(attr)+ writes +*attr+
-      # Both deref checks are deferred to {#finalize_deferred_reads} because a
-      # +<reg>+<imm>+ pointer may only become known-mapped once a later store marks
-      # +<reg>+ writable.
+      # Accept a +call+ to a libc function the emulator treats as non-terminal (a
+      # syscall wrapper), applying whatever {SafeCalls::COMMON} records about its
+      # arguments. Both deref requirements are deferred to
+      # {#finalize_deferred_reads}, because a +<reg>+<imm>+ pointer may only become
+      # known-mapped once a later store marks +<reg>+ writable.
+      # @param [String] addr The call target, as objdump names it.
       # @return [nil, :fail] +nil+ = call accepted, +:fail+ = abort the candidate.
       def dispatch_safe_call(addr)
         func = SafeCalls::COMMON.keys.find { |n| addr.include?(n) }
@@ -239,12 +214,6 @@ module OneGadget
       # accepted on the basis that they succeed, and success is what they all
       # report that way, so a branch on the result resolves instead of ending the
       # path. A path that needs the failing side then contradicts itself and drops.
-      #
-      # TODO: success is assumed, not required. A path that keeps going after the
-      # call fails can reach a terminal call just as well, and is dropped here
-      # only because the return is pinned. Modelling the result per function --
-      # which values it can return, and what each one requires -- would let both
-      # sides be walked, at the cost of a constraint describing the failing one.
       # @return [void]
       def clobber_caller_saved
         caller_saved.each do |reg|

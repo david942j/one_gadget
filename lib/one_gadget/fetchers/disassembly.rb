@@ -28,10 +28,6 @@ module OneGadget
       # How much to disassemble around each terminal call when an architecture can
       # locate the calls cheaply (see {#terminal_call_sites} / {#windowed_disasm}).
       #
-      # The walk runs backwards from the call, but what it reaches does not: a
-      # branch predecessor can sit *after* the call, so the window has to hold the
-      # loop or later block that jumps back into the region.
-      #
       # Both directions were measured by windowing every architecture against its
       # own full disassembly across the spec corpus. Gadgets start being lost below
       # 0x400 either way, and a window too small to hold a predecessor invents them
@@ -40,10 +36,7 @@ module OneGadget
       # a fifth of a libc -- terminal calls cluster into a handful of merged
       # windows, so a wider one costs little.
       #
-      # A gadget whose code and branch-predecessors exceed the window is missed,
-      # which is why windowing is opt-in per arch (fast disassembly arches keep the
-      # full, exhaustive scan) and falls back to full disassembly if the call scan
-      # comes up empty.
+      # A gadget whose code and branch-predecessors exceed the window is missed.
       WINDOW_BACK = 0x4000
 
       # As far past the call, for a predecessor that branches back into the region.
