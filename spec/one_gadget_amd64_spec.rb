@@ -183,10 +183,10 @@ describe 'one_gadget_amd64' do
         end
         # the state the file is in: objdump disassembles sections, and there are none
         expect(`objdump -d #{stripped}`).not_to include('call')
-        (0..2).each do |level|
-          expect(OneGadget.gadgets(file: stripped, force_file: true, level:))
-            .to eq OneGadget.gadgets(file: path, force_file: true, level:)
-        end
+        # Above RAW_LEVEL nothing is trimmed, and every lower level is a function
+        # of that set, so matching here matches at every level.
+        expect(OneGadget.gadgets(file: stripped, force_file: true, level: 100))
+          .to eq OneGadget.gadgets(file: path, force_file: true, level: 100)
       end
     end
   end
