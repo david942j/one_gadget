@@ -7,6 +7,7 @@ require 'one_gadget/error'
 require 'one_gadget/fetchers/argument_resolution'
 require 'one_gadget/fetchers/candidate_walk'
 require 'one_gadget/fetchers/disassembly'
+require 'one_gadget/fetchers/dynamic_symbols'
 require 'one_gadget/fetchers/objdump'
 
 module OneGadget
@@ -26,6 +27,7 @@ module OneGadget
       include ArgumentResolution
       include CandidateWalk
       include Disassembly
+      include DynamicSymbols
 
       # The absolute path to glibc.
       # @return [String] The filename.

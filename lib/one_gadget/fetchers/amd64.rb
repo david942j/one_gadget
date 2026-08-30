@@ -17,7 +17,7 @@ module OneGadget
       # stitches +jmp+ targets, so only the filter remains.
       def candidates
         super do |candidate|
-          next true if candidate.include?('posix_spawn@')
+          next true if candidate.match?(TERMINAL_SPAWN)
           next false unless candidate.include?(bin_sh_offset.to_s(16)) # works in x86-64
           next false unless candidate.lines.last.include?('execve') # only care execve
 

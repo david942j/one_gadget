@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'elftools'
+
 module OneGadget
   module Fetchers
     # Reading the target file: where its terminal calls are, and the disassembly
@@ -8,13 +10,20 @@ module OneGadget
     # instead (see {Base#scan_calls}), and everything derived from one objdump
     # command is cached. Mixed into {Base}.
     module Disassembly
-      # What a terminal function's name starts with, and enough bytes of a name to
-      # tell: a symbol table's string table is read as one blob, so a name is a
-      # slice of it.
+      # What a terminal function's name starts with. Read by {DynamicSymbols} too,
+      # which finds the same functions by another route.
       TERMINAL_PREFIXES = %w[exec posix_spawn].freeze
 
+      # A call to +posix_spawn+ itself, not one of the setup helpers that share its
+      # prefix. The name ends at the version marker, or at the closing bracket when
+      # there is none -- glibc's symbols are versioned, musl's are not, and neither
+      # is one recovered from a file with no symbol table (see {DynamicSymbols}).
+      TERMINAL_SPAWN = /posix_spawn[@>]/
+
+      # Enough bytes of a name to tell: a symbol table's string table is read as
+      # one blob, so a name is a slice of it.
       TERMINAL_PREFIX_BYTES = 12
-      private_constant :TERMINAL_PREFIXES, :TERMINAL_PREFIX_BYTES
+      private_constant :TERMINAL_PREFIX_BYTES
 
       # How much to disassemble around each terminal call when an architecture can
       # locate the calls cheaply (see {#terminal_call_sites} / {#windowed_disasm}).
@@ -57,9 +66,14 @@ module OneGadget
       # for the lifetime of the fetcher.
       # @return [Hash{Symbol => Array<String>, Hash}]
       def disassembly
-        @disassembly ||= Base.cached(:disasm, @objdump.command) do
-          sites = terminal_call_sites
-          sites.nil? || sites.empty? ? full_disasm : windowed_disasm(sites)
+        @disassembly ||= begin
+          # Before the command is read: it is what says how to disassemble, and
+          # what the cache is keyed on.
+          prepare_raw_disassembly if sectionless?
+          Base.cached(:disasm, @objdump.command) do
+            sites = terminal_call_sites
+            sites.nil? || sites.empty? ? full_disasm : windowed_disasm(sites)
+          end
         end
       end
 
@@ -101,20 +115,48 @@ module OneGadget
       DISASSEMBLED = /\A[0-9a-f]+:/
       private_constant :DISASSEMBLED
 
+      # Whether this file ships without section headers, which is what makes the
+      # ordinary route to its code and symbols unavailable (see {DynamicSymbols}).
+      # @return [Boolean]
+      def sectionless?
+        return @sectionless unless @sectionless.nil?
+
+        @sectionless = File.open(file) { |fd| ELFTools::ELFFile.new(fd).num_sections.zero? }
+      end
+
+      # Point objdump at the bytes rather than the ELF, once, when there is no
+      # other way to read the file.
+      # @return [void]
+      def prepare_raw_disassembly
+        File.open(file) do |fd|
+          elf = ELFTools::ELFFile.new(fd)
+          seg = executable_segment(elf)
+          next if seg.nil?
+
+          @raw_symbols = dynamic_symbols(elf)
+          @objdump.read_raw(machine: OneGadget::Helper.objdump_arch(OneGadget::Helper.architecture(file)),
+                            endian: elf.endian,
+                            vma: seg.header.p_vaddr.to_i - seg.header.p_offset.to_i)
+        end
+      end
+
       def objdump_lines(start: nil, stop: nil)
         # One pass, one string per line: a whole libc is hundreds of thousands of
         # them, and only the instructions are wanted.
+        symbols = @raw_symbols
         `#{@objdump.command(start:, stop:)}`.each_line.filter_map do |line|
           line = line.strip
-          line if DISASSEMBLED.match?(line)
+          next unless DISASSEMBLED.match?(line)
+
+          symbols ? symbolize(line, symbols) : line
         end
       end
 
       # Addresses of the calls reaching a terminal function, found without
       # disassembling anything: the +exec*+/+posix_spawn*+ symbols are read out of
-      # the ELF and +.text+ is scanned for direct calls into them (see
-      # {#scan_calls}). +nil+ when the file cannot be read that way, so the caller
-      # disassembles everything instead.
+      # the ELF and the segment holding the code is scanned for direct calls into
+      # them (see {#scan_calls}). +nil+ when the file cannot be read that way, so
+      # the caller disassembles everything instead.
       # @return [Array<Integer>, nil]
       def terminal_call_sites
         File.open(file) do |fd|
@@ -124,13 +166,22 @@ module OneGadget
           targets = terminal_symbol_addresses(elf)
           return [] if targets.empty?
 
-          text = elf.section_by_name('.text')
-          return nil if text.nil?
+          seg = executable_segment(elf)
+          return nil if seg.nil?
 
-          scan_calls(text.header.sh_addr.to_i, text.data, targets)
+          scan_calls(seg.header.p_vaddr.to_i, seg.data, targets)
         end
       rescue ELFTools::ELFError
         nil # not something we can scan; disassemble everything
+      end
+
+      # The loadable segment holding the code, which is where a call scan runs and
+      # what raw disassembly is taken from. It holds a little besides the code, and
+      # is used in place of a section because a stripped file has none.
+      # @param [ELFTools::ELFFile] elf
+      # @return [ELFTools::Segments::Segment, nil]
+      def executable_segment(elf)
+        elf.segments_by_type(:load).find(&:executable?)
       end
 
       # Where the +exec*+/+posix_spawn*+ symbols live, keyed for lookup. Read
@@ -139,6 +190,8 @@ module OneGadget
       # @param [ELFTools::ELFFile] elf
       # @return [Hash{Integer => true}]
       def terminal_symbol_addresses(elf)
+        return sectionless_terminal_addresses(elf) if elf.num_sections.zero?
+
         addrs = {}
         %w[.dynsym .symtab].each do |name|
           sec = elf.section_by_name(name)
