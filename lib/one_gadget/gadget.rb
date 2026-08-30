@@ -10,6 +10,23 @@ module OneGadget
   # Module for define gadgets.
   module Gadget
     # Information of a gadget.
+    #
+    # Its {Gadget#constraints} are written in this language:
+    #   REG: OneGadget::ABI.all
+    #   IMM: [+-]0x[\da-f]+
+    #   BITS: 8, 16, 32, 64
+    #   CAST: (<s|u><BITS>)
+    #   Identity: <REG><IMM>?
+    #   Identity: [<Identity>]
+    #   Expr: <REG> is the GOT address of libc
+    #   Expr: writable: <Identity>
+    #   Expr: readable: <Identity>
+    #   Expr: <CAST>?<Identity> == NULL
+    #   Expr: <REG> & 0xf == <IMM>
+    #   Expr: (s32)[<Identity>] <= 0
+    #   Expr: .+ is a valid argv
+    #   Expr: .+ is a valid envp
+    #   Expr: <Expr> || <Expr>
     class Gadget
       # @return [Integer] Base address of libc. Default: 0.
       attr_accessor :base
@@ -138,22 +155,12 @@ module OneGadget
       private
 
       # Drops what the rest of the list already settles, so a gadget asks for each
-      # thing once and never offers an option it rules out itself.
-      #
-      # Most of it follows from one reading: a constraint that accesses an address
-      # says that address is mapped memory (see {#mapped?}), which in turn says it
-      # is readable and not NULL. So:
-      # * A +readable:+ on an address a dereference already reaches repeats it.
-      # * A +== NULL+ option for a mapped address can never be taken.
-      # * A +!= NULL+ requirement on one is already met.
-      # The last rule reads a value rather than an address: one the list pins to a
-      # literal answers every other comparison against it, so a bound that literal
-      # already satisfies asks for nothing.
-      #
-      # Each needs the constraint doing the settling to hold outright: one inside a
-      # +||+ is an option among several and settles nothing. They run until the
-      # list stops changing, because dropping an option can leave a constraint
-      # holding outright and settle the next thing.
+      # thing once and never offers an option it rules out itself. Three of the
+      # rules follow from one reading -- a constraint that accesses an address says
+      # that address is mapped memory (see {#mapped?}), and so readable and not
+      # NULL -- while the fourth reads a value the list pins to a literal. Only a
+      # constraint holding outright settles anything, since one inside a +||+ is an
+      # option among several, and they run until the list stops changing.
       # @param [Array<String>] cons
       # @return [Array<String>]
       # @example An option the same list rules out.
@@ -305,21 +312,6 @@ module OneGadget
         end
       end
 
-      # REG: OneGadget::ABI.all
-      # IMM: [+-]0x[\da-f]+
-      # BITS: 8, 16, 32, 64
-      # CAST: (<s|u><BITS>)
-      # Identity: <REG><IMM>?
-      # Identity: [<Identity>]
-      # Expr: <REG> is the GOT address of libc
-      # Expr: writable: <Identity>
-      # Expr: readable: <Identity>
-      # Expr: <CAST>?<Identity> == NULL
-      # Expr: <REG> & 0xf == <IMM>
-      # Expr: (s32)[<Identity>] <= 0
-      # Expr: .+ is a valid argv
-      # Expr: .+ is a valid envp
-      # Expr: <Expr> || <Expr>
       def calculate_score(expr)
         return expr.split(' || ').map(&method(:calculate_score)).max if expr.include?(' || ')
 

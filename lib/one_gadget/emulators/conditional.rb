@@ -11,10 +11,6 @@ module OneGadget
     # actual taken/not-taken path (see {OneGadget::Fetchers::Base#candidates}), and
     # the emulator turns the branch decision into a gadget constraint.
     #
-    # Branches are resolved with one line of look-ahead: at the branch we record a
-    # pending decision, and on the next line we compare that line's address to the
-    # branch target to learn whether the stitched path took the branch.
-    #
     # The including class (an {OneGadget::Emulators::Processor} subclass) must
     # provide +registers+ and +register?+ (operand lookup), +operands(cmd)+ (the
     # arch's operand splitter), +self.class.bits+ (32/64, for the signedness cast),
