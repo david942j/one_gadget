@@ -144,9 +144,9 @@ module OneGadget
 
       # Addresses of the calls reaching a terminal function, found without
       # disassembling anything: the +exec*+/+posix_spawn*+ symbols are read out of
-      # the ELF and +.text+ is scanned for direct calls into them (see
-      # {#scan_calls}). +nil+ when the file cannot be read that way, so the caller
-      # disassembles everything instead.
+      # the ELF and the segment holding the code is scanned for direct calls into
+      # them (see {#scan_calls}). +nil+ when the file cannot be read that way, so
+      # the caller disassembles everything instead.
       # @return [Array<Integer>, nil]
       def terminal_call_sites
         File.open(file) do |fd|
@@ -156,35 +156,22 @@ module OneGadget
           targets = terminal_symbol_addresses(elf)
           return [] if targets.empty?
 
-          base, data = executable_bytes(elf)
-          return nil if data.nil?
+          seg = executable_segment(elf)
+          return nil if seg.nil?
 
-          scan_calls(base, data, targets)
+          scan_calls(seg.header.p_vaddr.to_i, seg.data, targets)
         end
       rescue ELFTools::ELFError
         nil # not something we can scan; disassemble everything
       end
 
-      # The bytes a call scan runs over, and where they are loaded. Normally that is
-      # +.text+; a file whose section headers are gone has the executable segment
-      # instead, which holds the same code and a little else besides.
-      # @param [ELFTools::ELFFile] elf
-      # @return [(Integer, String), nil] +nil+ when neither can be found.
-      def executable_bytes(elf)
-        text = elf.section_by_name('.text')
-        return [text.header.sh_addr.to_i, text.data] if text
-
-        seg = executable_segment(elf)
-        seg && [seg.header.p_vaddr.to_i, seg.data]
-      end
-
-      # The loadable segment holding the code (+PT_LOAD+, executable).
+      # The loadable segment holding the code, which is where a call scan runs and
+      # what raw disassembly is taken from. It holds a little besides the code, and
+      # is used in place of a section because a stripped file has none.
       # @param [ELFTools::ELFFile] elf
       # @return [ELFTools::Segments::Segment, nil]
       def executable_segment(elf)
-        elf.segments.find do |seg|
-          seg.header.p_type == ELFTools::Constants::PT::PT_LOAD && seg.header.p_flags.to_i.anybits?(1)
-        end
+        elf.segments_by_type(:load).find(&:executable?)
       end
 
       # Where the +exec*+/+posix_spawn*+ symbols live, keyed for lookup. Read

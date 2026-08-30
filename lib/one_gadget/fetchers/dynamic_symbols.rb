@@ -99,9 +99,7 @@ module OneGadget
       # @param [Integer] vaddr
       # @return [Integer, nil] nil when no segment covers it.
       def file_offset(elf, vaddr)
-        seg = elf.segments.find do |s|
-          next false unless s.header.p_type == ELFTools::Constants::PT::PT_LOAD
-
+        seg = elf.segments_by_type(:load).find do |s|
           base = s.header.p_vaddr.to_i
           vaddr >= base && vaddr < base + s.header.p_filesz.to_i
         end
