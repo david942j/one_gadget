@@ -66,10 +66,14 @@ module OneGadget
       # for the lifetime of the fetcher.
       # @return [Hash{Symbol => Array<String>, Hash}]
       def disassembly
-        prepare_raw_disassembly if sectionless?
-        @disassembly ||= Base.cached(:disasm, @objdump.command) do
-          sites = terminal_call_sites
-          sites.nil? || sites.empty? ? full_disasm : windowed_disasm(sites)
+        @disassembly ||= begin
+          # Before the command is read: it is what says how to disassemble, and
+          # what the cache is keyed on.
+          prepare_raw_disassembly if sectionless?
+          Base.cached(:disasm, @objdump.command) do
+            sites = terminal_call_sites
+            sites.nil? || sites.empty? ? full_disasm : windowed_disasm(sites)
+          end
         end
       end
 
