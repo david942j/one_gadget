@@ -23,6 +23,12 @@ releases are cut by giving that section a version and a date.
 - A terminal `posix_spawn` whose symbol carries no version marker, as musl's does
   not, is no longer passed over (#432).
 
+### Changed
+
+- Requires elftools >= 2.1.0 (#442), whose faster symbol-table read takes the
+  search of a libc with no section headers from 1.11s to 0.68s -- the read
+  itself from 0.51s to 0.17s. A libc that still has its sections is unaffected.
+
 ### Fixed
 
 - arm found nothing at all in a libc with no section headers (#441). Three

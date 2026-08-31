@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     one_gadget (2.0.0)
-      elftools (>= 2.0.0, < 3.0.0)
+      elftools (>= 2.1.0, < 3.0.0)
       logger
 
 GEM
@@ -11,7 +11,7 @@ GEM
     ast (2.4.3)
     bindata (3.0.0)
     diff-lcs (1.6.2)
-    elftools (2.0.0)
+    elftools (2.1.0)
       bindata (>= 2, < 4)
     json (2.21.2)
     language_server-protocol (3.17.0.6)
