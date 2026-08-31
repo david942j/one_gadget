@@ -13,7 +13,7 @@ import 'tasks/builds/refresh.rake'
 import 'tasks/doc.rake'
 import 'tasks/readme.rake'
 
-task default: %i[readme rubocop doc doc:orphans spec builds:list builds:audit builds:check]
+task default: %i[readme rubocop doc doc:orphans doc:untagged spec builds:list builds:audit builds:check]
 
 RuboCop::RakeTask.new(:rubocop) do |task|
   task.patterns = ['lib/**/*.rb', 'spec/**/*.rb', 'bin/*', 'tasks/**/*.rake', 'aletheia/**/*.rb', 'aletheia/bin/*']

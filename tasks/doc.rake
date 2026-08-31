@@ -34,6 +34,49 @@ namespace :doc do
       #{strays.join("\n")}
     MESSAGE
   end
+
+  desc 'Check that every public method says what it takes and what it gives back'
+  task :untagged do
+    YARD::Registry.clear
+    YARD.parse(DOCUMENTED_FILES, [], YARD::Logger::ERROR)
+    undocumented = YARD::Registry.all(:method).sort_by(&:path).filter_map do |method|
+      next unless method.visibility == :public
+      # An attribute is documented once, by the @return on the reader; its writer
+      # takes exactly that value back.
+      next if method.is_attribute?
+
+      missing = undocumented_signature(method)
+      "#{method.file}:#{method.line}: #{method.path} -- #{missing.join(', ')}" unless missing.empty?
+    end
+    next if undocumented.empty?
+
+    abort(<<~MESSAGE)
+      A public method states each parameter it takes and what it returns; these do not:
+      #{undocumented.join("\n")}
+    MESSAGE
+  end
+end
+
+# What +method+ leaves unsaid about its own signature.
+# @param [YARD::CodeObjects::MethodObject] method
+# @return [Array<String>] The missing tags, written as they would be.
+def undocumented_signature(method)
+  documented = method.tags(:param).map { |tag| tag.name.to_s }
+  missing = parameter_names(method).reject { |name| documented.include?(name) }.map { |name| "@param #{name}" }
+  missing << '@return' if method.tags(:return).empty? && method.tags(:overload).empty?
+  missing
+end
+
+# The parameters +method+ takes, named as a +@param+ names them: without the
+# keyword's colon or a splat's stars, and without the block, which +@yield+
+# tags describe instead.
+# @param [YARD::CodeObjects::MethodObject] method
+# @return [Array<String>]
+def parameter_names(method)
+  method.parameters.filter_map do |name, _default|
+    name = name.to_s.delete_suffix(':').sub(/\A\*+/, '')
+    name unless name.empty? || name.start_with?('&')
+  end
 end
 
 # Where a comment block starts describing something else. Two blocks separated by
