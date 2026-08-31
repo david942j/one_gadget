@@ -11,12 +11,13 @@
 
 ## OneGadget
 
-When playing ctf pwn challenges we usually need the one-gadget RCE (remote code execution),
-which leads to call `execve('/bin/sh', NULL, NULL)`.
+When solving CTF pwn challenges we usually want a one-gadget RCE: a single address in
+libc that, jumped to, calls `execve("/bin/sh", NULL, NULL)`.
 
-This gem provides such gadgets finder, no need to use objdump or IDA-pro every time like a fool :wink:
+This gem finds them for you, so you don't have to dig through objdump or IDA Pro every
+time :wink:
 
-To use this tool, type `one_gadget /path/to/libc` in command line and enjoy the magic :laughing:
+Point it at a libc -- `one_gadget /path/to/libc` -- and enjoy the magic :laughing:
 
 ## Installation
 
@@ -24,8 +25,6 @@ Available on RubyGems.org!
 ```bash
 $ gem install one_gadget
 ```
-
-Note: requires ruby version >= 2.1.0, you can use `ruby --version` to check.
 
 ## Supported Architectures
 
@@ -37,7 +36,8 @@ Note: requires ruby version >= 2.1.0, you can use `ruby --version` to check.
 
 ## Implementation
 
-OneGadget uses symbolic execution to find the constraints of gadgets to be successful.
+OneGadget symbolically executes the code around each candidate address to work out what
+has to hold for the gadget to work.
 
 Gadgets are found by walking the control-flow graph backward from each `exec`/`posix_spawn`
 call, following conditional branches both ways. When a gadget is only reachable if a branch is
@@ -89,29 +89,29 @@ BuildID is fetched from this repository, which keeps them all.
 
 ##### Why
 
-Consider this scenario when exploiting:
-1. Able to write on GOT (Global Offset Table)
-2. Base address of libc is *unknown*
+Consider this situation while exploiting:
+1. You can write to the GOT (Global Offset Table).
+2. The base address of libc is *unknown*.
 
-In this scenario you can choose to write two low-byte on a GOT entry with one-gadget's two low-byte.
-If the function offset on GOT is close enough with the one-gadget,
-you will have at least 1/16 chance of success.
+Here you can overwrite the low two bytes of a GOT entry with the low two bytes of a
+one-gadget. If the function sits close enough to the gadget, only one nibble is left to
+guess -- at least a 1 in 16 chance of success.
 
 ##### Usage
 
-Reorder gadgets according to the distance of given functions.
+Sorts the gadgets by how far they are from the functions you name.
 
 ```bash
 SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --near exit,mkdir)
 ```
 ![near](https://github.com/david942j/one_gadget/blob/master/examples/near.png?raw=true)
 
-Regular expression is acceptable.
+Regular expressions work too.
 ```bash
 SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --near 'write.*' --raw)
 ```
 
-Pass an ELF file as the argument, OneGadget will take all GOT functions for processing.
+Pass an ELF file instead, and OneGadget uses every function in its GOT.
 ```bash
 SHELL_OUTPUT_OF(one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so --near spec/data/test_near_file.elf --raw)
 ```
@@ -167,8 +167,8 @@ SHELL_OUTPUT_OF(one_gadget spec/data/riscv64-libc-2.39.so)
 ```
 
 #### Combine with Script
-Pass your exploit script as `one_gadget`'s arguments, it can
-try all gadgets one by one, so you don't need to try every possible gadgets manually.
+Pass your exploit script to `one_gadget` and it runs the script once per gadget, so you
+don't have to work through them by hand.
 
 ```bash
 $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so -s 'echo "offset ->"'
@@ -180,7 +180,7 @@ $ one_gadget spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so -s 
 ```ruby
 require 'one_gadget'
 RUBY_OUTPUT_OF(OneGadget.gadgets(file: 'spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so'))
-# or in shorter way
+# or, more briefly
 RUBY_OUTPUT_OF(one_gadget('spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so', level: 1))
 # from build id
 RUBY_OUTPUT_OF(one_gadget('b417c0ba7cc5cf06d1d1bed6652cedb9253c60d0'))
@@ -196,7 +196,7 @@ RUBY_OUTPUT_OF(one_gadget('spec/data/libc-2.31-9fdb74e7b217d06c93172a8243f8547f9
 ```
 
 ## Make OneGadget Better
-Any suggestion or feature request is welcome! Feel free to send a pull request.
+Any suggestion or feature request is welcome, and pull requests even more so!
 
-Please let me know if you find any libc that make OneGadget fail to find gadgets.
-And, if you like this work, I'll be happy to be [starred](https://github.com/david942j/one_gadget/stargazers) :grimacing:
+Please let me know if you come across a libc OneGadget finds nothing in. And if you like
+this work, I'd be happy to be [starred](https://github.com/david942j/one_gadget/stargazers) :grimacing:
