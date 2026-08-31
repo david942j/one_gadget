@@ -18,13 +18,20 @@ releases are cut by giving that section a version and a date.
 - Reading a libc that ships without section headers, as an embedded one commonly
   does -- OpenWrt strips them from musl to save flash (#432). Nothing is missing
   from such a file, so the symbols are read through `PT_DYNAMIC` and the code is
-  disassembled as raw bytes; it reports the same gadgets as the same libc with
-  its sections intact.
+  disassembled as raw bytes. i386, amd64 and RISC-V report the same gadgets as
+  the same libc with its sections intact; aarch64 does except where one address
+  carries several symbol names, and arm is not read this way yet.
 - A terminal `posix_spawn` whose symbol carries no version marker, as musl's does
   not, is no longer passed over (#432).
 
 ### Fixed
 
+- A libc with no section headers reported fewer gadgets than the same libc
+  intact on aarch64 and RISC-V (#439). Naming the targets in a raw disassembly
+  covered only the shape amd64 prints, so a target separated by a comma, or
+  followed by the note objdump appends to name a mnemonic's alias, went unnamed
+  and the control-flow walk lost every edge through it -- 84 gadgets across the
+  fixture corpus.
 - amd64 threw away every candidate whose terminal call was not `execve` or
   `posix_spawn` before emulating it -- 10 to 30 `execl` windows per libc, a call
   one_gadget knows how to resolve (#434). They are emulated now. No libc in the

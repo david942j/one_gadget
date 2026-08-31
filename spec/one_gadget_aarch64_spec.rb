@@ -109,6 +109,10 @@ describe 'one_gadget_aarch64' do
       expect(gadget.constraints).to include('writable: x29-0x20')
       expect(gadget.constraints).not_to include('x2 == 0x1')
     end
+
+    it 'reports the same gadgets for a libc with no section headers' do
+      expect_same_gadgets_when_stripped('aarch64-libc-2.43.so')
+    end
   end
 
   it 'objdump not installed' do

@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-require 'tmpdir'
-
-require 'elftools'
-
 require 'one_gadget'
 require 'one_gadget/error'
 
@@ -166,28 +162,8 @@ describe 'one_gadget_amd64' do
       EOS
     end
 
-    # An embedded libc commonly ships with its section headers removed -- OpenWrt
-    # does it to musl to save flash. Nothing is missing from such a file, but the
-    # usual route to its code and symbols is, so the same libc is stripped here
-    # and required to report the same gadgets.
     it 'reports the same gadgets for a libc with no section headers' do
-      path = data_path('libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
-      Dir.mktmpdir do |dir|
-        stripped = File.join(dir, 'stripped.so')
-        File.open(path) do |fd|
-          elf = ELFTools::ELFFile.new(fd)
-          elf.header.e_shoff = 0
-          elf.header.e_shnum = 0
-          elf.header.e_shstrndx = 0
-          elf.save(stripped)
-        end
-        # the state the file is in: objdump disassembles sections, and there are none
-        expect(`objdump -d #{stripped}`).not_to include('call')
-        # Above RAW_LEVEL nothing is trimmed, and every lower level is a function
-        # of that set, so matching here matches at every level.
-        expect(OneGadget.gadgets(file: stripped, force_file: true, level: 100))
-          .to eq OneGadget.gadgets(file: path, force_file: true, level: 100)
-      end
+      expect_same_gadgets_when_stripped('libc-2.31-9fdb74e7b217d06c93172a8243f8547f947ee6d1.so')
     end
   end
 
