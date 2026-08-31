@@ -104,6 +104,12 @@ describe 'one_gadget_arm' do
       expect(effects).to include('posix_spawn(r0, "/bin/sh", r2, r8, [sp], r3)')
       expect(effects).to include('posix_spawn([sp+0x34], "/bin/sh", [sp+0x2c], 0, [sp+0x3c], r3)')
     end
+
+    # This libc keeps setcontext in A32 while the rest of it is Thumb, so the
+    # windows only read correctly if each is disassembled as what it is.
+    it 'reports the same gadgets for a libc with no section headers' do
+      expect_same_gadgets_when_stripped('arm-libc-2.27.so')
+    end
   end
 
   it 'objdump not installed' do

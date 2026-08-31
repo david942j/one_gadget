@@ -47,9 +47,10 @@ module OneGadget
         end
       end
 
-      # Every function the dynamic symbol table names, as +{address => name}+.
-      # This is where a file that has been stripped of its sections still records
-      # them, and the tags reach as many as anything in the file refers to.
+      # Every function the dynamic symbol table names, as +{address => name}+,
+      # keyed as {#symbol_address} reads a value. This is where a file that has
+      # been stripped of its sections still records them, and the tags reach as
+      # many as anything in the file refers to.
       #
       # Several symbols may name one address, and only one of them can be
       # written beside it. They all name the same code, so the choice is settled
@@ -62,7 +63,8 @@ module OneGadget
           name = symbol.name.to_s
           next if value.zero? || name.empty?
 
-          symbols[value] = name if !symbols.key?(value) || name_rank(name) >= name_rank(symbols[value])
+          addr = symbol_address(value)
+          symbols[addr] = name if !symbols.key?(addr) || name_rank(name) >= name_rank(symbols[addr])
         end
       end
 

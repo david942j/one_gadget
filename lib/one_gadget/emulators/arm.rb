@@ -153,12 +153,17 @@ module OneGadget
       # Split an objdump line into its instruction body and the literal-pool address
       # embedded in the trailing +@+ comment (used by PC-relative +ldr+).
       # @return [(String, Integer?)] The instruction body, and the literal address (or +nil+).
-      # @example
+      # @example The same load, as objdump writes it from an ELF and from bytes --
+      #   it states the address differently when it cannot name what is there.
       #   split_line('2c626: ldr r2, [pc, #128] @ (2c6a8 <x>)')
       #   #=> ['ldr r2, [pc, #128]', 0x2c6a8]
+      #   split_line('2c626: ldr r2, [pc, #128] @ (0x2c6a8)')
+      #   #=> ['ldr r2, [pc, #128]', 0x2c6a8]
+      #   split_line('2c626: ldr.w r2, [pc, #128] @ 2c6a8')
+      #   #=> ['ldr.w r2, [pc, #128]', 0x2c6a8]
       def split_line(line)
         body = line.sub(/\A[0-9a-f]+:\s*/, '')
-        literal = body[/@\s*\(?([0-9a-f]+)\s/, 1]&.to_i(16)
+        literal = body[/@\s*\(?(?:0x)?([0-9a-f]+)(?:[\s)]|\z)/, 1]&.to_i(16)
         # Strip a trailing comment. The marker is whitespace-prefixed, which avoids
         # eating the +@@+ inside symbol names such as +<execve@@GLIBC_2.4>+.
         [body.sub(/\s+[@;].*\z/, '').strip, literal]

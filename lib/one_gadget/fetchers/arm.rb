@@ -14,10 +14,55 @@ module OneGadget
 
       private
 
+      # Read as Thumb rather than A32, which objdump assumes for these bytes.
+      THUMB = %w[-M force-thumb].freeze
+      private_constant :THUMB
+
       # An ARM function's symbol value carries the Thumb bit; the address is what
       # is left of it.
       def symbol_address(value)
         value & ~1
+      end
+
+      # ARM states its two instruction sets in one file, and objdump switches
+      # between them on the mapping symbols an ELF carries -- which a file read as
+      # bytes has none of. The dynamic symbol table says the same thing in the low
+      # bit of every function's value, so each stretch is disassembled as what it
+      # says it is.
+      # @param [ELFTools::ELFFile] elf
+      # @return [void]
+      def record_instruction_sets(elf)
+        entries = elf.dynamic.symbols.filter_map do |symbol|
+          value = symbol.header.st_value.to_i
+          next if value.zero? || (symbol.header.st_info.to_i & 0xf) != ELFTools::Constants::STT_FUNC
+
+          [symbol_address(value), value.odd?]
+        end
+        # Only where it changes: a boundary between two functions encoded the same
+        # way is one objdump call more for nothing.
+        @instruction_sets = entries.sort_by(&:first).chunk_while { |a, b| a[1] == b[1] }.map(&:first)
+      end
+
+      # Split +lo+ to +hi+ where the instruction set changes (see
+      # {#record_instruction_sets}), each piece told which one it is.
+      # @param [Integer] lo
+      # @param [Integer] hi
+      # @return [Array<(Integer, Integer, Array<String>)>]
+      def decode_ranges(lo, hi)
+        return super if @instruction_sets.nil?
+
+        bounds = @instruction_sets.map(&:first).select { |addr| addr > lo && addr < hi }
+        [lo, *bounds, hi].each_cons(2).map { |from, to| [from, to, thumb_at?(from) ? THUMB : []] }
+      end
+
+      # Which instruction set the code at +addr+ is in: the one the last function
+      # starting at or before it declared. Thumb is the answer for an address no
+      # symbol precedes, being what the rest of the file overwhelmingly is.
+      # @param [Integer] addr
+      # @return [Boolean]
+      def thumb_at?(addr)
+        idx = (@instruction_sets.bsearch_index { |entry| entry.first > addr } || @instruction_sets.size) - 1
+        idx.negative? || @instruction_sets[idx][1]
       end
 
       # A32 and Thumb both spell a direct call +BL+, in different encodings, and a
