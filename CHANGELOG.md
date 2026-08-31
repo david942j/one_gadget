@@ -18,14 +18,21 @@ releases are cut by giving that section a version and a date.
 - Reading a libc that ships without section headers, as an embedded one commonly
   does -- OpenWrt strips them from musl to save flash (#432). Nothing is missing
   from such a file, so the symbols are read through `PT_DYNAMIC` and the code is
-  disassembled as raw bytes. i386, amd64, aarch64 and RISC-V report the same
-  gadgets as the same libc with its sections intact; arm is not read this way
-  yet.
+  disassembled as raw bytes. Every architecture reports the same gadgets as the
+  same libc with its sections intact.
 - A terminal `posix_spawn` whose symbol carries no version marker, as musl's does
   not, is no longer passed over (#432).
 
 ### Fixed
 
+- arm found nothing at all in a libc with no section headers (#441). Three
+  things were in the way: objdump has no mapping symbols to switch instruction
+  set on, so it read Thumb code as A32 -- each stretch is now disassembled as
+  what the dynamic symbol table says it is, which also keeps the handful of
+  genuinely A32 functions (`setcontext` and its kin) read correctly; a symbol's
+  Thumb bit made every name in the table miss its address by one; and a
+  literal-pool load went unresolved wherever objdump stated the address it
+  points at without naming what is there.
 - A libc with no section headers lost the calls at an address its symbol table
   gives more than one name, such as glibc's `sigaction`/`__sigaction` (#440).
   The name written beside such an address is now the one the emulator acts on,

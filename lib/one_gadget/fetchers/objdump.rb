@@ -41,12 +41,13 @@ module OneGadget
 
       # @param [Integer] start The start address to be dumpped from.
       # @param [Integer] stop The end address.
+      # @param [Array<String>] extra Options for this range alone, on top of {#extra_options=}.
       # @return [String] The CLI command to be executed.
-      def command(start: nil, stop: nil)
+      def command(start: nil, stop: nil, extra: [])
         # --dwarf-start=0 is to make sure `suppress_bfd_header` is true to eliminate the file path in the output, see
         # issue #204 for more details.
         # Note: We might need to update this when the objdump act differently in the future.
-        cmd = [bin, '--dwarf-start=0', '--no-show-raw-insn', '-w', *disassemble_options, *@options, @file]
+        cmd = [bin, '--dwarf-start=0', '--no-show-raw-insn', '-w', *disassemble_options, *@options, *extra, @file]
         cmd.push('--start-address', start) if start
         cmd.push('--stop-address', stop) if stop
         ::Shellwords.join(cmd)

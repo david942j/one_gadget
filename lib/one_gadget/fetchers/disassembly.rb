@@ -80,10 +80,11 @@ module OneGadget
       # a full disassembly (the win on the slow-to-objdump Thumb-2 arm libcs).
       def windowed_disasm(sites)
         windows = sites.sort.map { |a| [[a - WINDOW_BACK, 0].max, a + WINDOW_FWD] }
-        # One objdump per window, all at once: they are separate processes that
+        # One objdump per range, all at once: they are separate processes that
         # wait on each other for nothing, and a libc comes to a handful of windows.
         disassembled = merge_ranges(windows)
-                       .map { |lo, hi| Thread.new { objdump_lines(start: lo, stop: hi) } }
+                       .flat_map { |lo, hi| decode_ranges(lo, hi) }
+                       .map { |lo, hi, extra| Thread.new { objdump_lines(start: lo, stop: hi, extra:) } }
                        .map(&:value)
         starts = {}
         lines = disassembled.each_with_object([]) do |window, acc|
@@ -127,17 +128,35 @@ module OneGadget
           next if seg.nil?
 
           @raw_symbols = dynamic_symbols(elf)
+          record_instruction_sets(elf)
           @objdump.read_raw(machine: OneGadget::Helper.objdump_arch(OneGadget::Helper.architecture(file)),
                             endian: elf.endian,
                             vma: seg.header.p_vaddr.to_i - seg.header.p_offset.to_i)
         end
       end
 
-      def objdump_lines(start: nil, stop: nil)
+      # How +lo+ to +hi+ must be disassembled: as one range by default. An
+      # architecture that encodes different parts of its code differently splits
+      # it where the encoding changes, since objdump reads a whole range one way.
+      # @param [Integer] lo
+      # @param [Integer] hi
+      # @return [Array<(Integer, Integer, Array<String>)>]
+      #   Each range, with the objdump options that read it correctly.
+      def decode_ranges(lo, hi)
+        [[lo, hi, []]]
+      end
+
+      # Note how the file says its code is encoded, for {#decode_ranges} to split
+      # on. Nothing to note for an architecture with one encoding.
+      # @param [ELFTools::ELFFile] elf
+      # @return [void]
+      def record_instruction_sets(elf); end
+
+      def objdump_lines(start: nil, stop: nil, extra: [])
         # One pass, one string per line: a whole libc is hundreds of thousands of
         # them, and only the instructions are wanted.
         symbols = @raw_symbols
-        `#{@objdump.command(start:, stop:)}`.each_line.filter_map do |line|
+        `#{@objdump.command(start:, stop:, extra:)}`.each_line.filter_map do |line|
           line = line.strip
           next unless DISASSEMBLED.match?(line)
 
