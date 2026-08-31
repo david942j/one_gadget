@@ -2,6 +2,7 @@
 
 require 'elftools'
 
+require 'one_gadget/fetchers/aarch64'
 require 'one_gadget/fetchers/amd64'
 
 describe OneGadget::Fetchers::DynamicSymbols do
@@ -19,6 +20,18 @@ describe OneGadget::Fetchers::DynamicSymbols do
         execve = elf.section_by_name('.dynsym').symbol_by_name('execve')
         expect(symbols[execve.header.st_value.to_i]).to eq 'execve'
         expect(symbols.values).to include('posix_spawn')
+      end
+    end
+
+    # glibc gives one address both +sigaction+ and +__sigaction+, and only the
+    # second is a name anything downstream acts on.
+    it 'keeps the name the engine reads when an address carries several' do
+      versioned = data_path('aarch64-libc-2.27.so')
+      File.open(versioned) do |fd|
+        elf = ELFTools::ELFFile.new(fd)
+        addr = elf.section_by_name('.dynsym').symbol_by_name('sigaction').header.st_value.to_i
+        expect(OneGadget::Fetchers::AArch64.new(versioned).send(:dynamic_symbols, elf)[addr])
+          .to eq '__sigaction'
       end
     end
 

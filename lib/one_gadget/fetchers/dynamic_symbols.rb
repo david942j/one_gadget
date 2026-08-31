@@ -2,6 +2,9 @@
 
 require 'elftools'
 
+require 'one_gadget/emulators/processor'
+require 'one_gadget/emulators/safe_calls'
+
 module OneGadget
   module Fetchers
     # Reading a shared object that ships without section headers, as an embedded
@@ -47,13 +50,35 @@ module OneGadget
       # Every function the dynamic symbol table names, as +{address => name}+.
       # This is where a file that has been stripped of its sections still records
       # them, and the tags reach as many as anything in the file refers to.
+      #
+      # Several symbols may name one address, and only one of them can be
+      # written beside it. They all name the same code, so the choice is settled
+      # by what a reader of the name can do with it ({#name_rank}).
       # @param [ELFTools::ELFFile] elf
       # @return [Hash{Integer => String}]
       def dynamic_symbols(elf)
         @dynamic_symbols ||= (elf.dynamic&.symbols || []).each_with_object({}) do |symbol, symbols|
           value = symbol.header.st_value.to_i
-          symbols[value] = symbol.name unless value.zero? || symbol.name.to_s.empty?
+          name = symbol.name.to_s
+          next if value.zero? || name.empty?
+
+          symbols[value] = name if !symbols.key?(value) || name_rank(name) >= name_rank(symbols[value])
         end
+      end
+
+      # How much the engine can do with +name+: it recognises a terminal entry
+      # point by naming it exactly, a call it can step over by containing one of
+      # the catalog's names, and nothing else by name at all. Higher is more.
+      # @param [String] name One symbol name.
+      # @return [Integer]
+      # @example Two names for one address, of which only the second is read.
+      #   name_rank('sigaction')   #=> 0
+      #   name_rank('__sigaction') #=> 1
+      def name_rank(name)
+        return 2 if OneGadget::Emulators::Processor::TERMINAL_CALL_RE.match?(name)
+        return 1 if OneGadget::Emulators::SafeCalls::COMMON.keys.any? { |known| name.include?(known) }
+
+        0
       end
 
       # Rewrite a raw-disassembly line into what reading the ELF would have
