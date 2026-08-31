@@ -136,8 +136,7 @@ module Aletheia
       # @param [String] file
       # @return [String?]
       def package_version(file)
-        File.binread(file)[/Ubuntu E?GLIBC (\d[^)]*)/, 1] ||
-          NON_UBUNTU_FIXTURE_VERSIONS[File.basename(file, '.so')]
+        File.binread(file)[/Ubuntu E?GLIBC (\d[^)]*)/, 1]
       end
 
       def stub_built?(dir)
@@ -147,16 +146,6 @@ module Aletheia
           File.file?(stub) && File.mtime(stub) >= src_mtime
         end
       end
-
-      # A few fixtures are plain (non-Ubuntu) glibc builds and carry no "Ubuntu
-      # GLIBC" banner to parse an exact package version from -- e.g.
-      # libc-2.26-2104f3d4...'s banner reads "GNU C Library (GNU libc) stable
-      # release version 2.26", with no Ubuntu package suffix. Recorded by hand
-      # from a same-major.minor sibling fixture that does carry the banner
-      # (same glibc release, so ABI-equivalent for sysroot purposes).
-      NON_UBUNTU_FIXTURE_VERSIONS = {
-        'libc-2.26-2104f3d4ad5cf68603afbe7ba1a17f5ac99c5988' => '2.26-0ubuntu2.1'
-      }.freeze
 
       # Build the per-version sysroot from the fixture's own Ubuntu package version
       # (Ubuntu-sourced fixtures only). Returns whether its park_stub now exists.

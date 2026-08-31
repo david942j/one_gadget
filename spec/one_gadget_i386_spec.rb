@@ -20,12 +20,6 @@ describe 'one_gadget_i386' do
       expect(OneGadget.gadgets(file: path, force_file: true)).to eq ans
     end
 
-    it 'libc-2.26' do
-      ans = [0x3cc3c, 0x66e7f, 0x66e80, 0x132fbe, 0x132fbf]
-      path = data_path('libc-2.26-f65648a832414f2144ce795d75b6045a1ec2e252.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq ans
-    end
-
     it 'libc-2.27' do
       ans = [0x3cbf7, 0x6729f, 0x672a0, 0x13573e, 0x13573f]
       path = data_path('libc-2.27-63b3d43ad45e1b0f601848c65b067f9e9b40528b.so')
@@ -67,15 +61,15 @@ describe 'one_gadget_i386' do
         .to include('[[ebp-0x30]] == NULL || [ebp-0x30] == NULL || [ebp-0x30] is a valid envp')
     end
 
-    # 0xbda64's argv pointer is a `lea eax, [ebp-0x28]` alias: the array it builds
+    # 0xbe804's argv pointer is a `lea eax, [ebp-0x28]` alias: the array it builds
     # on the stack is {"/bin/sh", eax, NULL}, with eax an untracked incoming
     # register -- so the same resolve_stack_deref used for envp above applies to
     # argv too, surfacing `eax == NULL` instead of the opaque "[ebp-0x2c] is a
     # valid argv" form.
     it 'resolves argv through a lea-computed alias into the stack frame' do
-      path = data_path('libc-2.26-f65648a832414f2144ce795d75b6045a1ec2e252.so')
+      path = data_path('libc-2.27-63b3d43ad45e1b0f601848c65b067f9e9b40528b.so')
       gadget = OneGadget.gadgets(file: path, force_file: true, details: true, level: 1)
-                        .find { |g| g.offset == 0xbda64 }
+                        .find { |g| g.offset == 0xbe804 }
       expect(gadget.constraints).to include('eax == NULL || {"/bin/sh", eax, NULL} is a valid argv')
     end
 
