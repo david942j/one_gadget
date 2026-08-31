@@ -25,8 +25,6 @@ Available on RubyGems.org!
 $ gem install one_gadget
 ```
 
-Note: requires ruby version >= 2.1.0, you can use `ruby --version` to check.
-
 ## Supported Architectures
 
 - [x] i386
