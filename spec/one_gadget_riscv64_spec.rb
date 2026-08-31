@@ -48,5 +48,9 @@ describe 'one_gadget_riscv64' do
       expect(gadget.effect).to eq 'execve("/bin/sh", a1, a2)'
       expect(gadget.constraints).to include('[a1] == NULL || a1 == NULL || a1 is a valid argv')
     end
+
+    it 'reports the same gadgets for a libc with no section headers' do
+      expect_same_gadgets_when_stripped('riscv64-libc-2.39.so')
+    end
   end
 end

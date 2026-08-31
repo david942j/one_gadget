@@ -103,12 +103,10 @@ module OneGadget
       # stops on ({OneGadget::Emulators::Processor#terminal_call?}). Not
       # {#terminal_call_regexp}, which is looser so it can locate call sites: it
       # also matches the +posix_spawn+ setup helpers, which emulation runs through.
-      # The mnemonic must be a call, so a branch whose target symbol merely looks
-      # similar (+<execlp@@GLIBC_2.4+0x136>+) doesn't end the window.
       # @param [String] line One disassembled line.
       # @return [Boolean]
       def terminal_call_line?(line)
-        return false unless line[/\A\s*[0-9a-f]+:\s*(\S+)/, 1]&.match?(/\A#{call_str}x?(?:\.[wn])?\z/)
+        return false unless call_line?(line)
 
         name = line[/<([^@>]+)/, 1]
         !name.nil? && OneGadget::Emulators::Processor::TERMINAL_CALL_RE.match?(name)
@@ -152,6 +150,26 @@ module OneGadget
       end
 
       private
+
+      # Whether +line+ is a call, whatever it calls. The mnemonic must be the call
+      # itself, so a branch to a symbol whose name merely looks like one is not
+      # counted.
+      # @param [String] line One disassembled line.
+      # @return [Boolean]
+      # @example A call, and a branch into the middle of the same function.
+      #   call_line?('e6570: call   94180 <execve>')          #=> true
+      #   call_line?('a34d0: b      a3210 <execlp+0x1a8>')    #=> false
+      def call_line?(line)
+        line[/\A\s*[0-9a-f]+:\s*(\S+)/, 1]&.match?(/\A#{call_str}x?(?:\.[wn])?\z/) || false
+      end
+
+      # Whether +line+ transfers control, so the address it names is a place in
+      # the file rather than a value it works with.
+      # @param [String] line One disassembled line.
+      # @return [Boolean]
+      def control_transfer?(line)
+        !branch_kind(line).nil? || call_line?(line)
+      end
 
       # Whether +str+ references a libc global, i.e. an address the caller does not
       # choose. The default reads the +$base+-relative form an arch produces once it

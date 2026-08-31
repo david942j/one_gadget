@@ -16,9 +16,21 @@ module OneGadget
     # dynamic segment, and the raw disassembly is rewritten to name them, so
     # everything downstream reads what it always reads.
     module DynamicSymbols
-      # A branch or call whose target objdump could not name, e.g.
-      # +call   0x94180+. Raw disassembly writes every target this way.
-      UNNAMED_TARGET = /\A(.*\s)0x([0-9a-f]+)\z/
+      # Where a line that transfers control says it goes. Raw disassembly writes
+      # every destination as +0x<addr>+, and the rest of the line is whatever the
+      # architecture puts around it: the destination may be separated by a comma,
+      # and followed by the note objdump appends to name the mnemonic's alias.
+      # @example
+      #   'call   0x94180'
+      #   'beqz   a5,0x43060'
+      #   'b.ls   0x47dcc  // b.plast'
+      CONTROL_TARGET = %r{\A(.*[\s,])0x([0-9a-f]+)(?:\s+//.*)?\z}
+
+      # An address any other line names, which it states last and alone -- so a
+      # value the line merely operates on is left as it is written.
+      # @example An architecture may resolve a pc-relative operand from this.
+      #   'lea    rcx,[rip+0x19dabe]        # 0x1eb960'
+      TRAILING_ADDRESS = /\A(.*\s)0x([0-9a-f]+)\z/
 
       private
 
@@ -45,16 +57,21 @@ module OneGadget
       end
 
       # Rewrite a raw-disassembly line into what reading the ELF would have
-      # produced: a target objdump wrote as +0x<addr>+ becomes the bare address,
-      # named when a symbol is there. The engine recognises a terminal call, and
-      # reads a branch target, from exactly that.
+      # produced: an address objdump wrote as +0x<addr>+ becomes the bare address,
+      # named when a symbol is there. The engine recognises a terminal call, reads
+      # a branch target, and matches a safe call by name, from exactly that.
+      #
+      # Where the address sits depends on what the line does, so the two are
+      # matched apart ({CONTROL_TARGET} against {TRAILING_ADDRESS}): asking for a
+      # destination's shape anywhere else would rewrite an operand that only looks
+      # like one.
       # @param [String] line One disassembled line.
       # @param [Hash{Integer => String}] symbols
       # @return [String]
       # @example
       #   symbolize('e6570: call   0x94180', symbols) #=> 'e6570: call   94180 <execve>'
       def symbolize(line, symbols)
-        m = line.match(UNNAMED_TARGET) or return line
+        m = line.match(control_transfer?(line) ? CONTROL_TARGET : TRAILING_ADDRESS) or return line
 
         name = symbols[m[2].to_i(16)]
         named = name ? " <#{name}>" : ''

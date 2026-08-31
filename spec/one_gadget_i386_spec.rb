@@ -82,6 +82,10 @@ describe 'one_gadget_i386' do
     it 'special filename' do
       expect(OneGadget.gadgets(file: data_path('filename$with+special&keys'))).not_to be_empty
     end
+
+    it 'reports the same gadgets for a libc with no section headers' do
+      expect_same_gadgets_when_stripped('libc-2.27-63b3d43ad45e1b0f601848c65b067f9e9b40528b.so')
+    end
   end
 
   describe 'from build id' do
