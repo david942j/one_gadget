@@ -173,8 +173,6 @@ module OneGadget
       def terminal_call_sites
         File.open(file) do |fd|
           elf = ELFTools::ELFFile.new(fd)
-          return nil unless elf.endian == :little
-
           targets = terminal_symbol_addresses(elf)
           return [] if targets.empty?
 
@@ -220,7 +218,8 @@ module OneGadget
 
       # Each symbol's name offset and value, unpacked from the table's bytes. A
       # 32-bit entry is four words with the value second; a 64-bit one is six, the
-      # value being the pair from the third.
+      # value being the pair from the third. The table is the file's own data, so
+      # it is read in the byte order the file states.
       # @param [ELFTools::ELFFile] elf
       # @param [ELFTools::Sections::Section] section
       # @yieldparam [Integer] name_offset
@@ -228,12 +227,23 @@ module OneGadget
       # @return [void]
       def each_symbol(elf, section)
         wide = elf.elf_class == 64
-        section.data.unpack('V*').each_slice(wide ? 6 : 4) do |words|
-          value = wide ? words[2] && words[3] && (words[2] | (words[3] << 32)) : words[1]
+        big = elf.endian == :big
+        section.data.unpack(big ? 'N*' : 'V*').each_slice(wide ? 6 : 4) do |words|
+          value = wide ? wide_value(words, big) : words[1]
           next if value.nil? || value.zero?
 
           yield(words[0], value)
         end
+      end
+
+      # A 64-bit value stated as two words, the more significant of which comes
+      # first in a big-endian file.
+      # @param [Array<Integer>] words One symbol table entry.
+      # @param [Boolean] big
+      # @return [Integer, nil] +nil+ for a truncated entry.
+      def wide_value(words, big)
+        low, high = big ? [words[3], words[2]] : [words[2], words[3]]
+        low && high && (low | (high << 32))
       end
 
       # Map from an instruction's address to its index in {#disasm_lines}, so a

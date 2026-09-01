@@ -389,6 +389,12 @@ module OneGadget
       # The addresses in +data+ (loaded at +base+) of direct calls into +targets+.
       # Over-approximating is fine -- a false positive only adds a window nothing
       # is found in -- while a missed call costs every gadget around it.
+      #
+      # How an instruction is spelled in those bytes is the architecture's to say,
+      # not the file's: an ELF states the byte order of its *data*, and an
+      # architecture may encode instructions in the other one.
+      # @example ARM and AArch64 keep their instructions little-endian in a
+      #   big-endian file, so both read words little-endian whatever the file says.
       # @param [Integer] _base
       # @param [String] _data
       # @param [Hash{Integer => true}] _targets
