@@ -189,7 +189,7 @@ module OneGadget
         address = dynamic.tag_by_type(:pltgot)&.value or return nil
         local = dynamic.tag_by_type(:mips_local_gotno)&.value or return nil
         gotsym = dynamic.tag_by_type(:mips_gotsym)&.value or return nil
-        segment = elf.segments_by_type(:load).find { |seg| holds?(seg, address) } or return nil
+        segment = elf.segments_by_type(:load).find { |seg| seg.vma_in?(address) } or return nil
 
         names = {}
         dynamic.symbols.each do |symbol|
@@ -197,15 +197,7 @@ module OneGadget
           names[value] = symbol.name unless value.zero? || symbol.name.to_s.empty?
         end
         { local:, gotsym:, symbols: dynamic.symbols, names:, big: elf.endian == :big,
-          offset: address - segment.header.p_vaddr.to_i + segment.header.p_offset.to_i }
-      end
-
-      # @param [ELFTools::Segments::Segment] segment
-      # @param [Integer] address
-      # @return [Boolean] Whether +segment+ carries the bytes at +address+.
-      def holds?(segment, address)
-        base = segment.header.p_vaddr.to_i
-        address >= base && address < base + segment.header.p_filesz.to_i
+          offset: segment.vma_to_offset(address).to_i }
       end
     end
   end
