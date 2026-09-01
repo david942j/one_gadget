@@ -175,10 +175,9 @@ module OneGadget
       # @return [Hash, nil]
       def read_mips_got(elf)
         dynamic = elf.segment_by_type(:dynamic) or return nil
-
-        tags = {}
-        dynamic.each_tags { |tag| tags[tag.header.d_tag.to_i] = tag.header.d_val.to_i }
-        address = tags[DT_PLTGOT] or return nil
+        address = dynamic.tag_by_type(:pltgot)&.value or return nil
+        local = dynamic.tag_by_type(:mips_local_gotno)&.value or return nil
+        gotsym = dynamic.tag_by_type(:mips_gotsym)&.value or return nil
         segment = elf.segments_by_type(:load).find { |seg| holds?(seg, address) } or return nil
 
         names = {}
@@ -186,8 +185,7 @@ module OneGadget
           value = symbol.header.st_value.to_i
           names[value] = symbol.name unless value.zero? || symbol.name.to_s.empty?
         end
-        { local: tags[DT_MIPS_LOCAL_GOTNO], gotsym: tags[DT_MIPS_GOTSYM], symbols: dynamic.symbols,
-          names:, big: elf.endian == :big,
+        { local:, gotsym:, symbols: dynamic.symbols, names:, big: elf.endian == :big,
           offset: address - segment.header.p_vaddr.to_i + segment.header.p_offset.to_i }
       end
 
@@ -198,18 +196,6 @@ module OneGadget
         base = segment.header.p_vaddr.to_i
         address >= base && address < base + segment.header.p_filesz.to_i
       end
-
-      # Where the GOT starts.
-      DT_PLTGOT = 3
-      private_constant :DT_PLTGOT
-
-      # How many GOT entries come before the ones that name symbols.
-      DT_MIPS_LOCAL_GOTNO = 0x7000000a
-      private_constant :DT_MIPS_LOCAL_GOTNO
-
-      # The dynamic symbol the first of those named entries corresponds to.
-      DT_MIPS_GOTSYM = 0x70000013
-      private_constant :DT_MIPS_GOTSYM
     end
   end
 end
