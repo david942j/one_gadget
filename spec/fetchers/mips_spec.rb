@@ -7,39 +7,33 @@ describe OneGadget::Fetchers::Mips do
   # it is also the shape a real router's libc arrives in.
   let(:fetcher) { described_class.new(data_path('mips-musl-1.2.4.so')) }
 
-  def swap(lines) = fetcher.send(:swap_delay_slots, lines)
-
+  # A branch or call takes effect one instruction late, so both addresses of the
+  # pair are real entry points and they run different things: entering at the
+  # transfer runs it and its delay slot, entering at the delay slot runs that and
+  # falls straight past the transfer.
   describe 'delay slots' do
-    # The instruction after a branch runs before the branch takes effect, so
-    # stating it first is stating the order things happen in.
-    it 'states the slot before the branch it belongs to' do
-      expect(swap(['4b3c8: beq a0,v1,4b3d8 <x>', '4b3cc: sw v0,236(sp)', '4b3d0: ori v0,v0,0x4']))
-        .to eq ['4b3cc: sw v0,236(sp)', '4b3c8: beq a0,v1,4b3d8 <x>', '4b3d0: ori v0,v0,0x4']
+    let(:pair) { ['1000: b 2000 <x>', '1004: move a0,s1', '1008: lw a1,4(s6)', '100c: nop'] }
+
+    def run_from(window)
+      emulator = OneGadget::Emulators::Mips.new
+      window.each { |line| break unless emulator.process(line) }
+      emulator.argument(0).to_s
     end
 
-    it 'does the same for a call, which is where an argument often sits' do
-      expect(swap(['4b3e0: jalr t9 <posix_spawn>', '4b3e4: move a0,s1']))
-        .to eq ['4b3e4: move a0,s1', '4b3e0: jalr t9 <posix_spawn>']
+    it 'offers every address of the pair as an entry' do
+      starts = [].tap { |acc| fetcher.executed_windows(pair) { |w| acc << w.first[/\A\w+/] } }
+      expect(starts).to eq %w[1008 1004 1000]
     end
 
-    it 'leaves a run of ordinary instructions alone' do
-      lines = ['4b3d8: addiu s1,sp,508', '4b3dc: lw t9,-31652(gp)']
-      expect(swap(lines)).to eq lines
+    it 'runs the delay slot when entered at the transfer' do
+      window = [].tap { |acc| fetcher.executed_windows(pair) { |w| acc << w } }.find { |w| w.first.start_with?('1000') }
+      expect(run_from(window)).to eq 's1'
     end
 
-    # A branch's own delay slot is never itself a branch, so a swapped pair is
-    # complete and the next pair starts after it.
-    it 'takes each pair once' do
-      expect(swap(['1000: b 2000 <x>', '1004: nop', '1008: b 3000 <x>', '100c: nop']))
-        .to eq ['1004: nop', '1000: b 2000 <x>', '100c: nop', '1008: b 3000 <x>']
-    end
-
-    it 'refuses to start a candidate at one' do
-      lines = swap(['1000: b 2000 <x>', '1004: nop', '1008: move a0,s1', '100c: nop'])
-      starts = [].tap { |acc| fetcher.executed_windows(lines) { |w| acc << w.first } }
-      # 0x1004 is the delay slot: entering there would fall past the branch, not
-      # through it, so it is not an entry this listing describes
-      expect(starts.map { |l| l[/\A[0-9a-f]+/] }).to eq %w[1008 1000]
+    it 'runs the delay slot alone when entered at it, without the branch' do
+      window = [].tap { |acc| fetcher.executed_windows(pair) { |w| acc << w } }.find { |w| w.first.start_with?('1004') }
+      expect(window.map { |l| l[/\A\w+/] }).to eq %w[1004 1008 100c] # the branch is behind us
+      expect(run_from(window)).to eq 's1'
     end
   end
 
@@ -109,10 +103,17 @@ describe OneGadget::Fetchers::Mips do
       named = lines.grep(/jalr\s+t9\s+</)
       expect(named.size).to be > 1000
       expect(lines.count { |line| fetcher.terminal_call_line?(line) }).to be > 0
-      # the instruction before a named call is its delay slot, which really runs first
-      call = lines.index { |line| fetcher.terminal_call_line?(line) }
-      expect(fetcher.send(:offset_of, lines[call - 1])).to be > fetcher.send(:offset_of, lines[call])
       expect(fetcher.send(:candidates)).not_to be_empty
+    end
+
+    # The window ends at the call, but the call's delay slot runs before control
+    # leaves -- so it is emulated too, which is often where an argument is set.
+    it 'runs the delay slot of the call a window ends at' do
+      call = fetcher.send(:disasm_lines).find { |line| fetcher.terminal_call_line?(line) }
+      expect(fetcher.send(:delay_slot_after, call).size).to be 1
+      # the call still lands, because the instruction it delays behind came with
+      # the window -- without that it would be held back and never applied
+      expect(fetcher.send(:emulate, [call]).registers['pc'].to_s).to eq call[/[0-9a-f]+ <.*>/]
     end
 
     it 'emulates with this arch' do

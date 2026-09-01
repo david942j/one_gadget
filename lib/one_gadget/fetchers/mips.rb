@@ -15,22 +15,15 @@ module OneGadget
     # * a call states no target -- it goes through a register loaded from the GOT,
     #   so the callee's name has to be resolved and written where every other arch
     #   has one already ({#name_got_calls});
-    # * a branch has a *delay slot*: the instruction after it runs before it takes
-    #   effect. Stating the pair in that order ({#swap_delay_slots}) is what the
-    #   engine already understands, so no delay-slot concept is needed anywhere
-    #   else.
+    # * a branch or call has a *delay slot*: the instruction after it runs before
+    #   it takes effect. {OneGadget::Emulators::Mips#process!} holds the transfer
+    #   back so both run in that order, which leaves the disassembly in the order
+    #   objdump wrote it and every address meaning what it says. Two seams follow
+    #   from it, and they are the only ones: the instruction after a call belongs
+    #   to the window that ends at the call ({#emulate}), and the edge into a
+    #   branch's target leaves from the delay slot rather than the branch
+    #   ({#branch_pred_map}).
     class Mips < Base
-      # A candidate may not begin at a delay slot. Jumping to one runs it and then
-      # falls past the branch it belongs to, which is not the path stated here --
-      # the branch is listed after it, and would be taken. Reporting such an entry
-      # would be reporting a gadget that does not exist.
-      # @param [Array<String>] lines One candidate, as a line list.
-      # @yieldparam [Array<String>] window
-      # @return [void]
-      def executed_windows(lines)
-        super { |window| yield(window) unless delay_slot?(window.first) }
-      end
-
       private
 
       # A call, however it is spelled: through a register (which is how PIC code
@@ -53,9 +46,48 @@ module OneGadget
       def emulator = OneGadget::Emulators::Mips.new
 
       # Rewrite the disassembly into what the engine reads everywhere else: every
-      # call named, and every instruction in the order it runs.
+      # call named.
       def objdump_lines(start: nil, stop: nil, extra: [])
-        swap_delay_slots(name_got_calls(super))
+        name_got_calls(super)
+      end
+
+      # A window ends at the call that ends the gadget, but that call's delay slot
+      # runs before control leaves -- it is where an argument is often set -- so it
+      # is part of what the window executes.
+      # @param [Array<String>] cmds
+      # @return [OneGadget::Emulators::Processor]
+      def emulate(cmds)
+        super(terminal_call_line?(cmds.last) ? cmds + delay_slot_after(cmds.last) : cmds)
+      end
+
+      # The instruction a transfer delays behind, as a one-element list, or none
+      # when the disassembly does not carry it (it starts another window).
+      # @param [String] line
+      # @return [Array<String>]
+      def delay_slot_after(line)
+        index = disasm_index[offset_of(line)]
+        return [] if index.nil? || window_starts.key?(index + 1)
+
+        [disasm_lines[index + 1]].compact
+      end
+
+      # A branch takes effect only after its delay slot, so the last instruction to
+      # run before control reaches the target is the one *after* the branch. Say
+      # the edge leaves from there, and a path through it reads in the order it
+      # executes without anything having to be reordered. The memo is the one the
+      # base class fills: +super+ sets it to the undelayed map, and this replaces
+      # it with the delayed one.
+      # @return [Hash{Integer => Array<Integer>}]
+      def branch_pred_map
+        @branch_pred_map ||= delayed_edges(super)
+      end
+
+      # Move each edge on by one instruction, dropping any whose delay slot the
+      # disassembly does not carry because another window starts there.
+      # @param [Hash{Integer => Array<Integer>}] map
+      # @return [Hash{Integer => Array<Integer>}]
+      def delayed_edges(map)
+        map.to_h { |target, indexes| [target, indexes.filter_map { |i| i + 1 unless window_starts.key?(i + 1) }] }
       end
 
       # The call this arch actually uses names no target: the callee is loaded out
@@ -99,51 +131,6 @@ module OneGadget
       # register rather than writing it.
       TARGET_WRITE = /:\s*(?!s[whb]\b)\S+\s+t9,/
       private_constant :TARGET_WRITE
-
-      # State each branch and its delay slot in the order they execute. The slot
-      # runs first -- that is what a delay slot is -- so listing it first leaves a
-      # line list the engine can read as ordinary straight-line code.
-      # @param [Array<String>] lines
-      # @return [Array<String>]
-      def swap_delay_slots(lines)
-        lines = lines.dup
-        index = 0
-        while index < lines.size - 1
-          unless delayed?(lines[index])
-            index += 1
-            next
-          end
-
-          delay_slots[offset_of(lines[index + 1])] = true
-          lines[index], lines[index + 1] = lines[index + 1], lines[index]
-          index += 2
-        end
-        lines
-      end
-
-      # Every mnemonic that carries a delay slot: this arch delays each of its
-      # branches, jumps and calls alike.
-      def delayed?(line)
-        mnem = mnemonic(line)
-        OneGadget::Emulators::Mips::COND.key?(mnem) || DELAYED_JUMPS.include?(mnem)
-      end
-
-      # The unconditional transfers, which are delayed as the conditional ones are.
-      DELAYED_JUMPS = %w[b j jr jal jalr bal].freeze
-      private_constant :DELAYED_JUMPS
-
-      # Which addresses hold a delay slot, remembered as they are found so
-      # {#executed_windows} can refuse to start there.
-      # @return [Hash{Integer => true}]
-      def delay_slots
-        @delay_slots ||= {}
-      end
-
-      # @param [String] line
-      # @return [Boolean] Whether +line+ is the delay slot of the branch after it.
-      def delay_slot?(line)
-        delay_slots.key?(offset_of(line))
-      end
 
       # The symbol a +gp+-relative GOT slot names, or +nil+ for one that names
       # nothing this can read. This arch states its GOT in the dynamic segment, so
@@ -194,10 +181,10 @@ module OneGadget
         names = {}
         dynamic.symbols.each do |symbol|
           value = symbol.header.st_value.to_i
-          names[value] = symbol.name unless value.zero? || symbol.name.to_s.empty?
+          names[value] = symbol.name unless value.zero? || symbol.name.empty?
         end
         { local:, gotsym:, symbols: dynamic.symbols, names:, big: elf.endian == :big,
-          offset: segment.vma_to_offset(address).to_i }
+          offset: segment.vma_to_offset(address) }
       end
     end
   end
