@@ -19,6 +19,12 @@ module OneGadget
     RISCV64 = %w[zero ra sp gp tp] + 0.upto(6).map { |i| "t#{i}" } +
               0.upto(11).map { |i| "s#{i}" } + 0.upto(7).map { |i| "a#{i}" }
 
+    # Registers of MIPS (32-bit), by the names objdump prints: it emits the ABI
+    # names rather than the numbered +$0+-+$31+, and +fp+ rather than +s8+.
+    MIPS = %w[zero at v0 v1 gp sp fp ra] +
+           0.upto(3).map { |i| "a#{i}" } + 0.upto(9).map { |i| "t#{i}" } +
+           0.upto(7).map { |i| "s#{i}" } + 0.upto(1).map { |i| "k#{i}" }
+
     # Registers of ARM (32-bit).
     # objdump never prints the numbered name of a register that has a role name:
     # +r10+-+r15+ always appear as +sl+/+fp+/+ip+/+sp+/+lr+/+pc+, so those are
@@ -39,7 +45,9 @@ module OneGadget
       arm: {},
       # RISC-V names no part of a register: its 32-bit operations are instructions
       # of their own (+addiw+, +sext.w+), each writing the whole register.
-      riscv64: {}
+      riscv64: {},
+      # MIPS names no part of a register either.
+      mips: {}
     }.freeze
 
     # Registers a call may destroy, per each ABI's calling convention: the return
@@ -60,7 +68,12 @@ module OneGadget
       arm: %w[r0 r1 r2 r3 ip lr],
       # RISC-V LP64: a0-a7 arguments (a0/a1 also the return), t0-t6 temporaries,
       # and ra, which the call itself overwrites with the return address.
-      riscv64: %w[ra] + 0.upto(7).map { |i| "a#{i}" } + 0.upto(6).map { |i| "t#{i}" }
+      riscv64: %w[ra] + 0.upto(7).map { |i| "a#{i}" } + 0.upto(6).map { |i| "t#{i}" },
+      # o32: v0/v1 the return, a0-a3 arguments, t0-t9 temporaries, at the
+      # assembler's scratch, and ra, which the call itself overwrites. gp goes
+      # with them: PIC code reloads it from the stack after every call, because
+      # the callee establishes its own.
+      mips: %w[at v0 v1 gp ra] + 0.upto(3).map { |i| "a#{i}" } + 0.upto(9).map { |i| "t#{i}" }
     }.freeze
 
     # The register each ABI leaves an integer return value in.
@@ -98,10 +111,16 @@ module OneGadget
       RISCV64
     end
 
+    # Registers' name of MIPS (32-bit).
+    # @return [Array<String>] List of registers.
+    def mips
+      MIPS
+    end
+
     # Returns all names of registers.
     # @return [Array<String>] List of registers.
     def all
-      amd64 + aarch64 + arm + riscv64
+      amd64 + aarch64 + arm + riscv64 + mips
     end
 
     # Checks if the register is a stack-related pointer.
