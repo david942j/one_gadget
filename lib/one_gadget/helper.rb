@@ -200,7 +200,8 @@ module OneGadget
       ELFTools::Constants::EM::EM_ARM => :arm,
       ELFTools::Constants::EM::EM_X86_64 => :amd64,
       ELFTools::Constants::EM::EM_AARCH64 => :aarch64,
-      ELFTools::Constants::EM::EM_RISCV => :riscv64
+      ELFTools::Constants::EM::EM_RISCV => :riscv64,
+      ELFTools::Constants::EM::EM_MIPS => :mips
     }.freeze
 
     # @param [String] file The target ELF filename.
