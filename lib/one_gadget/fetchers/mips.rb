@@ -70,14 +70,15 @@ module OneGadget
         lines.map do |line|
           if (m = line.match(GOT_LOAD))
             loaded = m[1].to_i
-            line
-          elsif line.match?(INDIRECT_CALL) && loaded
-            name = got_symbol(loaded)
+          elsif line.match?(INDIRECT_CALL)
+            name = loaded && got_symbol(loaded)
             loaded = nil
-            name ? "#{line} <#{name}>" : line
-          else
-            line
+            next name ? "#{line} <#{name}>" : line
+          elsif line.match?(TARGET_WRITE)
+            # the call no longer goes where that offset said
+            loaded = nil
           end
+          line
         end
       end
 
@@ -85,9 +86,19 @@ module OneGadget
       GOT_LOAD = /:\s*lw\s+t9,(-?\d+)\(gp\)/
       private_constant :GOT_LOAD
 
-      # The call through it, which objdump writes with nothing after the register.
-      INDIRECT_CALL = /:\s*jalr\s+t9\s*\z/
+      # The call through it. o32 requires the callee's address in +t9+ -- that is
+      # how the callee computes its own +gp+ -- so a call always reads that
+      # register, optionally naming the one the return address goes to.
+      INDIRECT_CALL = /:\s*jalr\s+(?:\w+,)?t9\s*\z/
       private_constant :INDIRECT_CALL
+
+      # Anything else that writes the call register. Only the load that last wrote
+      # +t9+ says where the call goes: most calls reach it another way (out of a
+      # struct, or from a register), and carrying a GOT offset over one of those
+      # would name the call after a function it never reaches. A store reads the
+      # register rather than writing it.
+      TARGET_WRITE = /:\s*(?!s[whb]\b)\S+\s+t9,/
+      private_constant :TARGET_WRITE
 
       # State each branch and its delay slot in the order they execute. The slot
       # runs first -- that is what a delay slot is -- so listing it first leaves a

@@ -60,6 +60,23 @@ describe OneGadget::Fetchers::Mips do
     it 'leaves a call whose target was never loaded from the GOT' do
       expect(fetcher.send(:name_got_calls, ['24: jalr t9'])).to eq ['24: jalr t9']
     end
+
+    # Most calls reach their target another way; carrying the offset over one of
+    # those would name the call after a function it never reaches.
+    it 'forgets the offset once something else writes the call register' do
+      lines = ['4b3dc: lw t9,-31652(gp)', '4b3e0: lw t9,8(s0)', '4b3e4: jalr t9']
+      expect(fetcher.send(:name_got_calls, lines)).to eq lines
+    end
+
+    it 'reads the register the call really uses, not the one it returns to' do
+      expect(fetcher.send(:name_got_calls, ['4b3dc: lw t9,-31652(gp)', '4b3e0: jalr ra,t9']))
+        .to eq ['4b3dc: lw t9,-31652(gp)', '4b3e0: jalr ra,t9 <posix_spawnattr_init>']
+    end
+
+    it 'keeps the offset across a store, which reads the register' do
+      lines = ['4b3dc: lw t9,-31652(gp)', '4b3e0: sw t9,16(sp)', '4b3e4: jalr t9']
+      expect(fetcher.send(:name_got_calls, lines).last).to eq '4b3e4: jalr t9 <posix_spawnattr_init>'
+    end
   end
 
   # This arch states its GOT in the dynamic segment, so the table is readable even
