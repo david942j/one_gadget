@@ -171,6 +171,19 @@ module OneGadget
         !branch_kind(line).nil? || call_line?(line)
       end
 
+      # What a libc calls the variable holding the environment a process started
+      # with, allowing for the aliases exported beside it (+_environ+, +__environ+).
+      ENVIRON = /\A_*environ\z/
+      private_constant :ENVIRON
+
+      # Whether +str+ names the address of that variable. An architecture that can
+      # say which symbol an address belongs to answers this; the rest cannot, and
+      # recognise the environment by the shape of the pointer instead (see
+      # {ArgumentResolution#check_envp}).
+      # @param [String] _str A rendered value.
+      # @return [Boolean]
+      def environ?(_str) = false
+
       # Whether +str+ references a libc global, i.e. an address the caller does not
       # choose. The default reads the +$base+-relative form an arch produces once it
       # concretizes a pc-relative operand; one that reaches its globals through a

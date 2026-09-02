@@ -33,6 +33,7 @@ $ gem install one_gadget
 - [x] aarch64 (ARMv8)
 - [x] arm (ARMv7, A32/Thumb-2)
 - [x] riscv64 (RV64GC)
+- [x] mips (MIPS32 o32, big- and little-endian)
 
 ## Implementation
 
@@ -164,6 +165,16 @@ SHELL_OUTPUT_OF(one_gadget spec/data/arm-libc-2.39.so)
 
 ```bash
 SHELL_OUTPUT_OF(one_gadget spec/data/riscv64-libc-2.39.so)
+```
+
+##### MIPS
+
+Big-endian is as common as little-endian here, and both are read. This one is
+OpenWrt's musl for ath79, which ships with no section headers -- the shape a
+router's libc usually arrives in.
+
+```bash
+SHELL_OUTPUT_OF(one_gadget spec/data/mips-musl-1.2.4.so)
 ```
 
 #### Combine with Script

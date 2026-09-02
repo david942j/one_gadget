@@ -5,6 +5,7 @@ require 'one_gadget/fetchers/aarch64'
 require 'one_gadget/fetchers/amd64'
 require 'one_gadget/fetchers/arm'
 require 'one_gadget/fetchers/i386'
+require 'one_gadget/fetchers/mips'
 require 'one_gadget/fetchers/riscv64'
 require 'one_gadget/gadget'
 require 'one_gadget/helper'
@@ -23,6 +24,7 @@ module OneGadget
       amd64: OneGadget::Fetchers::Amd64,
       arm: OneGadget::Fetchers::Arm,
       i386: OneGadget::Fetchers::I386,
+      mips: OneGadget::Fetchers::Mips,
       riscv64: OneGadget::Fetchers::Riscv64
     }.freeze
 

@@ -24,7 +24,43 @@ module OneGadget
     #   branch's target leaves from the delay slot rather than the branch
     #   ({#branch_pred_map}).
     class Mips < Base
+      # Everything this arch reaches -- its calls and its globals alike -- goes
+      # through the GOT base in +gp+, which is a precondition the caller arranges
+      # by setting that register. Say so, and drop the read/write requirements
+      # rooted there: the GOT is a fixed, mapped libc address, so reaching through
+      # it asks nothing further of the caller (as i386 does for its own GOT
+      # register).
+      # @param [OneGadget::Emulators::Processor] processor
+      # @return [Hash, nil]
+      def resolve(processor)
+        res = super
+        return if res.nil?
+
+        got = got_base_constraint(processor, GOT_BASE) or return nil
+
+        res[:constraints].unshift(got)
+        res[:constraints].reject! { |con| con.match?(/\A(?:writable|readable): \[*#{GOT_BASE}\b/) }
+        res
+      end
+
+      # This arch reads a global through the GOT and resolves the slot to the
+      # address it holds, so what reaches a call is one dereference of the variable
+      # rather than two of the slot naming it. Which variable that is comes from
+      # the symbols already read for the table.
+      # @param [String] str A rendered value.
+      # @return [Boolean]
+      def environ?(str)
+        got = mips_got or return false
+        offset = string_file_offset(str.delete('[]')) or return false
+
+        ENVIRON.match?(got[:names][offset].to_s)
+      end
+
       private
+
+      # The register o32 states the GOT base in.
+      GOT_BASE = 'gp'
+      private_constant :GOT_BASE
 
       # A call, however it is spelled: through a register (which is how PIC code
       # reaches everything) or directly.
@@ -48,7 +84,7 @@ module OneGadget
       # Rewrite the disassembly into what the engine reads everywhere else: every
       # call named.
       def objdump_lines(start: nil, stop: nil, extra: [])
-        name_got_calls(super)
+        state_got_values(name_got_calls(super))
       end
 
       # A window ends at the call that ends the gadget, but that call's delay slot
@@ -114,6 +150,28 @@ module OneGadget
         end
       end
 
+      # A libc global is reached through the GOT as well: the slot holds the
+      # address, and an +addiu+ applies the offset within it. What the slot holds
+      # is in the file, so state it beside the load -- which is what lets the
+      # value read as +$base+<off>+, the form every other architecture produces
+      # for a global.
+      # @param [Array<String>] lines
+      # @return [Array<String>]
+      # @example
+      #   'lw a0,-32496(gp)' #=> 'lw a0,-32496(gp)  # b0000'
+      def state_got_values(lines)
+        lines.map do |line|
+          m = line.match(GOT_GLOBAL_LOAD) or next line
+
+          address = got_address(m[1].to_i)
+          address.nil? || address.zero? ? line : "#{line}  # #{format('%x', address)}"
+        end
+      end
+
+      # Loading anything but the call target out of the GOT.
+      GOT_GLOBAL_LOAD = /:\s*lw\s+(?!t9,)\w+,(-?\d+)\(gp\)/
+      private_constant :GOT_GLOBAL_LOAD
+
       # Loading the call target out of the GOT, which is +gp+-relative.
       GOT_LOAD = /:\s*lw\s+t9,(-?\d+)\(gp\)/
       private_constant :GOT_LOAD
@@ -132,19 +190,31 @@ module OneGadget
       TARGET_WRITE = /:\s*(?!s[whb]\b)\S+\s+t9,/
       private_constant :TARGET_WRITE
 
-      # The symbol a +gp+-relative GOT slot names, or +nil+ for one that names
-      # nothing this can read. This arch states its GOT in the dynamic segment, so
-      # the answer is there even for a file with no sections at all.
+      # What a +gp+-relative GOT slot holds, as +[address, name]+, or +nil+ for one
+      # this cannot read. This arch states its GOT in the dynamic segment, so the
+      # answer is there even for a file with no sections at all. An entry below
+      # +DT_MIPS_LOCAL_GOTNO+ holds the address outright; the rest correspond one
+      # for one with the dynamic symbols.
       # @param [Integer] gp_offset The offset as the instruction writes it.
-      # @return [String, nil]
-      def got_symbol(gp_offset)
+      # @return [(Integer, String), nil]
+      def got_entry(gp_offset)
         got = mips_got or return nil
 
         index = (GP_BIAS + gp_offset) / 4
-        return got[:names][local_got_entry(got, index)] if index < got[:local]
-
-        got[:symbols][got[:gotsym] + index - got[:local]]&.name
+        if index < got[:local]
+          address = local_got_entry(got, index)
+          return address && [address, got[:names][address]]
+        end
+        got[:symbols][got[:gotsym] + index - got[:local]]
       end
+
+      # @param [Integer] gp_offset
+      # @return [String, nil] The symbol the slot names.
+      def got_symbol(gp_offset) = got_entry(gp_offset)&.last
+
+      # @param [Integer] gp_offset
+      # @return [Integer, nil] The address the slot holds.
+      def got_address(gp_offset) = got_entry(gp_offset)&.first
 
       # +gp+ points this far into the GOT, so that one signed 16-bit offset reaches
       # the most of it. Every +gp+-relative offset is read against it.
@@ -178,12 +248,12 @@ module OneGadget
         gotsym = dynamic.tag_by_type(:mips_gotsym)&.value or return nil
         segment = elf.segments_by_type(:load).find { |seg| seg.vma_in?(address) } or return nil
 
-        names = {}
-        dynamic.symbols.each do |symbol|
-          value = symbol.header.st_value.to_i
-          names[value] = symbol.name unless value.zero? || symbol.name.empty?
-        end
-        { local:, gotsym:, symbols: dynamic.symbols, names:, big: elf.endian == :big,
+        # Read out of the symbols now, rather than holding them: they are lazy, and
+        # the file they would read from is closed as soon as this returns.
+        symbols = dynamic.symbols.map { |symbol| [symbol.header.st_value.to_i, symbol.name] }
+        names = symbols.to_h { |value, name| [value, name] }
+                       .reject { |value, name| value.zero? || name.empty? }
+        { local:, gotsym:, symbols:, names:, big: elf.endian == :big,
           offset: segment.vma_to_offset(address) }
       end
     end
