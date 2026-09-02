@@ -774,10 +774,14 @@ module Aletheia
 
     # Set the base register to the libc GOT, +base + PLTGOT offset+; the driver
     # resolves the +base_off+ against the runtime load base (cf. +scratch_off+).
+    # An ABI may point that register a fixed distance *into* the table rather than
+    # at its start -- o32 puts +gp+ 0x7ff0 in, so one signed 16-bit offset reaches
+    # most of it -- which the backend states.
     def apply_got(plan, disjunct)
       return false unless @got_offset
 
-      set_reg(plan, xreg(disjunct[GOT, 1]), { 'base_off' => @got_offset })
+      bias = @arch.respond_to?(:got_bias) ? @arch.got_bias : 0
+      set_reg(plan, xreg(disjunct[GOT, 1]), { 'base_off' => @got_offset + bias })
     end
 
     # A register value the driver resolves against the libc load base.

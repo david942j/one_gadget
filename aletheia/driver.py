@@ -65,9 +65,19 @@ elif plan.get("benign_default"):
     fill = scratch + 0x100
 else:
     fill = None
+# A register gdb spells differently from the constraints: gdb's own $fp/$sp are
+# frame-derived and cannot be assigned, so such a register is named here by the
+# other name it answers to (MIPS $fp -> $s8).
+ALIASES = arch.get("reg_aliases", {})
+
+
+def gdb_name(reg):
+    return ALIASES.get(reg, reg)
+
+
 if fill is not None:
     for r in arch["gprs"]:
-        gdb.execute("set $%s = %#x" % (r, fill))
+        gdb.execute("set $%s = %#x" % (gdb_name(r), fill))
 
 def set_reg(reg, val):
     # gdb rejects `set $xmm0 = <int>` (an XMM register is a vector union, not a
@@ -77,7 +87,7 @@ def set_reg(reg, val):
         gdb.execute("set $%s.v2_int64[0] = %#x" % (reg, val & MASK))
         gdb.execute("set $%s.v2_int64[1] = 0" % reg)
     else:
-        gdb.execute("set $%s = %#x" % (reg, val & MASK))
+        gdb.execute("set $%s = %#x" % (gdb_name(reg), val & MASK))
 
 
 for reg, val in plan.get("regs", {}).items():

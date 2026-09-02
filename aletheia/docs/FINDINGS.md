@@ -497,6 +497,39 @@ register, so their store lands wherever the caller points it, not necessarily in
 **After the fix:** riscv64 level 2 is **171 PASS, 0 FAIL, 0 SKIP**, and no other
 architecture's output changes at any level.
 
+## Finding 12 -- missing constraint: a GOT base register the window reloads from its own frame
+
+**Where:** mipsel-libc-2.36 `0x4b3d8`, `0x4b424` (both `posix_spawn`). Found the first
+time MIPS was verified, 2026-09-02. **Fixed** -- one_gadget now refuses these. Every
+other MIPS gadget verifies: 6 for that fixture and 3 for each musl one, 12 in all.
+
+o32 code is PIC through `gp`, and every gadget on the architecture therefore carries
+`gp is the GOT address of libc`. But the ABI also has the *caller* restore `gp` after
+each call, because the callee establishes its own:
+
+```
+4b3e0: jalr t9 <posix_spawnattr_init>
+4b3e4: move a0,s1          ; delay slot
+4b3ec: lw   gp,24(sp)      ; gp reloaded from the frame
+4b3f0: lw   t9,-31648(gp)  ; SIGSEGV -- reads the GOT through whatever that slot held
+```
+
+From `0x4b3ec` on, the window reaches the GOT through `[sp+0x18]`, a slot nobody sets
+up. one_gadget still named the following call `<posix_spawnattr_setsigmask>` because the
+fetcher pairs `lw t9,off(gp)` with `jalr t9` in the *text*, taking `gp` to be the GOT
+base throughout. So the gadget was reported as though it reached `posix_spawn`, while a
+caller meeting every stated constraint faults at `0x4b3f0`.
+
+Aletheia said so plainly: `l0=false` with `SIGSEGV at base+0x4b3f0`, and the emulator's
+own state confirms the cause -- both failing gadgets end with `gp = [sp+0x18]`, while
+all six that pass end with `gp = gp`.
+
+**The fix** is the policy `Base#got_base_constraint` already states for i386 and arm: a
+window that gets its GOT base out of memory names a location nobody arranges, so it is
+refused rather than described by a constraint nothing can meet. `Fetchers::Mips#resolve`
+now drops any window whose GOT register no longer holds its entry value. That takes the
+fixture from 8 gadgets to 6 at level 1 (50 to 22 raw), and **all 6 verify**.
+
 ## Reproduce
 
 ```

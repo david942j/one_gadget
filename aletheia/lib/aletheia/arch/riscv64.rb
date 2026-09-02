@@ -39,10 +39,6 @@ module Aletheia
       # loads directly.
       def version_strict? = true
 
-      # gdb register expression for GPR +name+. gdb answers to the ABI names the
-      # disassembly uses, and they alias the numbered ones ($a0 is $x10).
-      def gdb_reg(name) = "$#{name}"
-
       # This arch spells no register more than one way: objdump emits neither the
       # numbered +x0+-+x31+ names nor +fp+ for +s0+, so a name arrives as itself.
       def normalize_reg(reg) = reg

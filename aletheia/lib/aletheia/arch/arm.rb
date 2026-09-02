@@ -39,8 +39,6 @@ module Aletheia
       # crashes under a newer ld.so); the toolchain-matched version uses the default.
       def version_strict? = true
 
-      def gdb_reg(name) = "$#{name}"
-
       def stub_binary = 'park_stub_arm'
 
       def qemu

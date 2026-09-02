@@ -10,7 +10,7 @@ part of the published gem.
 
 ## Status
 
-Verifies amd64, i386, arm, aarch64, and riscv64. The backend is picked from the target ELF's machine,
+Verifies amd64, i386, arm, aarch64, riscv64 and MIPS (both byte orders). The backend is picked from the target ELF's machine,
 and the transport from the *host* arch: the arch that matches the host runs natively, the rest
 under qemu-user — so the same suite works on any host (an aarch64 host runs aarch64 natively and
 the others under qemu; an x86_64 host does the reverse). arm runs via stub self-injection (no
@@ -18,8 +18,12 @@ gdbstub); its `execve` gadgets verify, but `posix_spawn` gadgets are SKIPped bec
 lacks the `clone3` syscall glibc uses to fork (see `docs/DESIGN.md`). Set `ALETHEIA_FORCE_QEMU=1`
 to run a native arch under qemu too. riscv64 answers L2 only: gdb has no syscall catchpoint on
 that architecture, so nothing stops at the `execve` entry and the L0 signal goes unanswered — the
-verdict still comes from a real shell running `ls /`, which is what decides PASS anyway. Other
-architectures plug in behind `Aletheia::Arch` — see `docs/ADDING-AN-ARCH.md`.
+verdict still comes from a real shell running `ls /`, which is what decides PASS anyway. MIPS
+has a backend per byte order, since each needs its own emulator and stub, and its musl fixtures
+are run *as* the stub's own libc rather than loaded beside it: musl recognises its own
+implementation and hands a second `dlopen` back the one already running, so it can only be
+verified by being the libc the stub comes up on. Other architectures plug in behind
+`Aletheia::Arch` — see `docs/ADDING-AN-ARCH.md`.
 
 ## Prerequisites
 

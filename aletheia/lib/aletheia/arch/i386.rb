@@ -27,8 +27,6 @@ module Aletheia
       # (see {Transport::Base#sysroot}). amd64 tolerates the mismatch and does not.
       def version_strict? = true
 
-      def gdb_reg(name) = "$#{name}"
-
       # i386 constraints already name the 32-bit registers, so no folding is needed.
       def normalize_reg(reg) = reg
 

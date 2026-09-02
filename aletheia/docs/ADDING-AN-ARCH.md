@@ -73,6 +73,22 @@ to reclaim disk; the next verify rebuilds what it needs. `ALETHEIA_LD_PREFIX` / 
 override manually. (Debian-sourced older fixtures would need their `.deb`s fetched differently —
 not handled yet; the default cross sysroot covers the toolchain-matched version.)
 
+## A libc that will not load beside the stub
+
+The stub normally `dlopen`s the target alongside itself. Some libcs refuse: musl
+recognises its own implementation and hands a second `dlopen` back the copy already
+running, so nothing new is mapped and no gadget in the fixture ever executes. A glibc
+stub cannot stand in either where the two disagree about the float ABI (OpenWrt's MIPS
+builds are soft-float; Debian's mipsel glibc is hard-float, and its loader refuses the
+mismatch).
+
+Such a target is instead run **as the stub's own libc**: a sysroot whose loader *is* the
+fixture, plus a stub built against that implementation (`park_stub_<arch>_musl`). The
+fixture is then the primary libc, mapped at a base the stub reports as usual, and nothing
+has to be loaded twice. `Transport::Base#self_hosted?` recognises the case and
+`#musl_sysroot` builds the sysroot; the backend states the loader name the stub asks for
+(`musl_loader`).
+
 ## posix_spawn note
 
 `do_system` gadgets fork a child that execs the shell. Natively, gdb follows the child and drives

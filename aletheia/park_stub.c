@@ -305,6 +305,11 @@ int main(int argc, char **argv) {
      * loaded libc.so.6, fall back to that mapping instead of erroring. */
     char loaded[1024] = "";
     unsigned long libc_base = map_base_path("libc.so.6", loaded, sizeof loaded);
+    /* musl refuses to load a second copy of itself, so a musl target is run AS
+     * this process's own libc (a sysroot whose loader is the fixture) and its
+     * dlopen just hands back the running one. It names that libc after the
+     * loader rather than libc.so.6, so look for it under that name too. */
+    if (!libc_base) libc_base = map_base_path("ld-musl-", loaded, sizeof loaded);
     void *h = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
     if (!h && !(loaded[0] && files_identical(argv[1], loaded))) {
         fprintf(stderr, "dlopen failed: %s\n", dlerror());

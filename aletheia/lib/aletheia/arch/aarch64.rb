@@ -30,9 +30,6 @@ module Aletheia
       # differs too much from the host's); the native run loads it directly.
       def version_strict? = true
 
-      # gdb register expression for GPR +name+ (e.g. "x0" -> "$x0").
-      def gdb_reg(name) = "$#{name}"
-
       # Normalise a 32-bit view to its 64-bit register.
       # @example +w21+ -> +x21+, +wzr+ -> +xzr+
       def normalize_reg(reg) = reg.sub(/\Aw(\d+|zr)\z/, 'x\1')

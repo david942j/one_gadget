@@ -30,8 +30,6 @@ module Aletheia
       # all). A version-matched sysroot avoids the whole ABI gap.
       def version_strict? = true
 
-      def gdb_reg(name) = "$#{name}"
-
       E2R = { 'eax' => 'rax', 'ebx' => 'rbx', 'ecx' => 'rcx', 'edx' => 'rdx',
               'esi' => 'rsi', 'edi' => 'rdi', 'ebp' => 'rbp', 'esp' => 'rsp' }.freeze
       private_constant :E2R

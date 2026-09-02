@@ -3,6 +3,7 @@
 require 'pty'
 require 'json'
 require 'timeout'
+require 'fileutils'
 require 'tempfile'
 
 require_relative 'transport'
@@ -70,6 +71,7 @@ module Aletheia
       # match? / include? on the log would raise on the invalid encoding --
       # arriving as a "harness error" against a gadget that ran fine.
       log = File.binread(log_path)
+      FileUtils.cp(log_path, ENV['ALETHEIA_KEEP_LOG']) if ENV['ALETHEIA_KEEP_LOG']
       [log_path, stub_out].each do |p|
         File.unlink(p)
       rescue StandardError
@@ -88,6 +90,14 @@ module Aletheia
         # could not drive `ls /` through this shell (e.g. a fixed `-c` command,
         # an uncontrolled argv[1], or a posix_spawn parent/child tty race).
         Result.new(result: 'EXEC', reason: 'execve("/bin/sh") reached; shell not L2-drivable', **common)
+      elsif base.nil?
+        # The stub never reached its parking point, so it never reported a load
+        # base and no gadget ever ran -- it could not host this libc beside
+        # itself. A libc implementation may refuse to be loaded twice (musl does),
+        # and a loader refuses one built for another ABI (glibc will not take a
+        # soft-float object into a hard-float process). Both are limits of what the
+        # stub can host, not statements about the gadget.
+        Result.new(result: 'SKIP', reason: 'the stub could not load this libc (harness limitation)', **common)
       elsif (sysno = log[/Unknown syscall (\d+)/, 1])
         # The emulator (qemu-user, -strace) hit a syscall it doesn't implement, so
         # the gadget couldn't run to a shell. A harness limit, not a gadget verdict.

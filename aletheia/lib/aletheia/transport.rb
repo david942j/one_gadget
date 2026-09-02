@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'fileutils'
 require 'json'
 require 'socket'
 
@@ -57,6 +58,7 @@ module Aletheia
       # is the only thing that's actually safe to assume needs nothing extra.
       def sysroot
         return @sysroot if defined?(@sysroot)
+        return @sysroot = musl_sysroot if self_hosted?
 
         ver = libc_version(@target)
         need = ver && @arch.version_strict? && ver != default_libc_version
@@ -163,11 +165,41 @@ module Aletheia
         built
       end
 
-      # The park_stub to run: an explicit override, else the per-version sysroot's
-      # stub, else the arch default.
+      # The park_stub to run: an explicit override, the one built against the
+      # target's own implementation when it hosts itself, else the per-version
+      # sysroot's stub, else the arch default.
       def stub
-        ENV['ALETHEIA_STUB'] || (sysroot && File.join(sysroot, 'park_stub')) ||
-          File.join(ROOT, @arch.stub_binary)
+        return ENV['ALETHEIA_STUB'] if ENV['ALETHEIA_STUB']
+        return File.join(ROOT, "#{@arch.stub_binary}_musl") if self_hosted?
+
+        (sysroot && File.join(sysroot, 'park_stub')) || File.join(ROOT, @arch.stub_binary)
+      end
+
+      # Whether this libc has to be run *as* the stub's own rather than loaded
+      # beside it. musl recognises its own implementation and hands a second
+      # +dlopen+ back the running one, so a musl stub can never map the fixture --
+      # and a glibc stub cannot either where the two disagree about the float ABI.
+      # Run as the loader itself, the fixture is the primary libc, mapped at a
+      # base the stub can report, and nothing has to be loaded twice. It is the
+      # same trick {#sysroot} plays for an older glibc, one step further.
+      # @return [Boolean]
+      def self_hosted?
+        return @self_hosted unless @self_hosted.nil?
+
+        @self_hosted = File.binread(@target).include?('musl libc')
+      end
+
+      # A sysroot whose loader *is* the target, so the stub it runs comes up on
+      # the very libc under test.
+      # @return [String]
+      def musl_sysroot
+        dir = File.join(ROOT, 'sysroots', "#{@arch.name}-musl")
+        loader = File.join(dir, 'lib', @arch.musl_loader)
+        unless File.file?(loader) && FileUtils.identical?(loader, @target)
+          FileUtils.mkdir_p(File.dirname(loader))
+          FileUtils.cp(@target, loader)
+        end
+        dir
       end
     end
 
