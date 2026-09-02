@@ -21,6 +21,15 @@ UBUNTU_MIRRORS = {
 # A glibc security fix is published to one pocket or the other, so ask both and
 # keep whichever answer is newer.
 UBUNTU_POCKETS = %w[-updates -security].freeze
+# Fixtures that state no BuildID, and so can never become a shipped entry: they
+# are built without the note segment that carries one, as OpenWrt builds are.
+# They are here to be searched, not to be shipped, so a refresh passes over them
+# rather than reporting that it could not read them. Named rather than detected,
+# so a fixture that unexpectedly lost its BuildID still says so.
+NO_BUILD_ID = %w[
+  mips-musl-1.2.4.so
+  mipsel-musl-1.2.4.so
+].freeze
 
 namespace :builds do
   desc 'Regenerates the shipped build database from Ubuntu LTS libcs and the spec fixtures'
@@ -71,8 +80,11 @@ end
 
 def refresh_fixtures
   Dir.glob(File.join(repo_root, 'spec', 'data', '*.so')).filter_map do |libc|
-    print "[spec] #{File.basename(libc)} .. "
-    regenerate(libc, File.join('spec', 'data', File.basename(libc)))
+    name = File.basename(libc)
+    next puts("[spec] #{name} .. states no BuildID, not shipped") if NO_BUILD_ID.include?(name)
+
+    print "[spec] #{name} .. "
+    regenerate(libc, File.join('spec', 'data', name))
   end
 end
 

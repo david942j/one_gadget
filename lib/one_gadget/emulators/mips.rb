@@ -93,6 +93,8 @@ module OneGadget
         resolve_pending_branch(cmd)
         @cur_addr = cmd[/\A\s*([0-9a-f]+):/, 1]&.to_i(16)
 
+        @got_value = cmd[GOT_VALUE, 1]&.to_i(16)
+
         mnem = mnemonic(cmd)
         if transfer?(mnem)
           @delayed = [mnem, cmd]
@@ -107,6 +109,12 @@ module OneGadget
       private_constant :ARG_REGISTERS
 
       private
+
+      # What a GOT slot holds, stated beside the load by
+      # +OneGadget::Fetchers::Mips+ because this architecture reaches its globals
+      # through that table rather than through the instruction's own address.
+      GOT_VALUE = /#\s*([0-9a-f]+)\s*\z/
+      private_constant :GOT_VALUE
 
       # The calls, which are delayed exactly as the branches are.
       CALLS = %w[jal jalr bal].freeze
@@ -232,6 +240,8 @@ module OneGadget
       # @return [void]
       def load_value(dst, mem, size)
         check_register!(dst)
+        # a GOT slot holds an address, and the file says which
+        return registers[dst] = libc_base + @got_value if @got_value && size == size_t
 
         value = read_value(arg_to_lambda(mem_operand(mem)))
         registers[dst] = size == size_t ? value : clobbered_value

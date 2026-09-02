@@ -245,9 +245,14 @@ module OneGadget
       # @return [Object, nil] Truthy when +envp+ is acceptable, +nil+ to reject the gadget.
       def check_envp(processor, envp_ptr)
         # A doubly-dereferenced pointer that names a global variable is believed to
-        # be environ; one that doesn't drops the gadget.
-        return global_var?(envp_ptr.to_s) if envp_ptr.is_a?(OneGadget::Emulators::Lambda) &&
-                                             envp_ptr.deref_count >= 2
+        # be environ; one that doesn't drops the gadget. The two dereferences are
+        # the slot the address is read from and the variable itself, so an
+        # architecture that resolves the first of them lands one earlier -- naming
+        # the variable, which it then has to be able to recognise.
+        if envp_ptr.is_a?(OneGadget::Emulators::Lambda)
+          return global_var?(envp_ptr.to_s) if envp_ptr.deref_count >= 2
+          return true if envp_ptr.deref_count == 1 && environ?(envp_ptr.to_s)
+        end
 
         envp_ptr = resolve_stack_deref(processor, envp_ptr)
         # A concrete integer, or a register with nothing useful tracked for it,

@@ -33,6 +33,7 @@ $ gem install one_gadget
 - [x] aarch64 (ARMv8)
 - [x] arm (ARMv7, A32/Thumb-2)
 - [x] riscv64 (RV64GC)
+- [x] mips (MIPS32 o32, big- and little-endian)
 
 ## Implementation
 
@@ -597,6 +598,33 @@ $ one_gadget spec/data/riscv64-libc-2.39.so
 # constraints:
 #   [sp+0x50] == NULL || {[sp+0x50], [sp+0x58], [sp+0x60], [sp+0x68], ...} is a valid argv
 #   [sp+0x30] == NULL || (s32)[[sp+0x30]+0x4] <= 0x0
+
+```
+
+##### MIPS
+
+Big-endian is as common as little-endian here, and both are read. This one is
+OpenWrt's musl for ath79, which ships with no section headers -- the shape a
+router's libc usually arrives in.
+
+```bash
+$ one_gadget spec/data/mips-musl-1.2.4.so
+# 0x56fd4 execl("/bin/sh", a1-0x7c70)
+# constraints:
+#   gp is the GOT address of libc
+#   a1-0x7c70 == NULL
+#
+# 0x77b44 posix_spawn(sp+0x20, "/bin/sh", s2, 0, sp+0x2c, environ)
+# constraints:
+#   gp is the GOT address of libc
+#   {"sh", "-c", s7, NULL} is a valid argv
+#   s2 == NULL || (s32)[s2+0x4] <= 0x0
+#
+# 0x77b48 posix_spawn(sp+0x20, "/bin/sh", s2, 0, sp+0x2c, environ)
+# constraints:
+#   gp is the GOT address of libc
+#   v0-0x7c70 == NULL || {v0-0x7c70, "-c", s7, NULL} is a valid argv
+#   s2 == NULL || (s32)[s2+0x4] <= 0x0
 
 ```
 

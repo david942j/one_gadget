@@ -15,6 +15,12 @@ releases are cut by giving that section a version and a date.
   #422, #423, #425). Every gadget the riscv64 fixture reports has been run under
   a debugger and seen to spawn a real shell, the same bar the other
   architectures are held to (#424).
+- MIPS (32-bit o32) support, in both byte orders (#448) -- big-endian is as widely
+  deployed as little-endian on this architecture, so both are read. Two things
+  about it are unlike the other architectures and are handled without the rest of
+  the engine having to know: a call names no target, going through the GOT
+  instead, and a branch or call takes effect one instruction late, so what follows
+  it runs first.
 - Reading a libc that ships without section headers, as an embedded one commonly
   does -- OpenWrt strips them from musl to save flash (#432). Nothing is missing
   from such a file, so the symbols are read through `PT_DYNAMIC` and the code is
