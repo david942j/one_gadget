@@ -78,18 +78,28 @@ module OneGadget
         sp_based_stack[top + (idx * size_t)]
       end
 
-      # @see OneGadget::Emulators::X86#process!
+      # Emulate one instruction, holding back any transfer of control.
+      #
+      # This arch delays every transfer by one instruction: whatever follows a
+      # branch or a call runs *before* it takes effect. So a transfer is held back
+      # here and applied once that instruction has run, which is the order they
+      # really happen in -- and it leaves both addresses of the pair meaning what
+      # they say, since entering at the transfer runs both, while entering at the
+      # instruction after it runs only that one.
       # @param [String] cmd One line from result of objdump.
       # @return [Boolean] If successfully processed.
+      # @see OneGadget::Emulators::X86#process!
       def process!(cmd)
         resolve_pending_branch(cmd)
         @cur_addr = cmd[/\A\s*([0-9a-f]+):/, 1]&.to_i(16)
 
         mnem = mnemonic(cmd)
-        return handle_branch(mnem, cmd) != :fail if branch_mnem?(mnem)
+        if transfer?(mnem)
+          @delayed = [mnem, cmd]
+          return true
+        end
 
-        inst, args = parse(cmd)
-        __send__(inst.handler, *args) != :fail
+        dispatch(cmd) && apply_delayed
       end
 
       # How many arguments this ABI states in registers.
@@ -98,7 +108,32 @@ module OneGadget
 
       private
 
+      # The calls, which are delayed exactly as the branches are.
+      CALLS = %w[jal jalr bal].freeze
+      private_constant :CALLS
+
       def branch_mnem?(mnem) = mnem == 'b' || COND.key?(mnem)
+
+      # Whether +mnem+ transfers control, and so takes effect one instruction late.
+      def transfer?(mnem) = branch_mnem?(mnem) || CALLS.include?(mnem)
+
+      def dispatch(cmd)
+        inst, args = parse(cmd)
+        __send__(inst.handler, *args) != :fail
+      end
+
+      # Carry out the transfer held back from the previous instruction, now that
+      # the instruction it delays behind has run.
+      # @return [Boolean]
+      def apply_delayed
+        return true if @delayed.nil?
+
+        mnem, cmd = @delayed
+        @delayed = nil
+        return handle_branch(mnem, cmd) != :fail if branch_mnem?(mnem)
+
+        dispatch(cmd)
+      end
 
       # Operands of +cmd+ (mnemonic dropped), each stripped of a trailing +<symbol>+.
       def operands(cmd)
