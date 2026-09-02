@@ -38,7 +38,7 @@ module OneGadget
 
         got = got_base_constraint(processor, GOT_BASE) or return nil
 
-        res[:constraints].unshift(got)
+        res[:constraints].unshift(*got_preconditions(processor, got))
         res[:constraints].reject! { |con| con.match?(/\A(?:writable|readable): \[*#{GOT_BASE}\b/) }
         res
       end
@@ -54,6 +54,24 @@ module OneGadget
         offset = string_file_offset(str.delete('[]')) or return false
 
         ENVIRON.match?(got[:names][offset].to_s)
+      end
+
+      # What the caller must arrange for this window to reach the GOT. Normally
+      # just the register itself -- but o32 has the *caller* restore it after
+      # every call, because the callee establishes its own, so a window that runs
+      # past a call reads the table through whatever it restored from. Every call
+      # it makes after that point was named on the assumption that this is the
+      # GOT, so say so rather than leaving it unsaid.
+      # @param [OneGadget::Emulators::Processor] processor
+      # @param [String] got The constraint naming the register itself.
+      # @return [Array<String>]
+      # @example a window that restores gp from its frame
+      #   ['gp is the GOT address of libc', '[sp+0x18] is the GOT address of libc']
+      def got_preconditions(processor, got)
+        held = processor.registers[GOT_BASE].to_s
+        return [got] if held == GOT_BASE
+
+        [got, "#{held} is the GOT address of libc"]
       end
 
       private
