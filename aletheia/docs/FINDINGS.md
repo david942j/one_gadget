@@ -500,8 +500,7 @@ architecture's output changes at any level.
 ## Finding 12 -- missing constraint: a GOT base register the window reloads from its own frame
 
 **Where:** mipsel-libc-2.36 `0x4b3d8`, `0x4b424` (both `posix_spawn`). Found the first
-time MIPS was verified, 2026-09-02. **Fixed** -- one_gadget now refuses these. Every
-other MIPS gadget verifies: 6 for that fixture and 3 for each musl one, 12 in all.
+time MIPS was verified, 2026-09-02. **Fixed** -- one_gadget now refuses these.
 
 o32 code is PIC through `gp`, and every gadget on the architecture therefore carries
 `gp is the GOT address of libc`. But the ABI also has the *caller* restore `gp` after
@@ -529,6 +528,36 @@ window that gets its GOT base out of memory names a location nobody arranges, so
 refused rather than described by a constraint nothing can meet. `Fetchers::Mips#resolve`
 now drops any window whose GOT register no longer holds its entry value. That takes the
 fixture from 8 gadgets to 6 at level 1 (50 to 22 raw), and **all 6 verify**.
+
+## Finding 13 -- wrong gadget: a window that follows a branch it never executed
+
+**Where:** mipsel-libc-2.36 `0x722a4` (`posix_spawn`), found by the level-2 strict
+scan, 2026-09-03. **Fixed** -- one_gadget now refuses these.
+
+An instruction after a branch runs whether or not the branch is taken, so it is a
+legitimate place to enter a gadget. What a gadget entering there cannot do is *follow*
+that branch, which never executed. one_gadget did:
+
+```
+722a0: <branch to 722d0>
+722a4: sw v0,4(s2)        ; the delay slot -- the gadget's entry
+722d0: lw v0,-26436(gp)   ; where one_gadget continued: through the branch above
+```
+
+Entering at `0x722a4` really falls through to `0x722a8`, and four instructions later
+walks into `jalr t9` on an uncontrolled register. Aletheia found it exactly there:
+`SIGSEGV at base+0x722a8`, with `l0=false` -- and it failed unpoisoned too, so it was
+never about a missing precondition, it was the wrong path.
+
+The cause is on the harness's side of the fence in one_gadget: MIPS attributes a
+branch's edge to its delay slot, because that is the last instruction to run before
+control transfers. That is right for a path arriving *through* the branch and wrong for
+one starting *at* the slot. `Fetchers::Mips#executed_windows` now refuses a window whose
+second line is not the next instruction along -- which is exactly the shape of a window
+that took a branch it skipped.
+
+**All 31 MIPS gadgets verify** after this: 21 for the glibc fixture and 5 for each musl
+one, level 2, strict.
 
 ## Reproduce
 

@@ -10,7 +10,7 @@ part of the published gem.
 
 ## Status
 
-Verifies amd64, i386, arm, aarch64, riscv64 and MIPS (both byte orders). The backend is picked from the target ELF's machine,
+Verifies amd64, i386, arm, aarch64, riscv64 and MIPS (both byte orders; 31 PASS at level 2, strict). The backend is picked from the target ELF's machine,
 and the transport from the *host* arch: the arch that matches the host runs natively, the rest
 under qemu-user — so the same suite works on any host (an aarch64 host runs aarch64 natively and
 the others under qemu; an x86_64 host does the reverse). arm runs via stub self-injection (no
