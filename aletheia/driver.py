@@ -112,6 +112,10 @@ for off, val in plan.get("mem", {}).items():
     fmt, mask = word_fmt, word_mask
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
+    elif isinstance(val, dict) and "base_off" in val:
+        # a libc address written into a slot -- e.g. the GOT base an ABI has the
+        # caller restore its GOT register from
+        val = base + val["base_off"]
     elif isinstance(val, dict) and "int32" in val:
         # A 4-byte field, e.g. a file descriptor. Writing a full word here would
         # run over the neighbouring field -- two adjacent descriptors are 4 bytes
@@ -124,6 +128,10 @@ for off, val in plan.get("mem", {}).items():
 for off, val in plan.get("base_mem", {}).items():
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
+    elif isinstance(val, dict) and "base_off" in val:
+        # a libc address written into a slot -- e.g. the GOT base an ABI has the
+        # caller restore its GOT register from
+        val = base + val["base_off"]
     gdb.selected_inferior().write_memory(base + int(off), struct.pack(word_fmt, int(val) & word_mask))
 
 sp = scratch + plan.get("sp_offset", 0x2000)

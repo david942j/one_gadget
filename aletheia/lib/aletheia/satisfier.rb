@@ -79,8 +79,10 @@ module Aletheia
     RELATION = /\A(?:\([su]\d+\))?(.+?) (==|!=) (?:\([su]\d+\))?(.+)\z/
 
     # +<reg> is the GOT address of libc+ (i386 PIC): the register must hold the
-    # libc GOT base, i.e. +base + PLTGOT offset+.
-    GOT = /\A(\w+) is the GOT address of libc\z/
+    # libc GOT base, i.e. +base + PLTGOT offset+. An ABI whose caller restores
+    # that register after every call (o32) names the slot it restores from the
+    # same way, so a memory location can be asked for it too.
+    GOT = /\A(\w+|\[[^\]]+\]) is the GOT address of libc\z/
 
     # A +(reg + $base+imm)+ used as an address rather than a value: dereferenced,
     # or named as a +writable:+/+readable:+ target (see {#steer_base_sums}).
@@ -404,8 +406,10 @@ module Aletheia
     # and the register is assignable (see {GOT}).
     # @return [Float, nil]
     def got_cost(disjunct)
-      reg = disjunct[GOT, 1]
-      @got_offset && settable?(reg) ? 0.3 : nil
+      holder = disjunct[GOT, 1]
+      return nil unless @got_offset
+
+      settable?(holder) || got_slot_shape?(holder) ? 0.3 : nil
     end
 
     # +reg & mask == want+: the stack pointer is aligned by construction (the
@@ -508,7 +512,7 @@ module Aletheia
         else (op = address_operand(text)) && deref_reads_zero?(plan, op)
         end
       when GOT
-        base_relative?(reg_value(plan, branch[GOT, 1]))
+        got_holder_resolved?(plan, branch[GOT, 1])
       else
         if (op = deref_zero(branch))
           deref_reads_zero?(plan, op)
@@ -781,7 +785,34 @@ module Aletheia
       return false unless @got_offset
 
       bias = @arch.respond_to?(:got_bias) ? @arch.got_bias : 0
-      set_reg(plan, xreg(disjunct[GOT, 1]), { 'base_off' => @got_offset + bias })
+      value = { 'base_off' => @got_offset + bias }
+      holder = disjunct[GOT, 1]
+      return set_reg(plan, xreg(holder), value) if settable?(holder)
+
+      op = address_operand(holder) or return false
+
+      set_mem(plan, mem_addr_off(plan, op), value)
+    end
+
+    # Whether a GOT constraint names a location the plan can write rather than a
+    # register: one dereference of the stack pointer, which is the slot an ABI has
+    # the caller restore its GOT register from.
+    # @param [String] holder
+    # @return [Boolean]
+    def got_slot_shape?(holder)
+      op = address_operand(holder)
+      !op.nil? && op.deref == 1 && stack_reg?(op.reg)
+    end
+
+    # Whether the plan has put the libc GOT where this constraint asks for it --
+    # in the register, or in the slot the caller restores it from.
+    # @param [String] holder
+    # @return [Boolean]
+    def got_holder_resolved?(plan, holder)
+      return base_relative?(reg_value(plan, holder)) if settable?(holder)
+      return false unless got_slot_shape?(holder)
+
+      base_relative?(plan.mem[mem_addr_off(plan, address_operand(holder))])
     end
 
     # A register value the driver resolves against the libc load base.
