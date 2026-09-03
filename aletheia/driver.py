@@ -105,7 +105,11 @@ for reg, val in plan.get("regs", {}).items():
 # where the first level needs a real pointer rather than the zero-fill a single
 # dereference relies on. See Satisfier#apply_deep_null.
 word_size = arch.get("word_size", 8)
-word_fmt = {4: "<I", 8: "<Q"}[word_size]
+# Memory is written in the target's byte order, which is not always the host's:
+# this arch ships big-endian as widely as little (ath79 against ramips), and a
+# pointer packed the wrong way round lands byte-swapped.
+byte_order = ">" if arch.get("big_endian") else "<"
+word_fmt = {4: byte_order + "I", 8: byte_order + "Q"}[word_size]
 word_mask = (1 << (word_size * 8)) - 1
 for off, val in plan.get("mem", {}).items():
     off = int(off)
@@ -120,7 +124,7 @@ for off, val in plan.get("mem", {}).items():
         # A 4-byte field, e.g. a file descriptor. Writing a full word here would
         # run over the neighbouring field -- two adjacent descriptors are 4 bytes
         # apart, and a word-sized write of one zeroes the other.
-        val, fmt, mask = val["int32"], "<i", 0xffffffff
+        val, fmt, mask = val["int32"], byte_order + "i", 0xffffffff
     gdb.selected_inferior().write_memory(scratch + off, struct.pack(fmt, int(val) & mask))
 
 # Libc-global writes (keyed by base-relative offset): a constraint on a $base+off

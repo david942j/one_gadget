@@ -85,6 +85,10 @@ module Aletheia
       # the name the fixture is given when it is run as that stub's own libc.
       def musl_loader = 'ld-musl-mips-sf.so.1'
 
+      # What the driver writes into memory has to be in the target's byte order,
+      # not the host's.
+      def driver_model = super.merge('big_endian' => true)
+
       def qemu
         { 'bin' => 'qemu-mips', 'ld_prefix' => File.join(MipsFamily::ROOT, 'sysroots', 'mipsel'),
           'gdb_arch' => 'mips' }
