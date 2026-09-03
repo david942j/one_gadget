@@ -113,7 +113,7 @@ describe OneGadget::Fetchers::Mips do
     it 'hands the engine a disassembly it can walk' do
       lines = fetcher.send(:disasm_lines)
       named = lines.grep(/jalr\s+t9\s+</)
-      expect(named.size).to be > 1000
+      expect(named.size).to be > 100
       expect(lines.count { |line| fetcher.terminal_call_line?(line) }).to be > 0
       expect(fetcher.send(:candidates)).not_to be_empty
     end

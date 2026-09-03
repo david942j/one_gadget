@@ -120,6 +120,69 @@ module OneGadget
       GOT_BASE = 'gp'
       private_constant :GOT_BASE
 
+      # Every instruction is one word here and word-aligned, so the whole scan is
+      # a masked compare per word. A call spells its destination two ways: a
+      # direct one carries it, and the indirect one PIC code reaches everything
+      # through names the GOT slot it is taken from.
+      def scan_calls(base, data, targets)
+        got = mips_got or return nil
+
+        sites = []
+        data.unpack(got[:big] ? 'N*' : 'V*').each_with_index do |word, i|
+          address = base + (i * INSTRUCTION_SIZE)
+          destination = call_destination(word, address)
+          sites << address if destination && targets.key?(destination)
+        end
+        sites
+      end
+
+      # Where a call at +address+ goes.
+      # @param [Integer] word The instruction word.
+      # @param [Integer] address
+      # @return [Integer, nil] +nil+ when the word is not a call, or is one whose
+      #   destination these bytes alone do not say.
+      # @example
+      #   # lw t9,-32744(gp), whose GOT slot holds _setjmp
+      #   call_destination(0x8f998018, 0x4b3dc) #=> 0x39190
+      #   # bal 4b3f0
+      #   call_destination(0x04110004, 0x4b3dc) #=> 0x4b3f0
+      def call_destination(word, address)
+        following = address + INSTRUCTION_SIZE
+        case word & OPCODE_AND_TARGET_REGISTERS
+        when GOT_CALL_LOAD then got_address(immediate(word))
+        when BAL then following + (immediate(word) * INSTRUCTION_SIZE)
+        else ((following & JAL_REGION) | ((word & JAL_TARGET) << 2) if (word >> 26) == JAL_OPCODE)
+        end
+      end
+
+      # The high half of a word, which is opcode plus whichever registers an
+      # instruction of that opcode names there.
+      OPCODE_AND_TARGET_REGISTERS = 0xffff0000
+      private_constant :OPCODE_AND_TARGET_REGISTERS
+
+      # +lw t9,<imm>(gp)+ -- the load of a call's destination out of the GOT.
+      GOT_CALL_LOAD = 0x8f990000
+      private_constant :GOT_CALL_LOAD
+
+      # +bal <imm>+, the pc-relative direct call, spelled +bgezal zero,<imm>+.
+      BAL = 0x04110000
+      private_constant :BAL
+
+      # +jal <target>+, the direct call that states an absolute address, which it
+      # can only do within the 256MB region it is itself in.
+      JAL_OPCODE = 3
+      JAL_TARGET = 0x03ffffff
+      JAL_REGION = 0xf0000000
+      private_constant :JAL_OPCODE, :JAL_TARGET, :JAL_REGION
+
+      # The signed offset an instruction states in its low half.
+      # @param [Integer] word The instruction word.
+      # @return [Integer]
+      def immediate(word)
+        half = word & 0xffff
+        half >= 0x8000 ? half - 0x10000 : half
+      end
+
       # A call, however it is spelled: through a register (which is how PIC code
       # reaches everything) or directly.
       def call_str = '(?:jalr|jal|bal)'
