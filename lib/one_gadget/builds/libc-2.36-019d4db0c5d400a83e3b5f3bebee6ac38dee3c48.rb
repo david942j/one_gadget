@@ -144,9 +144,6 @@ OneGadget::Gadget.add(build_id, 467612,
 OneGadget::Gadget.add(build_id, 467616,
                       constraints: ["gp is the GOT address of libc", "s5 == 0x0", "writable: s2+0x4", "{\"sh\", \"-c\", s0, NULL} is a valid argv", "s7+0xa0 == NULL || writable: s7+0xa0", "s1 == NULL || (s32)[s1+0x4] <= 0x0"],
                       effect: "posix_spawn(s7+0xa0, \"/bin/sh\", s1, 0, sp+0x58, environ)")
-OneGadget::Gadget.add(build_id, 467620,
-                      constraints: ["gp is the GOT address of libc", "writable: s2+0x4", "{\"sh\", \"-c\", s0, NULL} is a valid argv", "s7+0xa0 == NULL || writable: s7+0xa0", "s1 == NULL || (s32)[s1+0x4] <= 0x0"],
-                      effect: "posix_spawn(s7+0xa0, \"/bin/sh\", s1, 0, sp+0x58, environ)")
 OneGadget::Gadget.add(build_id, 467664,
                       constraints: ["gp is the GOT address of libc", "{\"sh\", \"-c\", s0, NULL} is a valid argv", "s7+0xa0 == NULL || writable: s7+0xa0", "s1 == NULL || (s32)[s1+0x4] <= 0x0"],
                       effect: "posix_spawn(s7+0xa0, \"/bin/sh\", s1, 0, sp+0x58, environ)")
