@@ -74,7 +74,32 @@ module OneGadget
         [got, "#{held} is the GOT address of libc"]
       end
 
+      # A candidate may begin at a delay slot -- entering there runs it and falls
+      # past the transfer it belongs to -- but it may not then *follow* that
+      # transfer, which never executed. Such a window shows it by its second line
+      # not being the next instruction along; entering one instruction earlier, at
+      # the transfer itself, is the separate and valid window that does follow it.
+      # @param [Array<String>] lines One candidate, as a line list.
+      # @yieldparam [Array<String>] window
+      # @return [void]
+      def executed_windows(lines)
+        super { |window| yield(window) unless follows_a_transfer_it_skipped?(window) }
+      end
+
       private
+
+      # This arch spells every instruction in one word.
+      INSTRUCTION_SIZE = 4
+      private_constant :INSTRUCTION_SIZE
+
+      # @param [Array<String>] window
+      # @return [Boolean] Whether it starts at a delay slot and then takes the
+      #   branch that delay slot belongs to.
+      def follows_a_transfer_it_skipped?(window)
+        return false if window.size < 2
+
+        offset_of(window[1]) != offset_of(window.first) + INSTRUCTION_SIZE
+      end
 
       # The register o32 states the GOT base in.
       GOT_BASE = 'gp'
