@@ -399,7 +399,7 @@ module OneGadget
       def branch_lead_chars; raise NotImplementedError
       end
 
-      # The addresses in +data+ (loaded at +base+) of direct calls into +targets+.
+      # The addresses in +data+ (loaded at +base+) of calls into +targets+.
       # Over-approximating is fine -- a false positive only adds a window nothing
       # is found in -- while a missed call costs every gadget around it.
       #

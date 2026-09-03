@@ -36,6 +36,9 @@ releases are cut by giving that section a version and a date.
   plus the libcs the specs run against, and 2.26 is neither of those any more; a
   lookup by one of those BuildIDs now answers from the remote database. The
   entries themselves stay in the repository, as every unshipped build does.
+- Searching a MIPS libc now reads only the code around its calls, rather than
+  disassembling the whole file: 1.9s to 0.7s for the mipsel glibc fixture and
+  2.3s to 0.7s for the musl ones. The gadgets reported are unchanged.
 - Requires elftools >= 2.1.0 (#442), whose faster symbol-table read takes the
   search of a libc with no section headers from 1.11s to 0.68s -- the read
   itself from 0.51s to 0.17s. A libc that still has its sections is unaffected.
