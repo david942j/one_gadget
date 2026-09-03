@@ -52,6 +52,19 @@ describe 'one_gadget_mips' do
       expect(gadget.constraints.join).not_to include 'valid envp'
     end
 
+    # o32 has the *caller* restore the GOT base after every call, because the
+    # callee establishes its own. A window that runs past a call therefore reads
+    # the table through the slot it restored from, and every call it makes after
+    # that point was named on the assumption that this is the GOT -- so the slot
+    # is stated as a precondition rather than left unsaid. Verified: without it
+    # these gadgets segfault at the first load through the restored register.
+    it 'states the slot it restores the GOT base from' do
+      gadget = OneGadget.gadgets(file: data_path('mipsel-libc-2.36.so'), force_file: true, details: true, level: 1)
+                        .find { |g| g.offset == 0x4b3d8 }
+      expect(gadget.constraints).to include 'gp is the GOT address of libc'
+      expect(gadget.constraints).to include '[sp+0x18] is the GOT address of libc'
+    end
+
     it 'reports the same gadgets for a libc with no section headers' do
       expect_same_gadgets_when_stripped('mipsel-libc-2.36.so')
     end
