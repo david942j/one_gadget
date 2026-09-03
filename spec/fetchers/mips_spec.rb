@@ -30,18 +30,16 @@ describe OneGadget::Fetchers::Mips do
       expect(run_from(window)).to eq 's1'
     end
 
-    # A branch's edge into its target leaves from the delay slot, that being the
-    # last instruction to run before control transfers -- right for a path
-    # arriving *through* the branch, wrong for one starting at the slot, which
-    # never executed it.
     it 'refuses to start at a delay slot and then take its branch' do
-      # the walk stitches the target on after the delay slot, so a candidate
-      # reads: branch, its delay slot, then where the branch goes
       lines = ['1000: b 1030 <x>', '1004: move a0,s1', '1030: lw a1,4(s6)', '1034: nop']
       starts = [].tap { |acc| fetcher.executed_windows(lines) { |w| acc << w.first[/\A\w+/] } }
-      # entering at 1004 runs the move and falls to 1008; it never reaches 1030,
-      # so that window is not offered. Entering at 1000 is the one that does.
-      expect(starts).to eq %w[1030 1000]
+      expect(starts).to eq %w[1030 1000] # 1004 falls to 1008; it never reaches 1030
+    end
+
+    it 'refuses to open on a call through a register it never set' do
+      lines = ['1000: jalr t9 <posix_spawnattr_init>', '1004: move a0,s1', '1008: nop']
+      starts = [].tap { |acc| fetcher.executed_windows(lines) { |w| acc << w.first[/\A\w+/] } }
+      expect(starts).to eq %w[1004]
     end
 
     it 'runs the delay slot alone when entered at it, without the branch' do

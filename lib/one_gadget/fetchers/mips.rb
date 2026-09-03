@@ -66,7 +66,8 @@ module OneGadget
       # @param [String] got The constraint naming the register itself.
       # @return [Array<String>]
       # @example a window that restores gp from its frame
-      #   ['gp is the GOT address of libc', '[sp+0x18] is the GOT address of libc']
+      #   got_preconditions(processor, 'gp is the GOT address of libc')
+      #   #=> ['gp is the GOT address of libc', '[sp+0x18] is the GOT address of libc']
       def got_preconditions(processor, got)
         held = processor.registers[GOT_BASE].to_s
         return [got] if held == GOT_BASE
@@ -83,7 +84,9 @@ module OneGadget
       # @yieldparam [Array<String>] window
       # @return [void]
       def executed_windows(lines)
-        super { |window| yield(window) unless follows_a_transfer_it_skipped?(window) }
+        super do |window|
+          yield(window) unless follows_a_transfer_it_skipped?(window) || enters_at_an_unset_call?(window)
+        end
       end
 
       private
@@ -91,6 +94,18 @@ module OneGadget
       # This arch spells every instruction in one word.
       INSTRUCTION_SIZE = 4
       private_constant :INSTRUCTION_SIZE
+
+      # Whether the window opens on a call through a register it never set, so that
+      # where it goes is whatever the caller happened to leave there. Refusing
+      # costs nothing: the window one instruction earlier loads it itself.
+      # @param [Array<String>] window
+      # @return [Boolean]
+      # @example The load that names the call is behind the window's first line.
+      #   enters_at_an_unset_call?(['4b3e0: jalr t9 <posix_spawnattr_init>']) #=> true
+      #   enters_at_an_unset_call?(['4b3dc: lw t9,-31652(gp)', '4b3e0: jalr t9']) #=> false
+      def enters_at_an_unset_call?(window)
+        mnemonic(window.first) == 'jalr'
+      end
 
       # @param [Array<String>] window
       # @return [Boolean] Whether it starts at a delay slot and then takes the
@@ -175,7 +190,8 @@ module OneGadget
       # @param [Array<String>] lines
       # @return [Array<String>]
       # @example
-      #   'lw t9,-31652(gp)' then 'jalr t9' #=> 'jalr t9 <posix_spawnattr_init>'
+      #   name_got_calls(['4b3dc: lw t9,-31652(gp)', '4b3e0: jalr t9'])
+      #   #=> ['4b3dc: lw t9,-31652(gp)', '4b3e0: jalr t9 <posix_spawnattr_init>']
       def name_got_calls(lines)
         loaded = nil
         lines.map do |line|
@@ -201,7 +217,8 @@ module OneGadget
       # @param [Array<String>] lines
       # @return [Array<String>]
       # @example
-      #   'lw a0,-32496(gp)' #=> 'lw a0,-32496(gp)  # b0000'
+      #   state_got_values(['77b44: lw a0,-32496(gp)'])
+      #   #=> ['77b44: lw a0,-32496(gp)  # b0000']
       def state_got_values(lines)
         lines.map do |line|
           m = line.match(GOT_GLOBAL_LOAD) or next line
