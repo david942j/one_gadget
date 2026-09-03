@@ -42,9 +42,6 @@ OneGadget::Gadget.add(build_id, 308184,
 OneGadget::Gadget.add(build_id, 308188,
                       constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "readable: [sp+0x28]", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
                       effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
-OneGadget::Gadget.add(build_id, 308192,
-                      constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "readable: [sp+0x28]", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
-                      effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
 OneGadget::Gadget.add(build_id, 308196,
                       constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "readable: [sp+0x28]", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
                       effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
@@ -55,9 +52,6 @@ OneGadget::Gadget.add(build_id, 308204,
                       constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "readable: [sp+0x28]", "writable: a0", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
                       effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
 OneGadget::Gadget.add(build_id, 308208,
-                      constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "readable: [sp+0x28]", "writable: a0", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
-                      effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
-OneGadget::Gadget.add(build_id, 308212,
                       constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "readable: [sp+0x28]", "writable: a0", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
                       effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
 OneGadget::Gadget.add(build_id, 308216,
@@ -72,9 +66,6 @@ OneGadget::Gadget.add(build_id, 308224,
 OneGadget::Gadget.add(build_id, 308228,
                       constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "readable: a1", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
                       effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
-OneGadget::Gadget.add(build_id, 308232,
-                      constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "readable: a1", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
-                      effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
 OneGadget::Gadget.add(build_id, 308236,
                       constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
                       effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
@@ -85,9 +76,6 @@ OneGadget::Gadget.add(build_id, 308244,
                       constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
                       effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
 OneGadget::Gadget.add(build_id, 308248,
-                      constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
-                      effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
-OneGadget::Gadget.add(build_id, 308252,
                       constraints: ["gp is the GOT address of libc", "[sp+0x18] is the GOT address of libc", "writable: s1", "{\"sh\", \"-c\", s5, NULL} is a valid argv", "(u16)[s1] == 0x0"],
                       effect: "posix_spawn(sp+0x3c, \"/bin/sh\", 0, s1, sp+0x5c, environ)")
 OneGadget::Gadget.add(build_id, 308256,
