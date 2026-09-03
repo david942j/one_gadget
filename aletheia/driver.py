@@ -65,9 +65,19 @@ elif plan.get("benign_default"):
     fill = scratch + 0x100
 else:
     fill = None
+# A register gdb spells differently from the constraints: gdb's own $fp/$sp are
+# frame-derived and cannot be assigned, so such a register is named here by the
+# other name it answers to (MIPS $fp -> $s8).
+ALIASES = arch.get("reg_aliases", {})
+
+
+def gdb_name(reg):
+    return ALIASES.get(reg, reg)
+
+
 if fill is not None:
     for r in arch["gprs"]:
-        gdb.execute("set $%s = %#x" % (r, fill))
+        gdb.execute("set $%s = %#x" % (gdb_name(r), fill))
 
 def set_reg(reg, val):
     # gdb rejects `set $xmm0 = <int>` (an XMM register is a vector union, not a
@@ -77,7 +87,7 @@ def set_reg(reg, val):
         gdb.execute("set $%s.v2_int64[0] = %#x" % (reg, val & MASK))
         gdb.execute("set $%s.v2_int64[1] = 0" % reg)
     else:
-        gdb.execute("set $%s = %#x" % (reg, val & MASK))
+        gdb.execute("set $%s = %#x" % (gdb_name(reg), val & MASK))
 
 
 for reg, val in plan.get("regs", {}).items():
@@ -95,18 +105,26 @@ for reg, val in plan.get("regs", {}).items():
 # where the first level needs a real pointer rather than the zero-fill a single
 # dereference relies on. See Satisfier#apply_deep_null.
 word_size = arch.get("word_size", 8)
-word_fmt = {4: "<I", 8: "<Q"}[word_size]
+# Memory is written in the target's byte order, which is not always the host's:
+# this arch ships big-endian as widely as little (ath79 against ramips), and a
+# pointer packed the wrong way round lands byte-swapped.
+byte_order = ">" if arch.get("big_endian") else "<"
+word_fmt = {4: byte_order + "I", 8: byte_order + "Q"}[word_size]
 word_mask = (1 << (word_size * 8)) - 1
 for off, val in plan.get("mem", {}).items():
     off = int(off)
     fmt, mask = word_fmt, word_mask
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
+    elif isinstance(val, dict) and "base_off" in val:
+        # a libc address written into a slot -- e.g. the GOT base an ABI has the
+        # caller restore its GOT register from
+        val = base + val["base_off"]
     elif isinstance(val, dict) and "int32" in val:
         # A 4-byte field, e.g. a file descriptor. Writing a full word here would
         # run over the neighbouring field -- two adjacent descriptors are 4 bytes
         # apart, and a word-sized write of one zeroes the other.
-        val, fmt, mask = val["int32"], "<i", 0xffffffff
+        val, fmt, mask = val["int32"], byte_order + "i", 0xffffffff
     gdb.selected_inferior().write_memory(scratch + off, struct.pack(fmt, int(val) & mask))
 
 # Libc-global writes (keyed by base-relative offset): a constraint on a $base+off
@@ -114,6 +132,10 @@ for off, val in plan.get("mem", {}).items():
 for off, val in plan.get("base_mem", {}).items():
     if isinstance(val, dict) and "scratch_off" in val:
         val = scratch + val["scratch_off"]
+    elif isinstance(val, dict) and "base_off" in val:
+        # a libc address written into a slot -- e.g. the GOT base an ABI has the
+        # caller restore its GOT register from
+        val = base + val["base_off"]
     gdb.selected_inferior().write_memory(base + int(off), struct.pack(word_fmt, int(val) & word_mask))
 
 sp = scratch + plan.get("sp_offset", 0x2000)

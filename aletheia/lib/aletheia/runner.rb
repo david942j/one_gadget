@@ -7,6 +7,7 @@ require 'one_gadget'
 require_relative 'arch/aarch64'
 require_relative 'arch/amd64'
 require_relative 'arch/i386'
+require_relative 'arch/mips'
 require_relative 'arch/arm'
 require_relative 'arch/riscv64'
 require_relative 'satisfier'
@@ -24,7 +25,7 @@ module Aletheia
   #           a verdict on the gadget)
   class Runner
     ARCHES = { amd64: Arch::Amd64, i386: Arch::I386, arm: Arch::Arm, aarch64: Arch::AArch64,
-               riscv64: Arch::Riscv64 }.freeze
+               mips: Arch::Mips, riscv64: Arch::Riscv64 }.freeze
 
     # The mapping granularity a loader rounds a segment up to. The smallest any
     # target uses, so the spare tail it implies is mapped whatever the real page
@@ -41,9 +42,12 @@ module Aletheia
 
     # Pick the arch backend from the target ELF's machine.
     def arch_of(target)
-      ARCHES.fetch(OneGadget::Helper.architecture(target)) do |m|
+      backend = ARCHES.fetch(OneGadget::Helper.architecture(target)) do |m|
         raise ArgumentError, "unsupported architecture: #{m}"
       end
+      # An arch shipped in more than one byte order answers for a file with the
+      # backend that matches it; every other arch is the one it always was.
+      backend.respond_to?(:for_target) ? backend.for_target(target) : backend
     end
 
     # The libc PLTGOT file offset, for i386's GOT-base constraint; nil when absent.

@@ -497,6 +497,91 @@ register, so their store lands wherever the caller points it, not necessarily in
 **After the fix:** riscv64 level 2 is **171 PASS, 0 FAIL, 0 SKIP**, and no other
 architecture's output changes at any level.
 
+## Finding 12 -- missing constraint: a GOT base register the window reloads from its own frame
+
+**Where:** mipsel-libc-2.36 `0x4b3d8`, `0x4b424` (both `posix_spawn`). Found the first
+time MIPS was verified, 2026-09-02. **Fixed** -- one_gadget now *states* the slot as a
+precondition. Refusing them, as this finding first proposed, was measured to cost 98
+windows (28 raw gadgets) across the fixture, every one restoring from the same slot
+`24(sp)` -- so a single extra constraint recovers them all, and they verify.
+
+o32 code is PIC through `gp`, and every gadget on the architecture therefore carries
+`gp is the GOT address of libc`. But the ABI also has the *caller* restore `gp` after
+each call, because the callee establishes its own:
+
+```
+4b3e0: jalr t9 <posix_spawnattr_init>
+4b3e4: move a0,s1          ; delay slot
+4b3ec: lw   gp,24(sp)      ; gp reloaded from the frame
+4b3f0: lw   t9,-31648(gp)  ; SIGSEGV -- reads the GOT through whatever that slot held
+```
+
+From `0x4b3ec` on, the window reaches the GOT through `[sp+0x18]`, a slot nobody sets
+up. one_gadget still named the following call `<posix_spawnattr_setsigmask>` because the
+fetcher pairs `lw t9,off(gp)` with `jalr t9` in the *text*, taking `gp` to be the GOT
+base throughout. So the gadget was reported as though it reached `posix_spawn`, while a
+caller meeting every stated constraint faults at `0x4b3f0`.
+
+Aletheia said so plainly: `l0=false` with `SIGSEGV at base+0x4b3f0`, and the emulator's
+own state confirms the cause -- both failing gadgets end with `gp = [sp+0x18]`, while
+all six that pass end with `gp = gp`.
+
+**The fix** states what the window really needs: `Fetchers::Mips#resolve` adds
+`[sp+0x18] is the GOT address of libc` beside the register's own constraint. The harness
+learned to arrange it -- a GOT constraint may now name a stack slot as well as a register,
+and the driver resolves a libc address written into memory.
+
+## Finding 13 -- wrong gadget: a window that follows a branch it never executed
+
+**Where:** mipsel-libc-2.36 `0x722a4` (`posix_spawn`), found by the level-2 strict
+scan, 2026-09-03. **Fixed** -- one_gadget now refuses these.
+
+An instruction after a branch runs whether or not the branch is taken, so it is a
+legitimate place to enter a gadget. What a gadget entering there cannot do is *follow*
+that branch, which never executed. one_gadget did:
+
+```
+722a0: <branch to 722d0>
+722a4: sw v0,4(s2)        ; the delay slot -- the gadget's entry
+722d0: lw v0,-26436(gp)   ; where one_gadget continued: through the branch above
+```
+
+Entering at `0x722a4` really falls through to `0x722a8`, and four instructions later
+walks into `jalr t9` on an uncontrolled register. Aletheia found it exactly there:
+`SIGSEGV at base+0x722a8`, with `l0=false` -- and it failed unpoisoned too, so it was
+never about a missing precondition, it was the wrong path.
+
+The cause is on the harness's side of the fence in one_gadget: MIPS attributes a
+branch's edge to its delay slot, because that is the last instruction to run before
+control transfers. That is right for a path arriving *through* the branch and wrong for
+one starting *at* the slot. `Fetchers::Mips#executed_windows` now refuses a window whose
+second line is not the next instruction along -- which is exactly the shape of a window
+that took a branch it skipped.
+
+**All 61 MIPS gadgets verify** after this and Finding 14: 45 for the glibc fixture and 8
+for each musl one, level 2, strict.
+
+## Finding 14 -- wrong gadget: a window opening on a call it never set up
+
+**Where:** mipsel-libc-2.36 `0x4b3e0`, `0x4b3f4`, `0x4b408`, `0x4b41c` (all
+`posix_spawnattr_*`), found by the level-2 strict scan, 2026-09-03. **Fixed** -- one_gadget
+now refuses these.
+
+This arch reaches libc through `t9`, and one_gadget names a call by pairing the
+`lw t9,off(gp)` that fills it with the `jalr t9` that uses it -- in the *text*. A window
+that starts at the call left that load behind, so `t9` holds whatever the caller happened
+to leave there, while the gadget is printed as though it called `posix_spawnattr_init`
+(and its safe-call requirements were applied on that basis).
+
+Nothing is lost by refusing rather than constraining: the caller would have to put a libc
+address in `t9` anyway, which is the whole of what the gadget offers, and the window one
+instruction earlier loads it itself and is the better answer.
+
+Same root cause as Finding 12 -- a name taken from the disassembly text and used where the
+window never established the value. That one is stated as a constraint because the slot it
+names is ordinary attacker-controlled stack; this one is refused because the requirement
+*is* the gadget.
+
 ## Reproduce
 
 ```
