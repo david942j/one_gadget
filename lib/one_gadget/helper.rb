@@ -304,8 +304,16 @@ module OneGadget
     def objdump_arch_supported?(bin, arch)
       return false if bin.nil?
 
-      arch = objdump_arch(arch)
-      `#{::Shellwords.join([bin, '--help'])}`.lines.any? { |c| c.split.include?(arch) }
+      objdump_targets(bin).include?(objdump_arch(arch))
+    end
+
+    # The target names an objdump binary lists as supported. Asked of the binary
+    # once: the answer is a property of that build, while the question is asked
+    # again for every command a search assembles.
+    # @param [String] bin Path to the objdump binary.
+    # @return [Array<String>]
+    def objdump_targets(bin)
+      (@objdump_targets ||= {})[bin] ||= `#{::Shellwords.join([bin, '--help'])}`.split
     end
 
     # Converts to the architecture name shown in objdump's +--help+ command.
