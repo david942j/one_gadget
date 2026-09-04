@@ -59,22 +59,12 @@ module OneGadget
       # @return [Array<OneGadget::Gadget::Gadget>] Gadgets found.
       def find
         str_offset('/bin/sh') # ensure it's glibc-like; raises "not glibc?" if not found
-        gadgets = []
-        # Overlapping candidate paths share tails, so the same suffix (a start line
-        # and everything after it) recurs across candidates; emulate each once.
-        seen = {}
-        candidates.each do |cand|
-          executed_windows(cand.lines) do |suffix|
-            next if seen.key?(key = suffix.join)
-
-            seen[key] = true
-            next if refused_before_call?(suffix)
-
-            gadget = resolve_suffix(suffix)
-            gadgets << gadget unless gadget.nil?
-          end
-        end
-        gadgets
+        # Reading the disassembly first settles the command the answer is a
+        # function of: how a file with no section headers is read is decided
+        # there. Each gadget is handed out as a copy, since a caller may write to
+        # one (see {OneGadget::Gadget::Gadget#base}).
+        disassembly
+        Base.cached(:gadgets, @objdump.command) { search }.map(&:dup)
       end
 
       # Every suffix of +lines+ -- a start line and everything after it, longest
@@ -150,6 +140,28 @@ module OneGadget
       end
 
       private
+
+      # Every gadget in the disassembly: each candidate walked back from a
+      # terminal call, cut into the windows that reach it, emulated one apiece.
+      # @return [Array<OneGadget::Gadget::Gadget>]
+      def search
+        gadgets = []
+        # Overlapping candidate paths share tails, so the same suffix (a start line
+        # and everything after it) recurs across candidates; emulate each once.
+        seen = {}
+        candidates.each do |cand|
+          executed_windows(cand.lines) do |suffix|
+            next if seen.key?(key = suffix.join)
+
+            seen[key] = true
+            next if refused_before_call?(suffix)
+
+            gadget = resolve_suffix(suffix)
+            gadgets << gadget unless gadget.nil?
+          end
+        end
+        gadgets
+      end
 
       # Whether +line+ is a call, whatever it calls. The mnemonic must be the call
       # itself, so a branch to a symbol whose name merely looks like one is not
