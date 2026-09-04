@@ -36,6 +36,9 @@ releases are cut by giving that section a version and a date.
   plus the libcs the specs run against, and 2.26 is neither of those any more; a
   lookup by one of those BuildIDs now answers from the remote database. The
   entries themselves stay in the repository, as every unshipped build does.
+- A search disassembles a quarter as much around each call it found (#457): the
+  window either side of one is 0x1000, was 0x4000. Measured against a full
+  disassembly of every fixture, the gadgets reported are unchanged.
 - Searching the same file twice in one process answers the second time from what
   the first found, as reading its disassembly already did. The specs search 29
   libcs 76 times between them, which is 34s of work rather than 21s.

@@ -28,19 +28,27 @@ module OneGadget
       # How much to disassemble around each terminal call when an architecture can
       # locate the calls cheaply (see {#terminal_call_sites} / {#windowed_disasm}).
       #
-      # Both directions were measured by windowing every architecture against its
-      # own full disassembly across the spec corpus. Gadgets start being lost below
-      # 0x400 either way, and a window too small to hold a predecessor invents them
-      # as well: the line before the first of a window is the last of another, and
-      # nothing about it follows. These leave 16x that, and still disassemble about
-      # a fifth of a libc -- terminal calls cluster into a handful of merged
-      # windows, so a wider one costs little.
+      # Both directions were measured against a full disassembly of every fixture:
+      # the least that reports the same gadgets is 0x368 back and 0x350 forward,
+      # and one word less than either changes the answer. These leave about four
+      # times that. Widening them further is close to free -- terminal calls
+      # cluster into a handful of merged windows -- so the margin is cheap and the
+      # thing it guards against, a libc whose predecessor sits further out than
+      # anything measured, is silent when it happens.
       #
-      # A gadget whose code and branch-predecessors exceed the window is missed.
-      WINDOW_BACK = 0x4000
+      # Both must stay a multiple of four. A window is asked for by address, and
+      # objdump decodes from wherever it is told to start, so an offset landing
+      # mid-instruction turns the whole window into rubble rather than shifting it.
+      #
+      # A window too small to hold a predecessor does not merely lose the gadgets
+      # that needed it: the line before the first of a window is the last of
+      # another, and nothing about it follows, so shortening one can invent gadgets
+      # too. Judge a change to these by set equality against a full disassembly,
+      # never by the count alone.
+      WINDOW_BACK = 0x1000
 
       # As far past the call, for a predecessor that branches back into the region.
-      WINDOW_FWD = 0x4000
+      WINDOW_FWD = 0x1000
 
       private
 
