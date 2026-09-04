@@ -609,10 +609,29 @@ router's libc usually arrives in.
 
 ```bash
 $ one_gadget spec/data/mips-musl-1.2.4.so
-# 0x56fd4 execl("/bin/sh", a1-0x7c70)
+# 0x668e8 posix_spawn(sp+0x20, "/bin/sh", 0, s0, sp+0x28, environ)
 # constraints:
 #   gp is the GOT address of libc
-#   a1-0x7c70 == NULL
+#   {"sh", "-c", s1, NULL} is a valid argv
+#   s0 == NULL || (u16)[s0] == 0x0
+#
+# 0x668ec posix_spawn(sp+0x20, "/bin/sh", 0, s0, sp+0x28, environ)
+# constraints:
+#   gp is the GOT address of libc
+#   {"sh", "-c", [sp+0x30], NULL} is a valid argv
+#   s0 == NULL || (u16)[s0] == 0x0
+#
+# 0x668f0 posix_spawn(sp+0x20, "/bin/sh", 0, a3, sp+0x28, environ)
+# constraints:
+#   gp is the GOT address of libc
+#   {"sh", "-c", [sp+0x30], NULL} is a valid argv
+#   a3 == NULL || (u16)[a3] == 0x0
+#
+# 0x668f4 posix_spawn(sp+0x20, "/bin/sh", 0, a3, sp+0x28, environ)
+# constraints:
+#   gp is the GOT address of libc
+#   v0-0x7c70 == NULL || {v0-0x7c70, "-c", [sp+0x30], NULL} is a valid argv
+#   a3 == NULL || (u16)[a3] == 0x0
 #
 # 0x77b44 posix_spawn(sp+0x20, "/bin/sh", s2, 0, sp+0x2c, environ)
 # constraints:

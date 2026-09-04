@@ -13,14 +13,18 @@ describe 'one_gadget_mips' do
     # both are read here.
     it 'musl 1.2.4, big-endian' do
       path = data_path('mips-musl-1.2.4.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x56fd4, 0x77b44, 0x77b48]
-      expect(OneGadget.gadgets(file: path, force_file: true, level: 1)).to eq [0x56fd4, 0x77b44, 0x77b48]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x668e8, 0x668ec, 0x668f0, 0x668f4,
+                                                                     0x77b44, 0x77b48]
+      expect(OneGadget.gadgets(file: path, force_file: true, level: 1)).to eq [0x56fd4, 0x66898, 0x668e8, 0x668ec,
+                                                                               0x668f0, 0x668f4, 0x77b44, 0x77b48]
     end
 
     it 'musl 1.2.4, little-endian' do
       path = data_path('mipsel-musl-1.2.4.so')
-      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x56f98, 0x77b00, 0x77b04]
-      expect(OneGadget.gadgets(file: path, force_file: true, level: 1)).to eq [0x56f98, 0x77b00, 0x77b04]
+      expect(OneGadget.gadgets(file: path, force_file: true)).to eq [0x668ac, 0x668b0, 0x668b4, 0x668b8,
+                                                                     0x77b00, 0x77b04]
+      expect(OneGadget.gadgets(file: path, force_file: true, level: 1)).to eq [0x56f98, 0x6685c, 0x668ac, 0x668b0,
+                                                                               0x668b4, 0x668b8, 0x77b00, 0x77b04]
     end
 
     it 'libc-2.36' do

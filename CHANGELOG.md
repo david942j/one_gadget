@@ -57,6 +57,16 @@ releases are cut by giving that section a version and a date.
 
 ### Fixed
 
+- A backward walk that ran out of its path budget threw away everything it had
+  walked (#460), where one that runs out of predecessors reports it. Which gadgets
+  a libc yields therefore depended on how far back it happened to be disassembled.
+  67 more across the fixtures, every one of them run under a debugger and seen to
+  spawn a real shell.
+- MIPS: no gadget is reported for a window that calls a function which builds its
+  own GOT base without having put that function's address in `t9` (#460), which
+  o32 asks of a caller. The call arrives; what the callee then computes is wrong,
+  and six such gadgets were verified not to work.
+
 - arm found nothing at all in a libc with no section headers (#441). Three
   things were in the way: objdump has no mapping symbols to switch instruction
   set on, so it read Thumb code as A32 -- each stretch is now disassembled as

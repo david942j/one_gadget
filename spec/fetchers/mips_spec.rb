@@ -36,10 +36,40 @@ describe OneGadget::Fetchers::Mips do
       expect(starts).to eq %w[1030 1000] # 1004 falls to 1008; it never reaches 1030
     end
 
+    # Where each window {OneGadget::Fetchers::Mips#executed_windows} still yields
+    # begins, so an example can say which of them survived.
+    def window_starts(lines)
+      [].tap { |acc| fetcher.executed_windows(lines) { |w| acc << w.first[/\A\w+/] } }
+    end
+
     it 'refuses to open on a call through a register it never set' do
       lines = ['1000: jalr t9 <posix_spawnattr_init>', '1004: move a0,s1', '1008: nop']
-      starts = [].tap { |acc| fetcher.executed_windows(lines) { |w| acc << w.first[/\A\w+/] } }
-      expect(starts).to eq %w[1004]
+      expect(window_starts(lines)).to eq %w[1004]
+    end
+
+    # o32 has a callee derive its own GOT base from the address the caller leaves
+    # in t9, so a window that reaches such a call is only good for as long as it
+    # has put the right address there. -30292(gp) holds posix_spawnattr_init and
+    # -30288(gp) holds posix_spawnattr_setsigmask.
+    it 'allows a call to a function that finds itself, once the window has aimed t9 at it' do
+      lines = ['1000: lw t9,-30292(gp)', '1004: bal 66578 <posix_spawnattr_init>', '1008: nop']
+      expect(window_starts(lines)).to eq %w[1000]
+    end
+
+    it 'refuses it where t9 was aimed at some other function' do
+      lines = ['1000: lw t9,-30288(gp)', '1004: bal 66578 <posix_spawnattr_init>', '1008: nop']
+      expect(window_starts(lines)).to be_empty
+    end
+
+    it 'refuses it where t9 was aimed and then overwritten' do
+      lines = ['1000: lw t9,-30292(gp)', '1004: move t9,s1',
+               '1008: bal 66578 <posix_spawnattr_init>', '100c: nop']
+      expect(window_starts(lines)).to be_empty
+    end
+
+    it 'asks nothing of t9 for a callee that never reads it' do
+      lines = ['1000: bal 665d0 <posix_spawnattr_setflags>', '1004: nop']
+      expect(window_starts(lines)).to eq %w[1000]
     end
 
     it 'runs the delay slot alone when entered at it, without the branch' do
