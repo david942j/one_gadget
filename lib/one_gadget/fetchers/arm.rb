@@ -33,8 +33,8 @@ module OneGadget
       # @return [void]
       def record_instruction_sets(elf)
         entries = elf.dynamic.symbols.filter_map do |symbol|
-          value = symbol.header.st_value.to_i
-          next if value.zero? || (symbol.header.st_info.to_i & 0xf) != ELFTools::Constants::STT_FUNC
+          value = symbol.value
+          next if value.zero? || symbol.type != ELFTools::Constants::STT_FUNC
 
           [symbol_address(value), value.odd?]
         end

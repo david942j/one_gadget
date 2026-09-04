@@ -18,7 +18,7 @@ describe OneGadget::Fetchers::DynamicSymbols do
       with_elf do |elf|
         symbols = fetcher.send(:dynamic_symbols, elf)
         execve = elf.section_by_name('.dynsym').symbol_by_name('execve')
-        expect(symbols[execve.header.st_value.to_i]).to eq 'execve'
+        expect(symbols[execve.value]).to eq 'execve'
         expect(symbols.values).to include('posix_spawn')
       end
     end
@@ -29,7 +29,7 @@ describe OneGadget::Fetchers::DynamicSymbols do
       versioned = data_path('aarch64-libc-2.27.so')
       File.open(versioned) do |fd|
         elf = ELFTools::ELFFile.new(fd)
-        addr = elf.section_by_name('.dynsym').symbol_by_name('sigaction').header.st_value.to_i
+        addr = elf.section_by_name('.dynsym').symbol_by_name('sigaction').value
         expect(OneGadget::Fetchers::AArch64.new(versioned).send(:dynamic_symbols, elf)[addr])
           .to eq '__sigaction'
       end

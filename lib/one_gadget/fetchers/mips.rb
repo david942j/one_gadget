@@ -395,7 +395,7 @@ module OneGadget
 
         # Read out of the symbols now, rather than holding them: they are lazy, and
         # the file they would read from is closed as soon as this returns.
-        symbols = dynamic.symbols.map { |symbol| [symbol.header.st_value.to_i, symbol.name] }
+        symbols = dynamic.symbols.map { |symbol| [symbol.value, symbol.name] }
         names = symbols.to_h { |value, name| [value, name] }
                        .reject { |value, name| value.zero? || name.empty? }
         { local:, gotsym:, symbols:, names:, big: elf.endian == :big,
