@@ -59,7 +59,7 @@ module OneGadget
       # @return [Hash{Integer => String}]
       def dynamic_symbols(elf)
         @dynamic_symbols ||= (elf.dynamic&.symbols || []).each_with_object({}) do |symbol, symbols|
-          value = symbol.header.st_value.to_i
+          value = symbol.value
           name = symbol.name.to_s
           next if value.zero? || name.empty?
 
