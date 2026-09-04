@@ -169,7 +169,7 @@ module OneGadget
         @loaded_code = File.open(file) do |fd|
           elf = ELFTools::ELFFile.new(fd)
           segment = executable_segment(elf)
-          segment && { base: segment.header.p_vaddr.to_i,
+          segment && { base: segment.mem_head,
                        words: segment.data.unpack(elf.endian == :big ? 'N*' : 'V*') }
         end
       end
