@@ -70,27 +70,35 @@ module OneGadget
       def scan_calls(base, data, targets)
         halves = data.unpack('v*') # 16-bit little-endian halfwords
         sites = []
+        # A whole .text is hundreds of thousands of halfwords, and all but a few
+        # open neither encoding, so each is asked what it could be before
+        # anything is read or decoded on its behalf.
         halves.each_with_index do |high, i|
-          low = halves[i + 1] or next
-
-          # Decoding a target is the expensive half, and a whole .text is hundreds
-          # of thousands of halfwords: ask what the encoding could be first.
-          addr = base + i * 2
-          if thumb_bl?(high, low) && targets.key?(thumb_bl_target(addr, high, low) & ~1)
-            sites << addr
-            next
+          if THUMB_BL_LEAD.cover?(high) && (low = halves[i + 1]) && thumb_bl_tail?(low)
+            addr = base + (i * 2)
+            sites << addr if targets.key?(thumb_bl_target(addr, high, low) & ~1)
           end
-          next unless i.even? && a32_bl?(low)
+          next unless i.even?
 
+          low = halves[i + 1] or next
+          next unless a32_bl?(low)
+
+          addr = base + (i * 2)
           sites << addr if targets.key?(a32_bl_target(addr, high | (low << 16)))
         end
         sites.uniq
       end
 
-      # Whether the two halfwords are a Thumb +BL+: the first names the encoding,
-      # and the second's top bits say it is the long form rather than +BLX+.
-      def thumb_bl?(high, low)
-        high.between?(0xf000, 0xf7ff) && low.allbits?(0xd000)
+      # What a Thumb +BL+'s first halfword names the encoding as.
+      THUMB_BL_LEAD = (0xf000..0xf7ff)
+      private_constant :THUMB_BL_LEAD
+
+      # Whether the second halfword of a Thumb +BL+ says it is the long form
+      # rather than +BLX+.
+      # @param [Integer] low
+      # @return [Boolean]
+      def thumb_bl_tail?(low)
+        low.allbits?(0xd000)
       end
 
       # The +cond|101|1+ of an A32 BL, read off the word's top byte -- which is the

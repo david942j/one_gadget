@@ -39,14 +39,17 @@ releases are cut by giving that section a version and a date.
 - A search disassembles a quarter as much around each call it found (#457): the
   window either side of one is 0x1000, was 0x4000. Measured against a full
   disassembly of every fixture, the gadgets reported are unchanged.
+- The scan locating calls in a libc's bytes asks a word what it could be before
+  decoding it (#456), and the MIPS one keeps what a GOT slot answered. About 5%
+  off an arm or MIPS search.
 - Searching the same file twice in one process answers the second time from what
-  the first found, as reading its disassembly already did. The specs search 29
+  the first found (#455), as reading its disassembly already did. The specs search 29
   libcs 76 times between them, which is 34s of work rather than 21s.
 - A search no longer asks objdump which targets it supports once per command it
   builds, nor rebuilds the pattern naming a call mnemonic for every line it
-  reads. Roughly a tenth off a search (aarch64 glibc 2.43: 0.53s to 0.47s).
-- Searching a MIPS libc now reads only the code around its calls, rather than
-  disassembling the whole file: 1.9s to 0.7s for the mipsel glibc fixture and
+  reads (#454). Roughly a tenth off a search (aarch64 glibc 2.43: 0.53s to 0.47s).
+- Searching a MIPS libc now reads only the code around its calls (#453), rather
+  than disassembling the whole file: 1.9s to 0.7s for the mipsel glibc fixture and
   2.3s to 0.7s for the musl ones. The gadgets reported are unchanged.
 - Requires elftools >= 2.1.0 (#442), whose faster symbol-table read takes the
   search of a libc with no section headers from 1.11s to 0.68s -- the read
