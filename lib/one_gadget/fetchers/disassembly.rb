@@ -139,7 +139,7 @@ module OneGadget
           record_instruction_sets(elf)
           @objdump.read_raw(machine: OneGadget::Helper.objdump_arch(OneGadget::Helper.architecture(file)),
                             endian: elf.endian,
-                            vma: seg.header.p_vaddr.to_i - seg.header.p_offset.to_i)
+                            vma: seg.mem_head - seg.file_head)
         end
       end
 
@@ -187,7 +187,7 @@ module OneGadget
           seg = executable_segment(elf)
           return nil if seg.nil?
 
-          scan_calls(seg.header.p_vaddr.to_i, seg.data, targets)
+          scan_calls(seg.mem_head, seg.data, targets)
         end
       rescue ELFTools::ELFError
         nil # not something we can scan; disassemble everything
@@ -197,7 +197,7 @@ module OneGadget
       # what raw disassembly is taken from. It holds a little besides the code, and
       # is used in place of a section because a stripped file has none.
       # @param [ELFTools::ELFFile] elf
-      # @return [ELFTools::Segments::Segment, nil]
+      # @return [ELFTools::Segments::LoadSegment, nil]
       def executable_segment(elf)
         elf.segments_by_type(:load).find(&:executable?)
       end

@@ -70,7 +70,7 @@ module Aletheia
     def spare_writable(target)
       end_of_data = File.open(target) do |f|
         ELFTools::ELFFile.new(f).segments_by_type(:load).select(&:writable?)
-                         .map { |s| s.header.p_vaddr.to_i + s.header.p_memsz.to_i }.max
+                         .map(&:mem_tail).max
       end
       return nil unless end_of_data
 
