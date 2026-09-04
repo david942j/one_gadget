@@ -160,7 +160,14 @@ module OneGadget
       #   call_line?('e6570: call   94180 <execve>')          #=> true
       #   call_line?('a34d0: b      a3210 <execlp+0x1a8>')    #=> false
       def call_line?(line)
-        line[/\A\s*[0-9a-f]+:\s*(\S+)/, 1]&.match?(/\A#{call_str}x?(?:\.[wn])?\z/) || false
+        line[/\A\s*[0-9a-f]+:\s*(\S+)/, 1]&.match?(call_mnemonic) || false
+      end
+
+      # The mnemonics {#call_str} names, as the whole of one. Built once: it comes
+      # out of a constant, and a search asks it of every line of a libc.
+      # @return [Regexp]
+      def call_mnemonic
+        @call_mnemonic ||= /\A#{call_str}x?(?:\.[wn])?\z/
       end
 
       # Whether +line+ transfers control, so the address it names is a place in
