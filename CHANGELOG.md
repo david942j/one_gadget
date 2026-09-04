@@ -36,6 +36,9 @@ releases are cut by giving that section a version and a date.
   plus the libcs the specs run against, and 2.26 is neither of those any more; a
   lookup by one of those BuildIDs now answers from the remote database. The
   entries themselves stay in the repository, as every unshipped build does.
+- Searching the same file twice in one process answers the second time from what
+  the first found, as reading its disassembly already did. The specs search 29
+  libcs 76 times between them, which is 34s of work rather than 21s.
 - A search no longer asks objdump which targets it supports once per command it
   builds, nor rebuilds the pattern naming a call mnemonic for every line it
   reads. Roughly a tenth off a search (aarch64 glibc 2.43: 0.53s to 0.47s).
