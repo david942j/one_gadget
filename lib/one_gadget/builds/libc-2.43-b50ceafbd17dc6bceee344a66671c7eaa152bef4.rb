@@ -16,13 +16,28 @@ require 'one_gadget/gadget'
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 310192,
+                      constraints: ["readable: x22", "x0 != 0x1", "{\"sh\", \"-c\", \"--\", x21, ...} is a valid argv", "sp+0x218 == NULL || (u16)[sp+0x218] == 0x0"],
+                      effect: "posix_spawn(sp+0xc, \"/bin/sh\", 0, sp+0x218, sp+0x50, environ)")
+OneGadget::Gadget.add(build_id, 310192,
                       constraints: ["readable: x22", "x0 == 0x1", "{\"sh\", \"-c\", \"--\", x21, ...} is a valid argv", "sp+0x218 == NULL || (u16)[sp+0x218] == 0x0"],
+                      effect: "posix_spawn(sp+0xc, \"/bin/sh\", 0, sp+0x218, sp+0x50, environ)")
+OneGadget::Gadget.add(build_id, 310196,
+                      constraints: ["readable: x22", "x0 != 0x1", "{\"sh\", \"-c\", \"--\", x21, ...} is a valid argv", "sp+0x218 == NULL || (u16)[sp+0x218] == 0x0"],
                       effect: "posix_spawn(sp+0xc, \"/bin/sh\", 0, sp+0x218, sp+0x50, environ)")
 OneGadget::Gadget.add(build_id, 310196,
                       constraints: ["readable: x22", "x0 == 0x1", "{\"sh\", \"-c\", \"--\", x21, ...} is a valid argv", "sp+0x218 == NULL || (u16)[sp+0x218] == 0x0"],
                       effect: "posix_spawn(sp+0xc, \"/bin/sh\", 0, sp+0x218, sp+0x50, environ)")
 OneGadget::Gadget.add(build_id, 310200,
+                      constraints: ["readable: x22", "x0 != 0x1", "{\"sh\", \"-c\", \"--\", x21, ...} is a valid argv", "sp+0x218 == NULL || (u16)[sp+0x218] == 0x0"],
+                      effect: "posix_spawn(sp+0xc, \"/bin/sh\", 0, sp+0x218, sp+0x50, environ)")
+OneGadget::Gadget.add(build_id, 310200,
                       constraints: ["readable: x22", "x0 == 0x1", "{\"sh\", \"-c\", \"--\", x21, ...} is a valid argv", "sp+0x218 == NULL || (u16)[sp+0x218] == 0x0"],
+                      effect: "posix_spawn(sp+0xc, \"/bin/sh\", 0, sp+0x218, sp+0x50, environ)")
+OneGadget::Gadget.add(build_id, 310208,
+                      constraints: ["readable: x22", "{\"sh\", \"-c\", \"--\", x21, ...} is a valid argv", "sp+0x218 == NULL || (u16)[sp+0x218] == 0x0"],
+                      effect: "posix_spawn(sp+0xc, \"/bin/sh\", 0, sp+0x218, sp+0x50, environ)")
+OneGadget::Gadget.add(build_id, 310212,
+                      constraints: ["readable: x22", "{\"sh\", \"-c\", \"--\", x21, ...} is a valid argv", "sp+0x218 == NULL || (u16)[sp+0x218] == 0x0"],
                       effect: "posix_spawn(sp+0xc, \"/bin/sh\", 0, sp+0x218, sp+0x50, environ)")
 OneGadget::Gadget.add(build_id, 310216,
                       constraints: ["readable: x22", "{\"sh\", \"-c\", \"--\", x21, ...} is a valid argv", "sp+0x218 == NULL || (u16)[sp+0x218] == 0x0"],

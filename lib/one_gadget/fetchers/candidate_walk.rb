@@ -55,7 +55,10 @@ module OneGadget
       # candidate at each leaf - {#find} then tries every start line within it.
       def back_walk(idx, forks, visited, path, &blk)
         addr = addr_at(idx)
-        return if path.size >= PATH_BUDGET
+        # Out of budget is a place to stop walking, not a reason to throw away
+        # what has been walked: the lines already on the path reach the call
+        # whether or not anything before them is ever looked at.
+        return blk.call(path.dup) if path.size >= PATH_BUDGET
 
         visited.add(addr)
         path.unshift(disasm_lines[idx])

@@ -85,7 +85,10 @@ module OneGadget
       # @return [void]
       def executed_windows(lines)
         super do |window|
-          yield(window) unless follows_a_transfer_it_skipped?(window) || enters_at_an_unset_call?(window)
+          next if follows_a_transfer_it_skipped?(window) || enters_at_an_unset_call?(window)
+          next if calls_without_the_callee_in_t9?(window)
+
+          yield(window)
         end
       end
 
@@ -105,6 +108,70 @@ module OneGadget
       #   enters_at_an_unset_call?(['4b3dc: lw t9,-31652(gp)', '4b3e0: jalr t9']) #=> false
       def enters_at_an_unset_call?(window)
         mnemonic(window.first) == 'jalr'
+      end
+
+      # Whether the window calls a function that builds its own GOT base, without
+      # having put that function's address where the ABI says it reads it from.
+      # The call still arrives; what the callee then computes is wrong.
+      # @param [Array<String>] window
+      # @return [Boolean]
+      def calls_without_the_callee_in_t9?(window)
+        held = nil
+        window.each do |line|
+          if (load = line.match(GOT_LOAD))
+            held = got_address(load[1].to_i)
+          elsif (call = line.match(DIRECT_CALL))
+            target = call[1].to_i(16)
+            return true if held != target && derives_got_base?(target)
+          elsif line.match?(TARGET_WRITE)
+            held = nil
+          end
+        end
+        false
+      end
+
+      # A call that states its destination, as opposed to one through a register.
+      DIRECT_CALL = /:\s*(?:bal|jal)\s+([0-9a-f]+)/
+      private_constant :DIRECT_CALL
+
+      # Whether the function at +address+ derives its own GOT base, which o32 asks
+      # a callee to do from the address the caller leaves in +t9+ -- so a caller
+      # that has not put it there is calling a function that cannot find anything.
+      # @param [Integer] address
+      # @return [Boolean]
+      # @example The prologue this recognises, and a leaf that has none.
+      #   derives_got_base?(0x6653c) #=> true  (lui gp / addiu gp / addu gp,gp,t9)
+      #   derives_got_base?(0x66594) #=> false (sltiu v0,a1,256 / ...)
+      def derives_got_base?(address)
+        code = loaded_code or return false
+
+        index = (address - code[:base]) / INSTRUCTION_SIZE
+        return false if index.negative?
+
+        PROLOGUE_WORDS.times.any? { |i| code[:words][index + i] == GOT_BASE_FROM_TARGET }
+      end
+
+      # How far into a function to look for that prologue: it is the first thing a
+      # function does, ahead of anything that could need what it computes.
+      PROLOGUE_WORDS = 4
+      private_constant :PROLOGUE_WORDS
+
+      # +addu gp,gp,t9+, the instruction the prologue ends with.
+      GOT_BASE_FROM_TARGET = 0x0399e021
+      private_constant :GOT_BASE_FROM_TARGET
+
+      # The code the file loads, as words, so that an instruction can be read at an
+      # address without disassembling anything around it.
+      # @return [Hash{Symbol => Integer, Array<Integer>}, nil]
+      def loaded_code
+        return @loaded_code if defined?(@loaded_code)
+
+        @loaded_code = File.open(file) do |fd|
+          elf = ELFTools::ELFFile.new(fd)
+          segment = executable_segment(elf)
+          segment && { base: segment.header.p_vaddr.to_i,
+                       words: segment.data.unpack(elf.endian == :big ? 'N*' : 'V*') }
+        end
       end
 
       # @param [Array<String>] window
