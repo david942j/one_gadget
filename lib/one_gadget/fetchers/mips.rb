@@ -129,12 +129,24 @@ module OneGadget
 
         sites = []
         data.unpack(got[:big] ? 'N*' : 'V*').each_with_index do |word, i|
+          next unless CALL_OPCODES.key?(word >> OPCODE_SHIFT)
+
           address = base + (i * INSTRUCTION_SIZE)
           destination = call_destination(word, address)
           sites << address if destination && targets.key?(destination)
         end
         sites
       end
+
+      # How far the opcode sits from the bottom of a word.
+      OPCODE_SHIFT = 26
+      private_constant :OPCODE_SHIFT
+
+      # The opcodes a call can be spelled in -- the load, the branch-and-link and
+      # the jump-and-link below -- so that a word which is none of them is passed
+      # over without being decoded. Most of a .text is.
+      CALL_OPCODES = { 0x23 => true, 0x01 => true, 0x03 => true }.freeze
+      private_constant :CALL_OPCODES
 
       # Where a call at +address+ goes.
       # @param [Integer] word The instruction word.
@@ -151,7 +163,7 @@ module OneGadget
         case word & OPCODE_AND_TARGET_REGISTERS
         when GOT_CALL_LOAD then got_address(immediate(word))
         when BAL then following + (immediate(word) * INSTRUCTION_SIZE)
-        else ((following & JAL_REGION) | ((word & JAL_TARGET) << 2) if (word >> 26) == JAL_OPCODE)
+        else ((following & JAL_REGION) | ((word & JAL_TARGET) << 2) if (word >> OPCODE_SHIFT) == JAL_OPCODE)
         end
       end
 
@@ -314,13 +326,23 @@ module OneGadget
       private_constant :TARGET_WRITE
 
       # What a +gp+-relative GOT slot holds, as +[address, name]+, or +nil+ for one
-      # this cannot read. This arch states its GOT in the dynamic segment, so the
-      # answer is there even for a file with no sections at all. An entry below
-      # +DT_MIPS_LOCAL_GOTNO+ holds the address outright; the rest correspond one
-      # for one with the dynamic symbols.
+      # this cannot read. Kept, since a libc reaches the same slot from every call
+      # site that goes through it.
       # @param [Integer] gp_offset The offset as the instruction writes it.
       # @return [(Integer, String), nil]
       def got_entry(gp_offset)
+        return @got_entries[gp_offset] if @got_entries&.key?(gp_offset)
+
+        (@got_entries ||= {})[gp_offset] = read_got_entry(gp_offset)
+      end
+
+      # The slot itself, out of the file. This arch states its GOT in the dynamic
+      # segment, so the answer is there even for a file with no sections at all.
+      # An entry below +DT_MIPS_LOCAL_GOTNO+ holds the address outright; the rest
+      # correspond one for one with the dynamic symbols.
+      # @param [Integer] gp_offset The offset as the instruction writes it.
+      # @return [(Integer, String), nil]
+      def read_got_entry(gp_offset)
         got = mips_got or return nil
 
         index = (GP_BIAS + gp_offset) / 4
