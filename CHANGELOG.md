@@ -36,6 +36,9 @@ releases are cut by giving that section a version and a date.
   plus the libcs the specs run against, and 2.26 is neither of those any more; a
   lookup by one of those BuildIDs now answers from the remote database. The
   entries themselves stay in the repository, as every unshipped build does.
+- A search disassembles a quarter as much around each call it found (#457): the
+  window either side of one is 0x1000, was 0x4000. Measured against a full
+  disassembly of every fixture, the gadgets reported are unchanged.
 - The scan locating calls in a libc's bytes asks a word what it could be before
   decoding it (#456), and the MIPS one keeps what a GOT slot answered. About 5%
   off an arm or MIPS search.
