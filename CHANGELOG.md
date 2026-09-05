@@ -7,7 +7,7 @@ Notable changes to one_gadget, newest first. The format follows
 A change worth a user's attention lands with its entry under *Unreleased*;
 releases are cut by giving that section a version and a date.
 
-## Unreleased
+## v2.1.1 - 2026-09-05
 
 ### Changed
 
