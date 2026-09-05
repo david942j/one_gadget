@@ -313,12 +313,9 @@ module OneGadget
         [disasm_lines[index + 1]].compact
       end
 
-      # A branch takes effect only after its delay slot, so the last instruction to
-      # run before control reaches the target is the one *after* the branch. Say
-      # the edge leaves from there, and a path through it reads in the order it
-      # executes without anything having to be reordered. The memo is the one the
-      # base class fills: +super+ sets it to the undelayed map, and this replaces
-      # it with the delayed one.
+      # A branch takes effect only after its delay slot, so the edge is recorded as
+      # leaving the instruction *after* the branch -- a path through it then reads
+      # in the order it executes.
       # @return [Hash{Integer => Array<Integer>}]
       def branch_pred_map
         @branch_pred_map ||= delayed_edges(super)

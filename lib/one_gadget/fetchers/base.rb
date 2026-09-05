@@ -205,11 +205,15 @@ module OneGadget
       def environ?(_str) = false
 
       # Whether +str+ references a libc global, i.e. an address the caller does not
-      # choose. The default reads the +$base+-relative form an arch produces once it
-      # concretizes a pc-relative operand; one that reaches its globals through a
-      # register (i386's GOT) overrides this against that register instead.
+      # choose. An arch reaching its globals through a register (i386's GOT)
+      # overrides this against that register instead.
       # @param [String] str A rendered value.
       # @return [Boolean]
+      # @example The +$base+-relative form an arch produces once it concretizes a
+      #   pc-relative operand.
+      #   global_var?('$base+0x3ed8e0') #=> true
+      #   global_var?('[$base+0x10]')   #=> true
+      #   global_var?('rax')            #=> false
       def global_var?(str)
         base_relative?(str, '$base')
       end
@@ -421,10 +425,8 @@ module OneGadget
       # is found in -- while a missed call costs every gadget around it.
       #
       # How an instruction is spelled in those bytes is the architecture's to say,
-      # not the file's: an ELF states the byte order of its *data*, and an
-      # architecture may encode instructions in the other one -- ARM and AArch64
-      # keep theirs little-endian in a big-endian file, so both read words
-      # little-endian whatever the file says.
+      # not the file's: ARM and AArch64 keep theirs little-endian in a big-endian
+      # file, so both read words little-endian whatever the file says.
       # @param [Integer] _base
       # @param [String] _data
       # @param [Hash{Integer => true}] _targets

@@ -125,26 +125,24 @@ module OneGadget
       private
 
       # Record a descriptor the gadget closes on its way to the terminal call, by
-      # where it is read from.
-      #
-      # Only one the caller chooses is worth recording, since which descriptor
-      # lands there decides whether the spawned shell keeps its I/O. One fixed in
-      # the code is nobody's to change, and no path that reaches a terminal call
-      # closes one, so it isn't modelled.
+      # where it is read from. Which descriptor lands there decides whether the
+      # spawned shell keeps its I/O.
       # @param [Object] fd The descriptor argument, as {#argument} returns it.
       # @return [void]
+      # @example One the caller chooses is recorded; one fixed in the code is
+      #   nobody's to change.
+      #   note_closed_fd(Lambda.parse('[rsp+0x60]')) ; closed_fds #=> ['[rsp+0x60]']
+      #   note_closed_fd(Lambda.parse('0x1'))        ; closed_fds #=> []
       def note_closed_fd(fd)
         @closed_fds << fd.to_s unless fd.is_a?(Integer)
       end
 
       # Record what the callee does through a pointer argument.
-      #
-      # Only a symbolic value carries a precondition the caller can arrange: an
-      # address that arrived as a literal is either one nobody can make readable
-      # or writable, or NULL. The exception is the argument a callee leaves alone
-      # when it is NULL -- passing NULL is exactly how that is asked for, so it is
-      # accepted and needs nothing of the caller.
       # @return [Boolean] false to abort the candidate.
+      # @example Only a symbolic address carries a precondition a caller can
+      #   arrange; a literal one is nobody's to make readable.
+      #   record_pointer(Lambda.parse('rsp+0x40'), :deref) #=> true
+      #   record_pointer(Lambda.parse('0x1'), :deref)      #=> false
       def record_pointer(arg, req)
         return NULLABLE_REQUIREMENTS.include?(req) if arg.is_a?(Integer) && arg.zero?
         return false unless arg.is_a?(OneGadget::Emulators::Lambda)

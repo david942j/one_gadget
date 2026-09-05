@@ -23,8 +23,11 @@ module OneGadget
     module Conditional
       # Taken-semantics of each supported branch condition, keyed by a predicate
       # named after the comparison it encodes (the LLVM +icmp+ names): a leading
-      # +u+ = unsigned, +s+ = signed. Value is +[relation, signedness]+, where
-      # signedness (+nil+/+:u+/+:s+) selects the operand cast.
+      # +u+ = unsigned, +s+ = signed.
+      # @example The value is the relation, and the cast its operands take.
+      #   RELATION[:eq]  #=> ['==', nil]
+      #   RELATION[:ult] #=> ['<', :u]
+      #   RELATION[:sge] #=> ['>=', :s]
       #   :eq  :ne                equality
       #   :ult :ule :ugt :uge     unsigned  <  <=  >  >=
       #   :slt :sle :sgt :sge     signed    <  <=  >  >=
@@ -38,11 +41,12 @@ module OneGadget
       NEGATE = { '==' => '!=', '!=' => '==', '>=' => '<', '<' => '>=', '>' => '<=', '<=' => '>' }.freeze
 
       # The flag-setting compares we model, keyed by the ALU operation the compare
-      # performs -- its flags reflect that result. Each entry says whether magnitude
-      # conditions (anything beyond +eq+/+ne+) are sound afterwards (+ordered+) and
-      # names the method that renders its constraint text. An arch maps its own
-      # mnemonics onto these ops (its +COMPARES+), so adding an arch needs no change
-      # here; adding a genuinely new ALU op means one entry plus its +render_*+ method.
+      # performs. An arch maps its own mnemonics onto these (its +COMPARES+), so
+      # adding one needs no change here.
+      # @example Whether magnitude conditions are sound after it, and what renders
+      #   its constraint text.
+      #   COMPARE_OPS[:sub] #=> { ordered: true, render: :render_sub }
+      #   COMPARE_OPS.keys  #=> [:sub, :add, :and]
       COMPARE_OPS = {
         sub: { ordered: true,  render: :render_sub },  # subtraction: flags from  lhs - rhs
         add: { ordered: true,  render: :render_add },  # addition:    flags from  lhs + rhs
@@ -307,15 +311,14 @@ module OneGadget
         ["#{cast}#{lhs}", op, rhs]
       end
 
-      # Addition (+:add+): the flags reflect +lhs + rhs+ compared against 0 -- but
-      # only for a signed or equality condition. An *unsigned* condition reads the
-      # carry out of the addition instead, which holds over a whole range of +lhs+,
-      # not just the one value making the sum zero: the carry is set exactly when
-      # +lhs + rhs+ wraps, i.e. when +lhs >= -rhs+. So the condition is +lhs+
-      # against +-rhs+, the form the subtractive compares already produce.
-      # @example glibc's "the syscall didn't return -errno" check, +cmn x0, 0x1000+
-      #   followed by a not-taken +b.hi+, is +(u64)x0 <= 0xfffffffffffff000+ --
-      #   satisfied by x0 == 0, which "(x0 + 0x1000) <= 0" would wrongly exclude.
+      # Addition (+:add+): the flags reflect +lhs + rhs+ against 0, except under an
+      # unsigned condition, which reads the carry instead -- set exactly when the
+      # sum wraps, that is when +lhs >= -rhs+.
+      # @example Read as an equality, then unsigned -- the second is glibc's "the
+      #   syscall didn't return -errno" check, which +x0 == 0+ satisfies and
+      #   +(x0 + 0x1000) <= 0+ would wrongly exclude.
+      #   render_add(nil, 'x0', '0x1000', :ne, nil) #=> ['(x0 + 0x1000)', :ne, '0x0']
+      #   render_add(nil, 'x0', '0x1000', :le, :u)  #=> ['x0', :le, '0xfffffffffffff000']
       def render_add(cast, lhs, rhs, op, sign)
         return ["#{cast}(#{lhs} + #{rhs})", op, ZERO] unless sign == :u && negatable?(rhs)
 
