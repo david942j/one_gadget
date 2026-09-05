@@ -9,6 +9,13 @@ releases are cut by giving that section a version and a date.
 
 ## Unreleased
 
+### Changed
+
+- The pre-generated gadgets for the libcs the gem does not ship were rebuilt
+  ([#468]) -- all 883 entries are now current. They dated from 2023 and predate a
+  year of emulator work, so a BuildID lookup could report gadgets that no longer
+  work and miss ones that do: 10,326 recorded gadgets became 43,410.
+
 ### Fixed
 
 - Looking up a BuildID the gem does not ship no longer advises updating the gem
@@ -357,3 +364,4 @@ test corpus reports has been run under a debugger and seen to spawn a shell.
 [#460]: https://github.com/david942j/one_gadget/pull/460
 [#465]: https://github.com/david942j/one_gadget/pull/465
 [#467]: https://github.com/david942j/one_gadget/pull/467
+[#468]: https://github.com/david942j/one_gadget/pull/468
