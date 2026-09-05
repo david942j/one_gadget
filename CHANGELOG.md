@@ -12,9 +12,9 @@ releases are cut by giving that section a version and a date.
 ### Changed
 
 - The pre-generated gadgets for the libcs the gem does not ship were rebuilt
-  ([#468]) -- 805 of the 883 entries. They dated from 2023 and predate a year of
-  emulator work, so a BuildID lookup could report gadgets that no longer work and
-  miss ones that do: 10,326 recorded gadgets became 41,417.
+  ([#468]) -- all 883 entries are now current. They dated from 2023 and predate a
+  year of emulator work, so a BuildID lookup could report gadgets that no longer
+  work and miss ones that do: 10,326 recorded gadgets became 43,410.
 
 ### Fixed
 
