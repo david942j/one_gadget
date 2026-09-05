@@ -311,8 +311,7 @@ constraints:
     allow(OneGadget::Helper).to receive(:url_request).with(/.rb$/).and_return('')
 
     expect { hook_logger { described_class.builds(id) } }.to output(<<-EOS).to_stdout
-[OneGadget] The desired one-gadget can be found in lastest version!
-            Update with: $ gem update one_gadget && gem cleanup one_gadget
+[OneGadget] remote_has_this is not shipped with the gem, fetching it from the repository
     EOS
     OneGadget::Gadget::ClassMethods::BUILDS.delete(id)
   end

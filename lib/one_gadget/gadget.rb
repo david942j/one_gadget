@@ -446,8 +446,7 @@ module OneGadget
         table = OneGadget::Helper.remote_builds.find { |c| c.include?(build_id) }
         return build_not_found if table.nil? # remote doesn't have this one either.
 
-        # builds found in remote! Ask update gem and download remote gadgets.
-        OneGadget::Logger.ask_update(msg: 'The desired one-gadget can be found in lastest version!')
+        OneGadget::Logger.info("#{build_id} is not shipped with the gem, fetching it from the repository\n")
         tmp_file = OneGadget::Helper.download_build(table)
         require tmp_file.path
         tmp_file.unlink

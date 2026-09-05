@@ -7,6 +7,15 @@ Notable changes to one_gadget, newest first. The format follows
 A change worth a user's attention lands with its entry under *Unreleased*;
 releases are cut by giving that section a version and a date.
 
+## Unreleased
+
+### Fixed
+
+- Looking up a BuildID the gem does not ship no longer advises updating the gem
+  ([#467]). The gem carries 34 of 883 builds by design, so that advice reached
+  almost every remote lookup, and updating would not have added them. It now says
+  the build is being fetched.
+
 ## v2.1.0 - 2026-09-05
 
 Two more architectures, and a libc that ships without section headers -- as an
@@ -347,3 +356,4 @@ test corpus reports has been run under a debugger and seen to spawn a shell.
 [#457]: https://github.com/david942j/one_gadget/pull/457
 [#460]: https://github.com/david942j/one_gadget/pull/460
 [#465]: https://github.com/david942j/one_gadget/pull/465
+[#467]: https://github.com/david942j/one_gadget/pull/467
