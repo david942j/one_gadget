@@ -17,10 +17,9 @@ module OneGadget
       # +"/bin/sh"+ names it outright -- except through +posix_spawn+, which takes
       # the path as an argument a window need not have materialised itself.
       #
-      # An architecture that builds such an address in pieces (+adrp+ then +add+)
-      # can state no such rule, which is why this one lives here and not in
-      # {Base}: filtering those on the same test drops all but one of the aarch64
-      # gadgets.
+      # This lives here rather than in {Base} because an architecture building such
+      # an address in pieces (+adrp+ then +add+) can state no such rule: filtering
+      # aarch64 on the same test drops all but one of its gadgets.
       def candidates
         reference = bin_sh_reference.to_s(16)
         super do |candidate|
