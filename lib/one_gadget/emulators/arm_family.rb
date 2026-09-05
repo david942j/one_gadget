@@ -13,10 +13,13 @@ module OneGadget
     # individual classes.
     class ArmFamily < Processor
       # ARM condition-code suffix (the +<cc>+ in +b<cc>+ / +b.<cc>+) mapped to a
-      # shared {Conditional::RELATION} predicate. Decodes the opaque mnemonics once:
-      # +hs+/+cs+ and +lo+/+cc+ are aliases; +mi+/+pl+ (sign bit) act as signed
-      # +</+>=+. +vs+/+vc+ (overflow) have no constraint form and are absent, so a
-      # branch on them maps to +nil+ and aborts the path. (x86 uses {X86::JCC}.)
+      # shared {Conditional::RELATION} predicate. (x86 uses {X86::JCC}.)
+      # @example Aliases decode alike, the sign bit reads as a signed comparison,
+      #   and overflow has no constraint form -- a branch on it aborts the path.
+      #   COND['hs'] #=> :uge
+      #   COND['cs'] #=> :uge
+      #   COND['mi'] #=> :slt
+      #   COND['vs'] #=> nil
       COND = {
         'eq' => :eq, 'ne' => :ne,
         'hs' => :uge, 'cs' => :uge, 'lo' => :ult, 'cc' => :ult,
@@ -69,16 +72,17 @@ module OneGadget
         OneGadget::Helper.hex(m[1] == 'lsl' ? value << Integer(m[2]) : value >> Integer(m[2]))
       end
 
-      # +op2+ with the modifier this family may spell on it folded in: a constant
-      # shift, or (aarch64) a sign-extension of its low half, which is taken
-      # whole. A +nil+ modifier is the bare operand. Yields, rather than
-      # returning, for a modifier this family does not model, so an unmodelled one
-      # aborts instead of being silently dropped.
+      # +op2+ with the modifier this family may spell on it folded in. Yields for a
+      # modifier it does not model, so an unmodelled one aborts the candidate
+      # instead of being silently dropped.
       # @param [String] op2 The operand the modifier applies to.
-      # @param [String, nil] mode The modifier, as written.
-      # @example (aarch64) +add x0, x1, w2, sxtw+ -- +mode+ is +"sxtw"+
-      # @example (arm) +add r0, r1, r2, lsl 3+ -- +mode+ is +"lsl 3"+
+      # @param [String, nil] mode The modifier, as written -- +nil+ for none.
       # @return [String] The operand {Processor#arith} then reads.
+      # @example (aarch64, +x2+ holding +0x1+) A constant shift folds in, a
+      #   sign-extension is taken whole, and a rotate is not modelled.
+      #   modified_operand('x2', 'lsl 3')            #=> '0x8'
+      #   modified_operand('x2', 'sxtw')             #=> 'x2'
+      #   modified_operand('x2', 'ror 3') { :abort } #=> :abort
       def modified_operand(op2, mode)
         return op2 if mode.nil? || mode == 'sxtw'
 

@@ -38,12 +38,12 @@ module OneGadget
       end
 
       # Add or subtract, and store the result.
-      #
-      # A sum of two values neither of which is known folds into no base+offset,
-      # so it is named as the operation it is -- a candidate deriving a pointer
-      # that way still says what the caller has to arrange. That is the only
-      # fallback: an offset from a known base stays a base+offset, which the rest
-      # of the emulator can resolve against tracked memory.
+      # @example An offset from a known base stays one, which the rest of the
+      #   emulator resolves against tracked memory; a sum of two unknowns is named
+      #   as the operation it is, so a pointer derived that way still says what the
+      #   caller has to arrange.
+      #   arith(:+, 'rax', 'rsp', '0x10') ; registers['rax'] #=> rsp+0x10
+      #   arith(:+, 'rax', 'rdi', 'rsi')  ; registers['rax'] #=> (rdi + rsi)
       # @param [Symbol] op +:++ or +:-+.
       # @param [String] dst The destination register.
       # @param [String] src The value added to, or the only operand given.

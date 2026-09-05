@@ -54,14 +54,11 @@ module OneGadget
       COMPARES = { 'cmp' => :sub, 'test' => :and }.freeze
 
       # A segment-prefixed operand reads thread-local storage, which isn't modelled
-      # (nor is its counterpart on the other arches -- aarch64's +mrs tpidr_el0+
-      # and arm's +mrc p15+ are unsupported instructions, so those paths already
-      # abort). Every gadget observed behind one tests +errno == ENOEXEC+ on
-      # glibc's +execvpe+ path -- a value the caller would have to have arranged
-      # beforehand, since the gadget is entered after the +execve+ that would set
-      # it -- so modelling this only produces gadgets that all but never apply.
-      # Worth revisiting if a libc is found reaching a terminal call under a
-      # condition that commonly holds, e.g. +errno != <some error>+.
+      # (the other arches reach it by instructions that are unsupported anyway).
+      # Every gadget observed behind one tests +errno == ENOEXEC+, which the caller
+      # would have had to arrange before entering, so modelling it would produce
+      # gadgets that all but never apply. Worth revisiting for a libc found
+      # reaching a terminal call under a condition that commonly holds.
       # @example +cmp DWORD PTR fs:[r14], 0x8+ -- errno == ENOEXEC
       SEGMENT_OPERAND = /\b(?:fs|gs|ds|es|ss|cs):/
 
@@ -320,14 +317,15 @@ module OneGadget
       def inst_endbr64(*); end
       alias inst_endbr32 inst_endbr64
 
-      # Swap what two registers hold. Two forms are not that, and stay refused: a
-      # memory operand is an exchange with memory (and an atomic one), and a
-      # narrower view names part of a register, which swapping whole values cannot
-      # express. Naming one place twice is nothing at all, whatever it names --
-      # that is the multi-byte nop a compiler pads with.
-      # @example
-      #   xchg ebx,edi  -- a swap
-      #   xchg ax,ax    -- padding
+      # Swap what two registers hold. Naming one place twice is nothing at all,
+      # whatever it names -- the multi-byte nop a compiler pads with.
+      # @raise [OneGadget::Error::UnsupportedInstructionArgumentError]
+      #   For a memory operand, which is an exchange with memory and an atomic one,
+      #   or a narrower view, which names part of a register where swapping whole
+      #   values cannot reach.
+      # @example (amd64) A swap, then the padding.
+      #   inst_xchg('rbx', 'rdi') #=> [rdi, rbx]
+      #   inst_xchg('rax', 'rax') #=> nil
       def inst_xchg(dst, src)
         return if dst == src
         raise Error::UnsupportedInstructionArgumentError, "xchg #{dst},#{src}" unless

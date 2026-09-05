@@ -275,10 +275,14 @@ module OneGadget
         'bct'
       end
 
-      # +b+ is unconditional; +bne+/+beq+/... and Thumb +cbz+/+cbnz+ are
-      # conditional (+bl+/+blx+ are calls, not branches). +bx+/table branches and
-      # returns via +pop {..,pc}+ / +ldm .. {..,pc}+ / +mov pc,..+ / +ldr pc,..+
-      # terminate the path.
+      # Which kind of transfer +line+ is, or +nil+ for one that is neither -- a
+      # call among them.
+      # @example Thumb +cbz+/+cbnz+ count as conditional, while +bx+, a table
+      #   branch and any return through +pc+ end the path.
+      #   branch_kind('4a1c0: b 4a200')      #=> :unconditional
+      #   branch_kind('4a1c0: bne 4a200')    #=> :conditional
+      #   branch_kind('4a1c0: bl 73ba0')     #=> nil
+      #   branch_kind('4a1c0: pop {r4, pc}') #=> :terminator
       def branch_kind(line)
         m = branch_mnemonic(line)
         return :conditional if conditional_mnemonic?(m)

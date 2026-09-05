@@ -47,16 +47,13 @@ module OneGadget
         end
       end
 
-      # Every function the dynamic symbol table names, as +{address => name}+,
-      # keyed as {#symbol_address} reads a value. This is where a file that has
-      # been stripped of its sections still records them, and the tags reach as
-      # many as anything in the file refers to.
-      #
-      # Several symbols may name one address, and only one of them can be
-      # written beside it. They all name the same code, so the choice is settled
-      # by what a reader of the name can do with it ({#name_rank}).
+      # Every function the dynamic symbol table names, as +{address => name}+ --
+      # where a file stripped of its sections still records them.
       # @param [ELFTools::ELFFile] elf
       # @return [Hash{Integer => String}]
+      # @example Several names may share an address; the one the engine can act on
+      #   wins (see {#name_rank}).
+      #   dynamic_symbols(elf)[0x43470] #=> '__sigsuspend'
       def dynamic_symbols(elf)
         @dynamic_symbols ||= (elf.dynamic&.symbols || []).each_with_object({}) do |symbol, symbols|
           value = symbol.value
@@ -88,15 +85,13 @@ module OneGadget
       # named when a symbol is there. The engine recognises a terminal call, reads
       # a branch target, and matches a safe call by name, from exactly that.
       #
-      # Where the address sits depends on what the line does, so the two are
-      # matched apart ({CONTROL_TARGET} against {TRAILING_ADDRESS}): asking for a
-      # destination's shape anywhere else would rewrite an operand that only looks
-      # like one.
       # @param [String] line One disassembled line.
       # @param [Hash{Integer => String}] symbols
       # @return [String]
-      # @example
-      #   symbolize('e6570: call   0x94180', symbols) #=> 'e6570: call   94180 <execve>'
+      # @example A destination is rewritten and named; an operand that merely looks
+      #   like one is left alone ({CONTROL_TARGET} against {TRAILING_ADDRESS}).
+      #   symbolize('e6570: call   0x94180', symbols)     #=> 'e6570: call   94180 <execve>'
+      #   symbolize('e6570: mov    rax,0x94180', symbols) #=> 'e6570: mov    rax,0x94180'
       def symbolize(line, symbols)
         m = line.match(control_transfer?(line) ? CONTROL_TARGET : TRAILING_ADDRESS) or return line
 

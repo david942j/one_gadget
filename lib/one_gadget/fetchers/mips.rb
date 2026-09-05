@@ -110,11 +110,14 @@ module OneGadget
         mnemonic(window.first) == 'jalr'
       end
 
-      # Whether the window calls a function that builds its own GOT base, without
-      # having put that function's address where the ABI says it reads it from.
-      # The call still arrives; what the callee then computes is wrong.
+      # Whether the window reaches a call whose callee derives its own GOT base
+      # from +t9+, without the window having aimed +t9+ at it.
       # @param [Array<String>] window
       # @return [Boolean]
+      # @example The same call, with and without the load that aims at it.
+      #   aimed = ['66860: lw t9,-30292(gp)', '66864: bal 6653c <posix_spawnattr_init>']
+      #   calls_without_the_callee_in_t9?(aimed)      #=> false
+      #   calls_without_the_callee_in_t9?(aimed[1..]) #=> true
       def calls_without_the_callee_in_t9?(window)
         held = nil
         window.each do |line|
@@ -160,9 +163,12 @@ module OneGadget
       GOT_BASE_FROM_TARGET = 0x0399e021
       private_constant :GOT_BASE_FROM_TARGET
 
-      # The code the file loads, as words, so that an instruction can be read at an
-      # address without disassembling anything around it.
+      # The code the file loads, so that an instruction can be read at an address
+      # without disassembling anything around it.
       # @return [Hash{Symbol => Integer, Array<Integer>}, nil]
+      # @example The word posix_spawnattr_init opens with, +lui gp,0x6+.
+      #   code = loaded_code
+      #   code[:words][(0x6653c - code[:base]) / 4] #=> 0x3c1c0006
       def loaded_code
         return @loaded_code if defined?(@loaded_code)
 
@@ -307,12 +313,9 @@ module OneGadget
         [disasm_lines[index + 1]].compact
       end
 
-      # A branch takes effect only after its delay slot, so the last instruction to
-      # run before control reaches the target is the one *after* the branch. Say
-      # the edge leaves from there, and a path through it reads in the order it
-      # executes without anything having to be reordered. The memo is the one the
-      # base class fills: +super+ sets it to the undelayed map, and this replaces
-      # it with the delayed one.
+      # A branch takes effect only after its delay slot, so the edge is recorded as
+      # leaving the instruction *after* the branch -- a path through it then reads
+      # in the order it executes.
       # @return [Hash{Integer => Array<Integer>}]
       def branch_pred_map
         @branch_pred_map ||= delayed_edges(super)
@@ -405,10 +408,12 @@ module OneGadget
 
       # The slot itself, out of the file. This arch states its GOT in the dynamic
       # segment, so the answer is there even for a file with no sections at all.
-      # An entry below +DT_MIPS_LOCAL_GOTNO+ holds the address outright; the rest
-      # correspond one for one with the dynamic symbols.
       # @param [Integer] gp_offset The offset as the instruction writes it.
       # @return [(Integer, String), nil]
+      # @example An entry below +DT_MIPS_LOCAL_GOTNO+ holds an address outright;
+      #   the rest correspond one for one with the dynamic symbols.
+      #   read_got_entry(-32744) #=> [0x39190, '_setjmp']
+      #   read_got_entry(-32752) #=> [0, nil]
       def read_got_entry(gp_offset)
         got = mips_got or return nil
 
