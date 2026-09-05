@@ -321,7 +321,7 @@ constraints:
       expect(described_class.builds_info('58c735bc7b19b0aeb395cce70cf63bd62ac75e4a').join("\n")).to eq <<-EOS.strip
 https://gitlab.com/david942j/libcdb/blob/master/libc/glibc-2.25-1-x86_64.pkg.tar/usr/lib/libc-2.25.so
 
-Advanced Micro Devices X86-64
+Advanced Micro Devices X86-64 processor
 
 GNU C Library (GNU libc) stable release version 2.25, by Roland McGrath et al.
 Copyright (C) 2017 Free Software Foundation, Inc.

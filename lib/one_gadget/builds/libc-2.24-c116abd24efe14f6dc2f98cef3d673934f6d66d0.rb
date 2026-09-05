@@ -21,6 +21,12 @@ build_id = File.basename(__FILE__, '.rb').split('-').last
 OneGadget::Gadget.add(build_id, 438928,
                       constraints: ["ebx is the GOT address of libc", "[esp+0x30] == NULL || {[esp+0x30], [esp+0x34], [esp+0x38], [esp+0x3c], ...} is a valid argv"],
                       effect: "execve(\"/bin/sh\", esp+0x30, environ)")
+OneGadget::Gadget.add(build_id, 438934,
+                      constraints: ["ebx is the GOT address of libc", "[esp+0x30] == NULL || {[esp+0x30], [esp+0x34], [esp+0x38], [esp+0x3c], ...} is a valid argv", "[[eax]] == NULL || [eax] == NULL || [eax] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", esp+0x30, [eax])")
+OneGadget::Gadget.add(build_id, 438937,
+                      constraints: ["ebx is the GOT address of libc", "[esp+0x24] == NULL || {[esp+0x24], [esp+0x28], [esp+0x2c], [esp+0x30], ...} is a valid argv", "[[eax]] == NULL || [eax] == NULL || [eax] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", esp+0x24, [eax])")
 OneGadget::Gadget.add(build_id, 438947,
                       constraints: ["ebx is the GOT address of libc", "[esp+0x24] == NULL || {[esp+0x24], [esp+0x28], [esp+0x2c], [esp+0x30], ...} is a valid argv", "[[eax]] == NULL || [eax] == NULL || [eax] is a valid envp"],
                       effect: "execve(\"/bin/sh\", esp+0x24, [eax])")
@@ -33,10 +39,4 @@ OneGadget::Gadget.add(build_id, 438953,
 OneGadget::Gadget.add(build_id, 438954,
                       constraints: ["ebx is the GOT address of libc", "[[esp]] == NULL || [esp] == NULL || [esp] is a valid argv", "[[esp+0x4]] == NULL || [esp+0x4] == NULL || [esp+0x4] is a valid envp"],
                       effect: "execve(\"/bin/sh\", [esp], [esp+0x4])")
-OneGadget::Gadget.add(build_id, 591648,
-                      constraints: ["ebx is the GOT address of libc", "eax == NULL"],
-                      effect: "execl(\"/bin/sh\", eax)")
-OneGadget::Gadget.add(build_id, 591649,
-                      constraints: ["ebx is the GOT address of libc", "[esp] == NULL"],
-                      effect: "execl(\"/bin/sh\", [esp])")
 

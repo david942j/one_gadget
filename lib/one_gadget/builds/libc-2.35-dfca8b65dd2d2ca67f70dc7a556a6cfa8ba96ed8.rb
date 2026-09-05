@@ -14,9 +14,66 @@ require 'one_gadget/gadget'
 # <https://bugs.launchpad.net/ubuntu/+source/glibc/+bugs>.
 
 build_id = File.basename(__FILE__, '.rb').split('-').last
-OneGadget::Gadget.add(build_id, 907139,
-                      constraints: ["ebx is the GOT address of libc", "writable: ebp-0x20", "[[ebp-0x30]] == NULL || [ebp-0x30] == NULL || [ebp-0x30] is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+OneGadget::Gadget.add(build_id, 906945,
+                      constraints: ["ebx is the GOT address of libc", "[[ebp+0xc]] == 0x0", "writable: ebp-0x34", "[ebp+0x8] == NULL || {\"/bin/sh\", [ebp+0x8], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
                       effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906948,
+                      constraints: ["ebx is the GOT address of libc", "[[ebp+0xc]] == 0x0", "writable: ebp-0x34", "[ebp+0x8] == NULL || {\"/bin/sh\", [ebp+0x8], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906951,
+                      constraints: ["ebx is the GOT address of libc", "[[ebp+0xc]] == 0x0", "writable: ebp-0x34", "eax == NULL || {\"/bin/sh\", eax, NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906954,
+                      constraints: ["ebx is the GOT address of libc", "[[ebp+0xc]] == 0x0", "writable: ebp-0x34", "eax == NULL || {\"/bin/sh\", eax, NULL} is a valid argv", "[esi] == NULL || esi == NULL || esi is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906957,
+                      constraints: ["ebx is the GOT address of libc", "[[ebp+0xc]] == 0x0", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[esi] == NULL || esi == NULL || esi is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906960,
+                      constraints: ["ebx is the GOT address of libc", "[eax] == 0x0", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[esi] == NULL || esi == NULL || esi is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906963,
+                      constraints: ["ebx is the GOT address of libc", "[eax] == 0x0", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906965,
+                      constraints: ["ebx is the GOT address of libc", "edi == 0x0", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906972,
+                      constraints: ["ebx is the GOT address of libc", "edi == 0x0", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906975,
+                      constraints: ["ebx is the GOT address of libc", "edi == 0x0", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 906977,
+                      constraints: ["ebx is the GOT address of libc", "edi == 0x0", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 907005,
+                      constraints: ["ebx is the GOT address of libc", "ecx == 0x1", "esi == 0x0", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 907009,
+                      constraints: ["ebx is the GOT address of libc", "ecx == 0x1", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 907134,
+                      constraints: ["ebx is the GOT address of libc", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 907136,
+                      constraints: ["ebx is the GOT address of libc", "writable: ebp-0x30", "[ebp-0x34] == NULL || {\"/bin/sh\", [ebp-0x34], NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 907139,
+                      constraints: ["ebx is the GOT address of libc", "writable: ebp-0x30", "eax == NULL || {\"/bin/sh\", eax, NULL} is a valid argv", "[[ebp-0x2c]] == NULL || [ebp-0x2c] == NULL || [ebp-0x2c] is a valid envp"],
+                      effect: "execve(\"/bin/sh\", [ebp-0x30], [ebp-0x2c])")
+OneGadget::Gadget.add(build_id, 1502964,
+                      constraints: ["esi is the GOT address of libc", "eax == NULL"],
+                      effect: "execl(\"/bin/sh\", \"sh\", eax)")
+OneGadget::Gadget.add(build_id, 1502966,
+                      constraints: ["esi is the GOT address of libc", "eax == NULL"],
+                      effect: "execl(\"/bin/sh\", \"sh\", eax)")
+OneGadget::Gadget.add(build_id, 1502970,
+                      constraints: ["esi is the GOT address of libc", "eax == NULL"],
+                      effect: "execl(\"/bin/sh\", \"sh\", eax)")
+OneGadget::Gadget.add(build_id, 1502971,
+                      constraints: ["esi is the GOT address of libc", "[esp] == NULL"],
+                      effect: "execl(\"/bin/sh\", \"sh\", [esp])")
 OneGadget::Gadget.add(build_id, 1502977,
                       constraints: ["esi is the GOT address of libc", "eax == NULL"],
                       effect: "execl(\"/bin/sh\", eax)")
