@@ -85,15 +85,13 @@ module OneGadget
       # named when a symbol is there. The engine recognises a terminal call, reads
       # a branch target, and matches a safe call by name, from exactly that.
       #
-      # Where the address sits depends on what the line does, so the two are
-      # matched apart ({CONTROL_TARGET} against {TRAILING_ADDRESS}): asking for a
-      # destination's shape anywhere else would rewrite an operand that only looks
-      # like one.
       # @param [String] line One disassembled line.
       # @param [Hash{Integer => String}] symbols
       # @return [String]
-      # @example
-      #   symbolize('e6570: call   0x94180', symbols) #=> 'e6570: call   94180 <execve>'
+      # @example A destination is rewritten and named; an operand that merely looks
+      #   like one is left alone ({CONTROL_TARGET} against {TRAILING_ADDRESS}).
+      #   symbolize('e6570: call   0x94180', symbols)     #=> 'e6570: call   94180 <execve>'
+      #   symbolize('e6570: mov    rax,0x94180', symbols) #=> 'e6570: mov    rax,0x94180'
       def symbolize(line, symbols)
         m = line.match(control_transfer?(line) ? CONTROL_TARGET : TRAILING_ADDRESS) or return line
 

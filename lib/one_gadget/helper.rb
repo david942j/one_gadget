@@ -190,7 +190,6 @@ module OneGadget
       nil
     end
 
-    # Fetch the ELF architecture of +file+.
     # What this tool calls each architecture it can search. Keyed by the
     # header's own value, which is fixed by the ELF ABI, rather than by the name a
     # reader library prints for it -- that is the library's wording and does
@@ -204,6 +203,7 @@ module OneGadget
       ELFTools::Constants::EM::EM_MIPS => :mips
     }.freeze
 
+    # Fetch the ELF architecture of +file+.
     # @param [String] file The target ELF filename.
     # @return [Symbol]
     #   One of +:amd64+, +:i386+, +:arm+ or +:aarch64+, +:unknown+ for a valid ELF

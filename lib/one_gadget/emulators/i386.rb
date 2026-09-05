@@ -20,12 +20,9 @@ module OneGadget
         super(OneGadget::ABI.i386, 'esp', 'ebp', 'eip')
       end
 
-      # Get function call arguments.
-      #
-      # For i386 this is a little bit tricky.
-      # We need to fetch the stack slots reference to current 'esp'
-      # but not original 'esp'.
-      # So we need to evaluate the offset of current esp first.
+      # The value on the stack slot holding the +idx+-th argument. The slots are
+      # relative to the +esp+ the line sees, not the one the candidate was entered
+      # with, so its offset is evaluated first.
       # @param [Integer] idx The 0-based index of the argument.
       # @return [Lambda, Integer] The value on the stack slot holding the +idx+-th argument.
       def argument(idx)
