@@ -32,8 +32,9 @@ releases are cut by giving that section a version and a date.
   once per binary rather than once per command ([#454]), the scan locating calls
   decodes far fewer words ([#456]), and a quarter as much is disassembled around
   each call ([#457]).
-- Requires elftools >= 2.1.0 ([#442]): searching a libc with no section headers
-  takes 0.68s, was 1.11s.
+- Requires elftools >= 2.2.0 ([#442], [#465]), which reads a symbol table without
+  building an object per symbol. A libc with no section headers searches in 0.24s,
+  was 0.44s; one with its sections intact is unchanged.
 
 ### Fixed
 
@@ -342,3 +343,4 @@ test corpus reports has been run under a debugger and seen to spawn a shell.
 [#456]: https://github.com/david942j/one_gadget/pull/456
 [#457]: https://github.com/david942j/one_gadget/pull/457
 [#460]: https://github.com/david942j/one_gadget/pull/460
+[#465]: https://github.com/david942j/one_gadget/pull/465
