@@ -178,6 +178,10 @@ module OneGadget
       # The mnemonics {#call_str} names, as the whole of one. Built once: it comes
       # out of a constant, and a search asks it of every line of a libc.
       # @return [Regexp]
+      # @example On arm, where a call carries an +x+ and a width suffix.
+      #   call_mnemonic.match?('blx')  #=> true
+      #   call_mnemonic.match?('bl.w') #=> true
+      #   call_mnemonic.match?('b')    #=> false
       def call_mnemonic
         @call_mnemonic ||= /\A#{call_str}x?(?:\.[wn])?\z/
       end
