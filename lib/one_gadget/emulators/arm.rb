@@ -105,18 +105,16 @@ module OneGadget
       end
 
       # Settle Thumb vs A32 from a whole candidate, before any of it is emulated.
-      # {#track_mode} can only learn from lines already seen, so the FIRST
-      # instruction is judged on no evidence at all -- and when that instruction
-      # reads +pc+, the bias it picks decides an address the constraints go on to
-      # name. Applying the same evidence up front removes that dependence on
-      # whatever happened to be processed first.
-      #
-      # A32 is left alone: it shows neither a width suffix nor a 2-byte stride, so
-      # a genuinely A32 candidate keeps the whole-word bias. A single-instruction
-      # Thumb candidate offers no evidence either and is no better served than
-      # before.
+      # {#track_mode} learns only from lines already seen, so the first instruction
+      # would otherwise be judged on no evidence -- and when it reads +pc+, that
+      # decides an address the constraints go on to name.
       # @param [Array<String>] lines The candidate's objdump lines.
       # @return [void]
+      # @example A 2-byte stride settles it as Thumb, where +pc+ reads four ahead
+      #   of the instruction rather than eight.
+      #   note_instruction_set(['4a1c0: ldr r0, [pc, #8]', '4a1c2: add r0, pc'])
+      #   process('4a1c2: mov r0, pc')
+      #   registers['r0'] #=> $base+0x4a1c6
       def note_instruction_set(lines)
         return if @thumb
 

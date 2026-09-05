@@ -67,20 +67,17 @@ module OneGadget
         Base.cached(:gadgets, @objdump.command) { search }.map(&:dup)
       end
 
-      # Every suffix of +lines+ -- a start line and everything after it, longest
-      # last -- cut down to the part that runs: emulation ends at the terminal
-      # call, so anything past one never executes. A suffix reaches beyond a
-      # terminal call when the function holds several and the candidate was walked
-      # back from a later one. Bounding each window here lets everything
-      # downstream -- {#emulate} and its overrides, the dedup key in {#find} --
-      # read a window as executed code.
-      #
-      # Each line is classified once per candidate rather than once per suffix
-      # containing it: walking the start backwards, the first terminal call at or
-      # after it only moves when the start is itself one.
+      # Every suffix of +lines+, longest last, cut at the terminal call it reaches
+      # -- emulation ends there, so anything past one never executes.
       # @param [Array<String>] lines One candidate, as a line list.
       # @yieldparam [Array<String>] window
       # @return [void]
+      # @example A candidate holding two terminal calls; no window runs past the
+      #   one it reaches.
+      #   lines = ['1000: mov r0, r1', '1004: bl <execve>',
+      #            '1008: mov r1, r2', '100c: bl <execl>']
+      #   [].tap { |a| executed_windows(lines) { |w| a << w.map { |l| l[/\A\w+/] } } }
+      #   #=> [['1008', '100c'], ['1004'], ['1000', '1004']]
       def executed_windows(lines)
         stop = lines.size - 1 if terminal_call_line?(lines.last)
         (lines.size - 2).downto(0) do |i|
@@ -368,13 +365,10 @@ module OneGadget
       end
 
       # The two sides of a relation as plain numbers, when they can be compared
-      # without the caller arranging anything: the same expression twice, two
-      # concrete values, or two offsets from one base (+r1+ against +r1+0x4+ can
-      # never be equal). +nil+ leaves the relation a real constraint.
-      #
-      # Offsets are only comparable undereferenced. +[r1]+ and +[r1+0x4]+ address
-      # different slots, but the values in them are unrelated -- nothing says they
-      # differ.
+      # without the caller arranging anything.
+      # @example Offsets from one base compare; the slots they address do not.
+      #   comparable_values('r1', 'r1+0x4')     #=> [0, 4]
+      #   comparable_values('[r1]', '[r1+0x4]') #=> nil
       # @param [String] lhs The relation's left side, cast already stripped.
       # @param [String] rhs The relation's right side.
       # @return [(Numeric, Numeric), nil] Both sides as numbers, or nil when they

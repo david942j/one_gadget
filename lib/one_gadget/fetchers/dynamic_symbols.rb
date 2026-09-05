@@ -47,16 +47,13 @@ module OneGadget
         end
       end
 
-      # Every function the dynamic symbol table names, as +{address => name}+,
-      # keyed as {#symbol_address} reads a value. This is where a file that has
-      # been stripped of its sections still records them, and the tags reach as
-      # many as anything in the file refers to.
-      #
-      # Several symbols may name one address, and only one of them can be
-      # written beside it. They all name the same code, so the choice is settled
-      # by what a reader of the name can do with it ({#name_rank}).
+      # Every function the dynamic symbol table names, as +{address => name}+ --
+      # where a file stripped of its sections still records them.
       # @param [ELFTools::ELFFile] elf
       # @return [Hash{Integer => String}]
+      # @example Several names may share an address; the one the engine can act on
+      #   wins (see {#name_rank}).
+      #   dynamic_symbols(elf)[0x43470] #=> '__sigsuspend'
       def dynamic_symbols(elf)
         @dynamic_symbols ||= (elf.dynamic&.symbols || []).each_with_object({}) do |symbol, symbols|
           value = symbol.value

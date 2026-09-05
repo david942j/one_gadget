@@ -204,17 +204,14 @@ module OneGadget
         nil
       end
 
-      # Forget the caller-saved registers, which the call it just accepted is free
-      # to leave in any state (see {OneGadget::ABI::CALLER_SAVED}). Keeping their
-      # entry values would let a later branch on one -- +call __close+ then
-      # +test eax, eax+ -- read as a condition on a value the caller chooses, when
-      # it is really the callee's return.
-      #
-      # The return register is set to zero rather than forgotten: these calls are
-      # accepted on the basis that they succeed, and success is what they all
-      # report that way, so a branch on the result resolves instead of ending the
-      # path. A path that needs the failing side then contradicts itself and drops.
+      # Forget the caller-saved registers, setting the return register to zero
+      # rather than forgetting it (see {OneGadget::ABI::CALLER_SAVED}).
       # @return [void]
+      # @example A later branch on the result resolves, rather than reading as a
+      #   condition on a value the caller chooses.
+      #   process('e6570: call 94180 <__close>')
+      #   registers['rax'] #=> 0
+      #   registers['rcx'] #=> $clobbered
       def clobber_caller_saved
         caller_saved.each do |reg|
           next unless registers.key?(reg)

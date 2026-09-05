@@ -14,15 +14,11 @@ module OneGadget
     # the specific +posix_spawnattr_setsigmask+/+setsigdefault+ keys precede the
     # generic +posix_spawnattr_+ prefix.
     module SafeCalls
-      # What each requirement asks of the caller, the entries below saying why the
-      # function needs it:
+      # What each requirement asks of the caller:
       # * +:global_var?+ -- nothing; it must already hold, or the candidate is aborted.
       # * +:closed_fd+ -- nothing; the descriptor is recorded (see {Processor#note_closed_fd}).
-      # * +:null+, +:nullable_deref+ -- +<arg> == NULL+, because the callee writes through
-      #   it otherwise, or dereferences it unless it is NULL. Tag the second only after
-      #   confirming the callee both NULL-checks the argument and still reaches the
-      #   terminal call on that path.
-      # * +:deref+ -- +readable: <arg>+, for a pointer NULL cannot make safe.
+      # * +:null+, +:nullable_deref+ -- +<arg> == NULL+.
+      # * +:deref+ -- +readable: <arg>+.
       # * +:writable+ -- +writable: <arg>+.
       # @return [Hash{String => Hash{Integer => Symbol}}]
       #   Function name (or name prefix) => argument index => requirement.
