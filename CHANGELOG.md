@@ -7,7 +7,10 @@ Notable changes to one_gadget, newest first. The format follows
 A change worth a user's attention lands with its entry under *Unreleased*;
 releases are cut by giving that section a version and a date.
 
-## Unreleased
+## v2.1.0 - 2026-09-05
+
+Two more architectures, and a libc that ships without section headers -- as an
+embedded one usually does -- can now be searched at all.
 
 ### Added
 
