@@ -14,6 +14,29 @@ describe OneGadget::Fetchers::Arm do
     lines.map { |l| l[/\A\s*([0-9a-f]+):/, 1].to_i(16) }.sort
   end
 
+  # A GOT base register is established by an `ldr reg, [pc, ..]; add reg, pc` pair
+  # somewhere before the line that uses it, and the search for that pair walks back
+  # through the disassembly -- which holds a window per terminal call, not a whole
+  # file. It must not walk out of the window it started in.
+  describe 'how far back the GOT setup is looked for' do
+    let(:f) { fetcher('2.27') }
+
+    it 'stops where the window the line belongs to begins, not at an earlier one' do
+      allow(f).to receive(:window_starts).and_return({ 5 => true, 10 => true })
+      expect(f.send(:reachable_from, 12, 400)).to be 10
+    end
+
+    it 'goes the whole way back where nothing intervenes' do
+      allow(f).to receive(:window_starts).and_return({ 10 => true })
+      expect(f.send(:reachable_from, 9, 400)).to be 0
+    end
+
+    it 'reads a whole file as the one window it is' do
+      allow(f).to receive(:window_starts).and_return({})
+      expect(f.send(:reachable_from, 500, 400)).to be 100
+    end
+  end
+
   describe 'terminal_call_sites (BL byte scan)' do
     # The scan must miss no real bl-to-exec site (a false positive only adds a
     # harmless empty window, so we require superset, not equality). Gadget-level

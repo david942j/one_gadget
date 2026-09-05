@@ -242,13 +242,33 @@ module OneGadget
 
         lines = disasm_lines
         pattern = reg_patterns(reg)
-        add_at = pos.downto([0, pos - 400].max).find { |i| lines[i].match?(pattern[:add]) }
+        add_at = pos.downto(reachable_from(pos, SETUP_REACH)).find { |i| lines[i].match?(pattern[:add]) }
         return if add_at.nil?
 
-        ldr_at = add_at.downto([0, add_at - 4].max).find { |i| lines[i].match?(pattern[:ldr]) }
+        ldr_at = add_at.downto(reachable_from(add_at, LOAD_REACH)).find { |i| lines[i].match?(pattern[:ldr]) }
         return if ldr_at.nil?
 
         [lines[ldr_at], lines[add_at]]
+      end
+
+      # How far back to look for each half of the pair, in lines.
+      SETUP_REACH = 400
+      LOAD_REACH = 4
+      private_constant :SETUP_REACH, :LOAD_REACH
+
+      # The earliest line back from +pos+ that the line at +pos+ follows on from.
+      # {#disasm_lines} holds a window per terminal call, so a window's first line
+      # is where the code around it starts.
+      # @param [Integer] pos
+      # @param [Integer] reach
+      # @return [Integer]
+      # @example Where line 10 opens a window, line 12 can see back only that far.
+      #   window_starts           #=> { 10 => true }
+      #   reachable_from(12, 400) #=> 10
+      #   reachable_from(9, 400)  #=> 0
+      def reachable_from(pos, reach)
+        floor = [0, pos - reach].max
+        (floor..pos).reverse_each.find { |i| window_starts.key?(i) } || floor
       end
 
       def branch_lead_chars
