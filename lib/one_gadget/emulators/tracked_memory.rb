@@ -51,10 +51,8 @@ module OneGadget
       # differently, so it lands on a different key without any invalidation to
       # arrange. Only a store overwriting what the base itself reads from would
       # break that, which a candidate short enough to be a gadget doesn't do.
-      # @example a register
-      #   get_corresponding_stack('x21')
-      # @example a pointer rounded down before use
-      #   get_corresponding_stack(Lambda.parse('(rsi & 0xfffffffffffffff0)'))
+      # @example (amd64) After +mov QWORD PTR [rsp+0x10], rdi+, keyed by offset.
+      #   get_corresponding_stack('rsp') #=> { 0x10 => rdi }
       # @param [String, Lambda] base A base, as {#resolve_address} yields it --
       #   not an offset expression, whose offset belongs in the key it indexes.
       # @return [Hash{Integer => Lambda}, nil] nil when +base+ names nothing this

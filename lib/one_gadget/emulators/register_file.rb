@@ -75,20 +75,22 @@ module OneGadget
         @narrow_views.key?(name)
       end
 
-      # The part of +value+ that +name+ addresses. Only one such part can be named
-      # exactly: the low half of a register still holding what the gadget was
-      # entered with, which is what the narrower name means. Anything else is
-      # handed back whole, since no expression names half of it -- an
-      # over-approximation, and one that only ever tightens a constraint or drops
-      # the path it renders.
+      # The part of +value+ that +name+ addresses. Handing back the whole of what
+      # cannot be halved over-approximates, which only ever tightens a constraint
+      # or drops the path it renders.
       #
-      # The name's own lambda is kept rather than rebuilt, so that repeated reads
-      # of an untouched register return one object: a register's value is compared
-      # by identity to tell a reassignment from the value that was there before
-      # (see {Processor#reg_based_stack}).
+      # The name's own lambda is kept rather than rebuilt, so repeated reads of an
+      # untouched register return one object -- a value is compared by identity to
+      # tell a reassignment from what was there before (see
+      # {Processor#reg_based_stack}).
       # @param [String] name A narrower name (see {#narrow?}).
       # @param [Object] value The value held by the register it names part of.
       # @return [Object]
+      # @example (amd64) The low half of a register still holding what the gadget
+      #   was entered with is the one part a name addresses exactly; no expression
+      #   names half of anything else.
+      #   narrowed('eax', Lambda.parse('rax'))      #=> eax
+      #   narrowed('eax', Lambda.parse('rsp+0x10')) #=> rsp+0x10
       def narrowed(name, value)
         return value unless entry_value?(value, full(name))
 
