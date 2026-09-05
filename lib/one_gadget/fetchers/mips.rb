@@ -408,10 +408,12 @@ module OneGadget
 
       # The slot itself, out of the file. This arch states its GOT in the dynamic
       # segment, so the answer is there even for a file with no sections at all.
-      # An entry below +DT_MIPS_LOCAL_GOTNO+ holds the address outright; the rest
-      # correspond one for one with the dynamic symbols.
       # @param [Integer] gp_offset The offset as the instruction writes it.
       # @return [(Integer, String), nil]
+      # @example An entry below +DT_MIPS_LOCAL_GOTNO+ holds an address outright;
+      #   the rest correspond one for one with the dynamic symbols.
+      #   read_got_entry(-32744) #=> [0x39190, '_setjmp']
+      #   read_got_entry(-32752) #=> [0, nil]
       def read_got_entry(gp_offset)
         got = mips_got or return nil
 

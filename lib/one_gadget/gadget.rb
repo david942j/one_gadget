@@ -155,12 +155,9 @@ module OneGadget
       private
 
       # Drops what the rest of the list already settles, so a gadget asks for each
-      # thing once and never offers an option it rules out itself. Three of the
-      # rules follow from one reading -- a constraint that accesses an address says
-      # that address is mapped memory (see {#mapped?}), and so readable and not
-      # NULL -- while the fourth reads a value the list pins to a literal. Only a
+      # thing once and never offers an option it rules out itself. Only a
       # constraint holding outright settles anything, since one inside a +||+ is an
-      # option among several, and they run until the list stops changing.
+      # option among several; the rules run until the list stops changing.
       # @param [Array<String>] cons
       # @return [Array<String>]
       # @example An option the same list rules out.
@@ -317,9 +314,9 @@ module OneGadget
 
         return 0.95 if stack_alignment?(expr)
         # Zero is the easy value to arrange and every other one is hard, so a mask
-        # tells them apart rather than making them easier: asking for zero in some
-        # of a value's bits is a little easier than zeroing all of it, while asking
-        # a mask for any other value is as hard as asking for that value anywhere.
+        # tells them apart rather than making them easier: some of a value's bits
+        # zeroed is a little easier than all of them, while a mask asking for any
+        # other value is as hard as asking for it anywhere.
         return 0.92 if MASKED_ZERO.match?(expr)
         # Any other mask asks for a particular value, which the mask does nothing
         # to make easier, so it is the relation it looks like.
