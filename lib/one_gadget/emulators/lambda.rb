@@ -12,7 +12,7 @@ module OneGadget
     # 4. dereferenced {Lambda}
     class Lambda
       attr_accessor :obj # @return [String, Lambda] The object currently related to.
-      attr_accessor :immi # @return [Integer] The immidiate value currently added.
+      attr_accessor :immi # @return [Integer] The immediate value currently added.
       attr_accessor :deref_count # @return [Integer] The times of dereference.
       attr_accessor :op # @return [String, nil] The operator applied to {#obj}, for an operation (see {.operation}).
       attr_accessor :rhs # @return [Integer, Lambda, String, nil] The operator's right operand.
@@ -44,7 +44,7 @@ module OneGadget
       end
 
       # Implement subtract with +Numeric+.
-      # @param [Numeric] other Value to substract.
+      # @param [Numeric] other Value to subtract.
       # @return [Lambda] The result.
       def -(other)
         self + -other
@@ -58,7 +58,7 @@ module OneGadget
 
       # Decrease dereference count by 1.
       # @return [self]
-      # @raise [Error::InstrutionArgumentError] When this object cannot be referenced anymore.
+      # @raise [Error::InstructionArgumentError] When this object cannot be referenced anymore.
       def ref!
         raise Error::InstructionArgumentError, 'Cannot reference anymore!' if @deref_count <= 0
 
