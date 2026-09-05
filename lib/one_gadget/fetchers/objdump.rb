@@ -39,7 +39,7 @@ module OneGadget
         @options = options
       end
 
-      # @param [Integer] start The start address to be dumpped from.
+      # @param [Integer] start The start address to be dumped from.
       # @param [Integer] stop The end address.
       # @param [Array<String>] extra Options for this range alone, on top of {#extra_options=}.
       # @return [String] The CLI command to be executed.

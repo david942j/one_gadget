@@ -456,7 +456,7 @@ module OneGadget
       # Returns the comments in builds/libc-*-<build_id>*.rb
       # @param [String] build_id
       #   Supports give only few starting bytes, but a warning will be shown
-      #   if multiple BulidIDs are matched.
+      #   if multiple BuildIDs are matched.
       # @return [String?]
       #   Lines of comments.
       # @example
