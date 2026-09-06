@@ -33,7 +33,7 @@ Gem::Specification.new do |s|
   s.metadata = {
     'bug_tracker_uri' => 'https://github.com/david942j/one_gadget/issues',
     'changelog_uri' => 'https://github.com/david942j/one_gadget/blob/master/CHANGELOG.md',
-    'documentation_uri' => 'https://www.rubydoc.info/gems/one_gadget/',
+    'documentation_uri' => "https://www.rubydoc.info/gems/one_gadget/#{OneGadget::VERSION}",
     'homepage_uri' => 'https://github.com/david942j/one_gadget',
     'source_code_uri' => 'https://github.com/david942j/one_gadget',
     'rubygems_mfa_required' => 'true'
